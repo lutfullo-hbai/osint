@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OSINT Recon Console</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="scanlines" aria-hidden="true"></div>
+
+  <header class="header">
+    <h1 class="logo">&gt;_ OSINT<span>RECON</span></h1>
+    <p class="subtitle">local investigation toolkit // sherlock · maigret · holehe · truecaller</p>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="name" role="tab" aria-selected="true">Name</button>
+    <button class="tab" data-tab="username" role="tab" aria-selected="false">Username</button>
+    <button class="tab" data-tab="email" role="tab" aria-selected="false">Email</button>
+    <button class="tab" data-tab="phone" role="tab" aria-selected="false">Phone</button>
+    <button class="tab" data-tab="domain" role="tab" aria-selected="false">Domain/IP</button>
+    <button class="tab" data-tab="catalog" role="tab" aria-selected="false">Catalog</button>
+  </nav>
+
+  <main>
+    <section class="panel active" id="panel-name" role="tabpanel">
+      <form class="search-form" data-endpoint="/api/name" autocomplete="off">
+        <input
+          type="text"
+          name="query"
+          placeholder="Enter full name, e.g. John Doe"
+          spellcheck="false"
+          required
+        />
+        <button type="submit">Search</button>
+      </form>
+      <div class="spinner hidden"><div class="loader"></div><span>Searching public profiles...</span></div>
+      <div class="error-box hidden"></div>
+      <div class="summary"></div>
+      <div class="results"></div>
+    </section>
+
+    <section class="panel" id="panel-username" role="tabpanel">
+      <form class="search-form" data-endpoint="/api/username" autocomplete="off">
+        <input
+          type="text"
+          name="query"
+          placeholder="Enter username, e.g. johndoe"
+          spellcheck="false"
+          required
+        />
+        <button type="submit">Search</button>
+      </form>
+      <div class="spinner hidden"><div class="loader"></div><span>Scanning hundreds of platforms...</span></div>
+      <div class="error-box hidden"></div>
+      <div class="summary"></div>
+      <div class="results"></div>
+    </section>
+
+    <section class="panel" id="panel-email" role="tabpanel">
+      <form class="search-form" data-endpoint="/api/email" autocomplete="off">
+        <input
+          type="email"
+          name="query"
+          placeholder="Enter email, e.g. target@example.com"
+          spellcheck="false"
+          required
+        />
+        <button type="submit">Search</button>
+      </form>
+      <div class="spinner hidden"><div class="loader"></div><span>Checking site registrations...</span></div>
+      <div class="error-box hidden"></div>
+      <div class="summary"></div>
+      <div class="results"></div>
+    </section>
+
+    <section class="panel" id="panel-phone" role="tabpanel">
+      <form class="search-form" data-endpoint="/api/phone" autocomplete="off">
+        <input
+          type="tel"
+          name="query"
+          placeholder="Enter phone number, e.g. +14155552671"
+          spellcheck="false"
+          required
+        />
+        <button type="submit">Search</button>
+      </form>
+      <div class="spinner hidden"><div class="loader"></div><span>Querying public phone directory...</span></div>
+      <div class="error-box hidden"></div>
+      <div class="summary"></div>
+      <div class="results"></div>
+    </section>
+
+    <section class="panel" id="panel-domain" role="tabpanel">
+      <form class="search-form" data-endpoint="/api/domain" autocomplete="off">
+        <input
+          type="text"
+          name="query"
+          placeholder="Enter domain, e.g. example.com"
+          spellcheck="false"
+          required
+        />
+        <button type="submit">Search</button>
+      </form>
+      <div class="spinner hidden"><div class="loader"></div><span>Resolving infrastructure...</span></div>
+      <div class="error-box hidden"></div>
+      <div class="summary"></div>
+      <div class="results"></div>
+    </section>
+
+    <section class="panel" id="panel-catalog" role="tabpanel">
+      <input type="text" id="catalog-filter" placeholder="Filter tools and resources..." spellcheck="false" autocomplete="off" />
+      <div id="catalog-list" class="results"><div class="empty-state">Loading catalog...</div></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>Use only for authorized investigations.</span>
+    <span id="api-status" class="api-status"></span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

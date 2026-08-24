@@ -1,0 +1,30 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: osint-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - HIBP_API_KEY=${HIBP_API_KEY:-}
+    networks:
+      - osint-net
+    restart: unless-stopped
+
+  frontend:
+    image: nginx:alpine
+    container_name: osint-frontend
+    ports:
+      - "8080:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+    networks:
+      - osint-net
+    restart: unless-stopped
+
+networks:
+  osint-net:
+    driver: bridge
