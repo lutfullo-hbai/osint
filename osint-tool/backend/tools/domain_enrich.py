@@ -10,6 +10,7 @@ from tools.net_guard import UnsafeURLError, ensure_safe_url, safe_get
 
 TLS_TIMEOUT_SECONDS = 10
 CERT_EXPIRY_WARNING_DAYS = 14
+MAX_CDX_PREVIEW = 6
 
 TECH_SIGNATURES = {
     "Cloudflare": ["cloudflare", "__cf_bm", "cf-ray"],
@@ -124,9 +125,11 @@ async def tls_lookup(domain: str) -> dict:
     try:
         cert = writer.get_extra_info("peercert") or {}
         tls_object = writer.get_extra_info("ssl_object")
+        sans = [value for kind, value in cert.get("subjectAltName", ()) if kind == "DNS"]
         return {
             **entry,
             "info": summarize_cert(cert, tls_object.version() if tls_object else None),
+            "_sans": sans,
         }
     finally:
         writer.close()
@@ -181,6 +184,37 @@ async def wayback_lookup(client: httpx.AsyncClient, domain: str) -> dict:
         "url": snapshot_url,
         "status": "found",
         "info": info,
+    }
+
+
+async def wayback_cdx(client: httpx.AsyncClient, domain: str) -> dict:
+    """List of archived URLs (incl. pages later deleted from the live site)."""
+    response = await client.get(
+        "http://web.archive.org/cdx/search/cdx",
+        params={
+            "url": f"{domain}/*",
+            "output": "json",
+            "fl": "timestamp,original,statuscode",
+            "collapse": "urlkey",
+            "limit": "600",
+        },
+    )
+    if response.status_code != 200:
+        raise ToolError(f"Wayback CDX returned HTTP {response.status_code}.")
+    rows = response.json()
+    if len(rows) <= 1:
+        raise ToolError("No archived URLs for this domain.")
+    data_rows = rows[1:]
+    # Pages that archived with 200 but are now gone are the interesting ones.
+    sample = [r[1] for r in data_rows[:MAX_CDX_PREVIEW]]
+    return {
+        "platform": "Archived URLs (Wayback)",
+        "url": f"https://web.archive.org/web/*/{domain}/*",
+        "status": "found",
+        "info": (
+            f"{len(data_rows)} unique archived URL(s). Sample: "
+            + ", ".join(sample)
+        ),
     }
 
 
