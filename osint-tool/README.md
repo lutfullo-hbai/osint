@@ -110,9 +110,10 @@ mavjud bo'lmasa, jarayon ichidagi xotira keshiga fallback qiladi.
 - **Footprint** (self-OSINT): o'z email yoki username'ingiz bo'yicha barcha
   ochiq izni (ro'yxatlar, breachlar, Gravatar, profillar) bitta hisobotga jamlaydi,
   **ekspozitsiya bahosi** (low/medium/high) va moslashtirilgan **OPSEC tavsiyalari** beradi.
-- **Company**: GLEIF (ochiq LEI registri) orqali yuridik shaxs — rasmiy nom,
-  manzil, yurisdiksiya, mahalliy reg-ID, LEI holati va ota-kompaniya zanjiri
-  (direct/ultimate parent → pivot). Nom yoki LEI bo'yicha. Bepul, kalitsiz.
+- **Company**: GLEIF (ochiq LEI registri) — rasmiy nom, manzil, yurisdiksiya,
+  mahalliy reg-ID, LEI holati va ota-kompaniya zanjiri; **SEC EDGAR** (filing'lar);
+  **GDELT** media (rate-limit bo'lishi mumkin); **OpenCorporates** (kalit bilan).
+  Nom yoki LEI bo'yicha.
 - **Name**: veb-qidiruv (ism tartibi + lotin/kirill transliteratsiya), ORCID,
   OpenAlex, GitHub va **Wikidata/Wikipedia** shaxs kartasi (tug'ilgan sana, kasb,
   mamlakat, ulangan ijtimoiy handle'lar → pivot). OpenSanctions sanksiya/PEP
