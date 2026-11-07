@@ -23,16 +23,36 @@ const OLLAMA_URL_KEY = "osint_ollama_url";
 const OLLAMA_MODEL_KEY = "osint_ollama_model";
 const OLLAMA_VISION_KEY = "osint_ollama_vision_model";
 
+// Server-provided defaults (from backend .env); localStorage still overrides.
+const AI_DEFAULTS = {
+  url: "http://127.0.0.1:11434",
+  model: "qwen2.5:7b",
+  vision: "qwen2.5vl:7b",
+};
+
+async function loadAiDefaults() {
+  try {
+    const response = await fetch(`${API_BASE}/api/config`, { headers: authHeaders() });
+    if (!response.ok) return;
+    const cfg = (await response.json()).ollama || {};
+    if (cfg.url) AI_DEFAULTS.url = cfg.url;
+    if (cfg.model) AI_DEFAULTS.model = cfg.model;
+    if (cfg.vision_model) AI_DEFAULTS.vision = cfg.vision_model;
+  } catch (err) {
+    /* keep built-in defaults */
+  }
+}
+
 function ollamaConfig() {
-  let url = "http://127.0.0.1:11434";
-  let model = "qwen2.5:7b";
+  let url = AI_DEFAULTS.url;
+  let model = AI_DEFAULTS.model;
   try {
     url = localStorage.getItem(OLLAMA_URL_KEY) || url;
     model = localStorage.getItem(OLLAMA_MODEL_KEY) || model;
   } catch (err) {
     /* ignore */
   }
-  let vision = "qwen2.5vl:7b";
+  let vision = AI_DEFAULTS.vision;
   try {
     vision = localStorage.getItem(OLLAMA_VISION_KEY) || vision;
   } catch (err) {
@@ -841,3 +861,4 @@ document.getElementById("catalog-filter").addEventListener("input", (event) => {
 
 checkApiStatus();
 setInterval(checkApiStatus, 30000);
+loadAiDefaults();

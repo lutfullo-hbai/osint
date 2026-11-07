@@ -14,6 +14,7 @@ from slowapi.errors import RateLimitExceeded
 from routers import (
     catalog,
     company,
+    config,
     domain,
     email,
     exposure,
@@ -131,6 +132,7 @@ app.include_router(exposure.router)
 app.include_router(domain.router)
 app.include_router(image.router)
 app.include_router(catalog.router)
+app.include_router(config.router)
 app.include_router(jobs.router)
 
 
@@ -150,6 +152,7 @@ async def root():
             "/api/domain",
             "/api/image",
             "/api/catalog",
+            "/api/config",
             "/api/jobs",
         ],
         "docs": "/docs",
