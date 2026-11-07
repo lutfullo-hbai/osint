@@ -107,6 +107,9 @@ bilan keshlanadi. Takroriy so'rovda natija `"cached": true` bilan qaytadi. Redis
 mavjud bo'lmasa, jarayon ichidagi xotira keshiga fallback qiladi.
 
 ### Qo'shimcha modullar
+- **Company**: GLEIF (ochiq LEI registri) orqali yuridik shaxs — rasmiy nom,
+  manzil, yurisdiksiya, mahalliy reg-ID, LEI holati va ota-kompaniya zanjiri
+  (direct/ultimate parent → pivot). Nom yoki LEI bo'yicha. Bepul, kalitsiz.
 - **Name**: veb-qidiruv (ism tartibi + lotin/kirill transliteratsiya), ORCID,
   OpenAlex, GitHub va **Wikidata/Wikipedia** shaxs kartasi (tug'ilgan sana, kasb,
   mamlakat, ulangan ijtimoiy handle'lar → pivot). OpenSanctions sanksiya/PEP

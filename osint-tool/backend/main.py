@@ -11,7 +11,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from routers import catalog, domain, email, image, jobs, name, phone, username
+from routers import (
+    catalog,
+    company,
+    domain,
+    email,
+    image,
+    jobs,
+    name,
+    phone,
+    username,
+)
 from security import limiter
 
 app = FastAPI(
@@ -113,6 +123,7 @@ app.include_router(username.router)
 app.include_router(email.router)
 app.include_router(phone.router)
 app.include_router(name.router)
+app.include_router(company.router)
 app.include_router(domain.router)
 app.include_router(image.router)
 app.include_router(catalog.router)
@@ -126,6 +137,7 @@ async def root():
         "version": "1.0.0",
         "endpoints": [
             "/api/name",
+            "/api/company",
             "/api/username",
             "/api/email",
             "/api/phone",

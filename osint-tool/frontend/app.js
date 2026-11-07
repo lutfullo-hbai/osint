@@ -208,7 +208,8 @@ function buildActionButton(label, onClick) {
 }
 
 function pivotTo(pivot) {
-  const tab = pivot.type === "username" ? "username" : "domain";
+  const tabByType = { username: "username", company: "company", domain: "domain", ip: "domain" };
+  const tab = tabByType[pivot.type] || "domain";
   activateTab(tab);
   const panel = getPanel(tab);
   panel.input.value = pivot.value;

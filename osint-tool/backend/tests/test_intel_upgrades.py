@@ -564,3 +564,50 @@ async def test_reverse_ip_filters_ptr_arpa_noise(monkeypatch):
         Client("real.com\n0.d.5.ip6.arpa\nother.org"), "8.8.8.8"
     )
     assert domains == ["other.org", "real.com"]
+
+
+from tools import company_intel as ci
+
+
+def test_company_lei_validation_and_detection():
+    assert ci.LEI_RE.fullmatch("7ZW8QJWVPR4P1J1KQY45")
+    assert not ci.LEI_RE.fullmatch("not-a-lei")
+    import pytest as _pytest
+    with _pytest.raises(ci.CompanyValidationError):
+        ci.normalize_company("x")
+    assert ci.normalize_company("  Acme   Corp ") == "Acme Corp"
+
+
+def test_format_record_extracts_name_address_and_reg_id():
+    record = {
+        "attributes": {
+            "lei": "7ZW8QJWVPR4P1J1KQY45",
+            "entity": {
+                "legalName": {"name": "GOOGLE LLC"},
+                "legalAddress": {"city": "Mountain View", "region": "US-CA", "country": "US"},
+                "jurisdiction": "US-DE",
+                "status": "ACTIVE",
+                "registeredAs": "4356162",
+            },
+            "registration": {"status": "ISSUED", "lastUpdateDate": "2026-01-02T00:00:00Z"},
+        }
+    }
+    entry = ci.format_record(record)
+    assert entry["title"] == "GOOGLE LLC"
+    assert "LEI: 7ZW8QJWVPR4P1J1KQY45" in entry["info"]
+    assert "Mountain View" in entry["info"]
+    assert "Local reg. id: 4356162" in entry["info"]
+    assert "7ZW8QJWVPR4P1J1KQY45" in entry["url"]
+
+
+async def test_investigate_company_builds_response_with_pivots(monkeypatch):
+    async def fake(query):
+        return {"results": [{"platform": "Company (GLEIF)", "title": "X", "status": "found"}],
+                "pivots": [{"type": "company", "value": "Parent Inc"}]}
+
+    monkeypatch.setattr(svc, "run_company_search", fake)
+    result = await svc._investigate_company("X Corp")
+    assert result["category"] == "company"
+    assert result["count"] == 1
+    assert result["pivots"] == [{"type": "company", "value": "Parent Inc"}]
+    assert result["notice"]

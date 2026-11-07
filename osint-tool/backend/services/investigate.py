@@ -35,6 +35,11 @@ from tools.ip_intel import (
 )
 from tools.net_guard import UnsafeURLError, is_public_ip
 from tools.maigret_runner import run_maigret
+from tools.company_intel import (
+    CompanyValidationError,
+    normalize_company,
+    run_company_search,
+)
 from tools.entity_intel import run_person_entity, run_sanctions_check
 from tools.name_search import run_name_search, run_username_web
 from tools.phone_intel import PhoneParseError, analyze, manual_check_links
@@ -688,8 +693,43 @@ async def investigate_image(raw_url: str) -> dict:
     return await _cached(f"osint:image:{digest}", _investigate_image, url)
 
 
+async def _investigate_company(query: str) -> dict:
+    outcome = await run_company_search(query)
+    results = outcome["results"]
+    response = {
+        "status": "success",
+        "category": "company",
+        "query": query,
+        "results": results,
+        "count": len(results),
+        "notice": (
+            "Legal-entity data from the public LEI register. A name can match "
+            "several entities worldwide; confirm jurisdiction and local reg. id."
+        ),
+    }
+    if outcome["pivots"]:
+        response["pivots"] = _dedupe_pivots(outcome["pivots"])
+    if not results:
+        response["message"] = (
+            "No legal entity with this name (or LEI) is in the GLEIF register. "
+            "Not every company has an LEI."
+        )
+    return response
+
+
+async def investigate_company(raw_query: str) -> dict:
+    try:
+        query = normalize_company(raw_query)
+    except CompanyValidationError as exc:
+        raise InvestigationValidationError(str(exc)) from exc
+    return await _cached(
+        f"osint:company:{query.casefold()}", _investigate_company, query
+    )
+
+
 HANDLERS = {
     "name": investigate_name,
+    "company": investigate_company,
     "username": investigate_username,
     "email": investigate_email,
     "phone": investigate_phone,
