@@ -275,10 +275,16 @@ function renderResults(panel, data) {
   if (Array.isArray(data.warnings) && data.warnings.length) {
     const warnings = document.createElement("div");
     warnings.className = "warnings";
+    const head = document.createElement("div");
+    head.className = "warnings-head";
+    head.textContent = `${data.warnings.length} note${
+      data.warnings.length === 1 ? "" : "s"
+    } (skipped or unavailable sources)`;
+    warnings.appendChild(head);
     data.warnings.forEach((warning) => {
       const item = document.createElement("div");
       item.className = "warning-item";
-      item.textContent = `[!] ${warning}`;
+      item.textContent = warning;
       warnings.appendChild(item);
     });
     panel.results.appendChild(warnings);

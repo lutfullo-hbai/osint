@@ -238,16 +238,31 @@ main {
   gap: 6px;
 }
 
+.warnings-head {
+  color: var(--muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
 .warning-item {
-  color: var(--warning);
-  background: rgba(255, 179, 71, 0.08);
-  border: 1px solid rgba(255, 179, 71, 0.3);
-  border-left: 3px solid var(--warning);
+  color: var(--muted);
+  background: rgba(139, 148, 158, 0.06);
+  border: 1px solid var(--border);
+  border-left: 3px solid rgba(139, 148, 158, 0.5);
   border-radius: 6px;
-  padding: 8px 12px;
-  font-size: 0.82rem;
+  padding: 7px 12px;
+  font-size: 0.8rem;
   line-height: 1.45;
   word-break: break-word;
+}
+
+.warning-item::before {
+  content: "\2139";
+  color: var(--muted);
+  margin-right: 7px;
+  opacity: 0.8;
 }
 
 .results {
