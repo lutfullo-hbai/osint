@@ -16,6 +16,7 @@ from routers import (
     company,
     domain,
     email,
+    exposure,
     footprint,
     image,
     jobs,
@@ -126,6 +127,7 @@ app.include_router(phone.router)
 app.include_router(name.router)
 app.include_router(company.router)
 app.include_router(footprint.router)
+app.include_router(exposure.router)
 app.include_router(domain.router)
 app.include_router(image.router)
 app.include_router(catalog.router)
@@ -141,6 +143,7 @@ async def root():
             "/api/name",
             "/api/company",
             "/api/footprint",
+            "/api/exposure",
             "/api/username",
             "/api/email",
             "/api/phone",

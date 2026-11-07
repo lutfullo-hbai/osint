@@ -9,6 +9,7 @@ import httpx
 from cache import DEFAULT_TTL_SECONDS, get_cached_json, set_cached_json
 from tools.base import ToolError
 from tools.domain_enrich import (
+    audit_security_headers,
     http_fingerprint,
     tls_lookup,
     urlscan_lookup,
@@ -26,6 +27,7 @@ from tools.domain_intel import (
 )
 from tools.email_domain import (
     disposable_check,
+    gather_dns_records,
     domain_mail_intel,
     email_domain_intel,
     gravatar_lookup,
@@ -39,7 +41,7 @@ from tools.ip_intel import (
     reverse_dns_lookup,
     reverse_ip_lookup,
 )
-from tools.net_guard import UnsafeURLError, is_public_ip
+from tools.net_guard import UnsafeURLError, is_public_ip, safe_get
 from tools.web_recon import disclosure_files, favicon_hash
 from tools.maigret_runner import run_maigret
 from tools.company_intel import (
@@ -930,10 +932,172 @@ async def investigate_footprint(raw_query: str) -> dict:
     )
 
 
+def _mail_findings(records: dict) -> tuple[list[dict], int, list[str]]:
+    findings = []
+    risk = 0
+    recs = []
+    txt = records.get("txt") or []
+    spf = any(r.lower().startswith("v=spf1") for r in txt)
+    dmarc_records = records.get("dmarc") or []
+    dmarc = next(
+        (r for r in dmarc_records if r.lower().startswith("v=dmarc1")), ""
+    )
+    dkim = records.get("dkim") or []
+
+    if not spf:
+        risk += 2
+        findings.append({"platform": "SPF", "status": "error",
+                         "info": "No SPF record - the domain can be spoofed in email."})
+        recs.append("Publish an SPF record listing your mail servers.")
+    else:
+        findings.append({"platform": "SPF", "status": "found", "info": "SPF record present."})
+
+    if not dmarc:
+        risk += 2
+        findings.append({"platform": "DMARC", "status": "error",
+                         "info": "No DMARC policy - spoofed mail is not rejected."})
+        recs.append("Add a DMARC record and move toward p=reject.")
+    elif "p=none" in dmarc.lower():
+        risk += 1
+        findings.append({"platform": "DMARC", "status": "error",
+                         "info": "DMARC is monitor-only (p=none) - spoofing not blocked."})
+        recs.append("Tighten DMARC from p=none to p=quarantine or p=reject.")
+    else:
+        findings.append({"platform": "DMARC", "status": "found",
+                         "info": f"DMARC enforced: {dmarc[:80]}"})
+
+    if not dkim:
+        risk += 1
+        findings.append({"platform": "DKIM", "status": "error",
+                         "info": "No DKIM selector found among common names."})
+        recs.append("Enable DKIM signing for outbound mail.")
+    else:
+        findings.append({"platform": "DKIM", "status": "found",
+                         "info": f"DKIM selectors: {', '.join(dkim)}"})
+    return findings, risk, recs
+
+
+async def _header_findings(client, domain: str) -> tuple[list[dict], int, list[str]]:
+    try:
+        response = await safe_get(client, f"https://{domain}")
+    except (UnsafeURLError, Exception):
+        return [], 0, []
+    headers = {k.lower(): v for k, v in response.headers.items()}
+    present, missing = audit_security_headers(headers)
+    risk = min(len(missing), 4)
+    status = "found" if not missing else "error"
+    info = f"{len(present)}/{len(present) + len(missing)} security headers present."
+    if missing:
+        info += " Missing: " + ", ".join(missing)
+    recs = ["Add the missing HTTP security headers (HSTS, CSP, etc.)."] if missing else []
+    return [{"platform": "Security headers", "status": status, "info": info}], risk, recs
+
+
+def _risk_level(score: int) -> str:
+    return "high" if score >= 6 else "medium" if score >= 3 else "low"
+
+
+async def _investigate_exposure(domain: str) -> dict:
+    findings: list[dict] = []
+    recommendations: list[str] = []
+    warnings: list[str] = []
+    risk = 0
+
+    async with httpx.AsyncClient(
+        headers={"User-Agent": "osint-tool/1.0"},
+        follow_redirects=True,
+        timeout=DEFAULT_TIMEOUT,
+    ) as client:
+        records = await asyncio.to_thread(gather_dns_records, domain)
+        mail_findings, mail_risk, mail_recs = _mail_findings(records)
+        findings.extend(mail_findings)
+        risk += mail_risk
+        recommendations.extend(mail_recs)
+
+        header_findings, header_risk, header_recs = await _header_findings(client, domain)
+        findings.extend(header_findings)
+        risk += header_risk
+        recommendations.extend(header_recs)
+
+        outcomes, failures = await _collect({
+            "RDAP": rdap_lookup(client, domain),
+            "TLS": tls_lookup(domain),
+            "Subdomains": subdomain_lookup(client, domain),
+            "Disclosure": disclosure_files(client, domain),
+        })
+        warnings.extend(failures)
+
+        if "TLS" in outcomes:
+            entry = outcomes["TLS"]
+            entry.pop("_sans", None)
+            info = entry.get("info", "")
+            if "day(s) left" in info and "RENEWAL DUE" in info:
+                risk += 2
+                recommendations.append("Renew the TLS certificate - it expires soon.")
+            if "verification FAILED" in info:
+                risk += 2
+                recommendations.append("Fix the TLS certificate - it fails verification.")
+            findings.append(entry)
+
+        if "RDAP" in outcomes:
+            rdap_info = outcomes["RDAP"].get("info", "")
+            if "NEW DOMAIN" in rdap_info:
+                risk += 1
+                recommendations.append("Domain is newly registered - verify legitimacy.")
+            findings.append(outcomes["RDAP"])
+
+        if "Subdomains" in outcomes:
+            sub_entry, subdomains, _sw = outcomes["Subdomains"]
+            findings.append(sub_entry)
+            if len(subdomains) > 50:
+                recommendations.append(
+                    f"{len(subdomains)} subdomains exposed - review the attack surface."
+                )
+
+        if "Disclosure" in outcomes:
+            disc_results, _dw = outcomes["Disclosure"]
+            findings.extend(disc_results)
+
+    level = _risk_level(risk)
+    summary = {
+        "platform": "Exposure score",
+        "status": "error" if level == "high" else "found",
+        "info": f"Email & web exposure risk: {level.upper()} ({min(risk, 10)}/10).",
+    }
+    recommendations = list(dict.fromkeys(recommendations)) or [
+        "No major issues found. Keep monitoring and rotate secrets regularly."
+    ]
+    rec_cards = [
+        {"platform": "Recommendation", "status": "found", "info": rec}
+        for rec in recommendations
+    ]
+    results = [summary] + findings + rec_cards
+    response = {
+        "status": "success",
+        "category": "exposure",
+        "query": domain,
+        "results": results,
+        "count": len(results),
+        "notice": (
+            "Legal-entity exposure check: run it on domains you own or are "
+            "authorized to assess. All data is passive/public."
+        ),
+    }
+    if warnings:
+        response["warnings"] = warnings
+    return response
+
+
+async def investigate_exposure(raw_query: str) -> dict:
+    domain = normalize_domain_query(raw_query)
+    return await _cached(f"osint:exposure:{domain}", _investigate_exposure, domain)
+
+
 HANDLERS = {
     "name": investigate_name,
     "company": investigate_company,
     "footprint": investigate_footprint,
+    "exposure": investigate_exposure,
     "username": investigate_username,
     "email": investigate_email,
     "phone": investigate_phone,

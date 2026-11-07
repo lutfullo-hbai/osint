@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import re
 import time
 
 import httpx
@@ -34,6 +35,15 @@ def _txt_records(resolver, name: str) -> list[str]:
     return records
 
 
+def _is_valid_dkim(record: str) -> bool:
+    """A real DKIM selector has a non-empty public key. Reject null/wildcard keys."""
+    match = re.search(r"p=([A-Za-z0-9+/=]*)", record)
+    if not match:
+        return False
+    # Empty p= is a revoked/placeholder key (e.g. wildcard "v=DKIM1; p=").
+    return len(match.group(1)) >= 20
+
+
 def gather_dns_records(domain: str) -> dict:
     import dns.resolver
 
@@ -51,7 +61,7 @@ def gather_dns_records(domain: str) -> dict:
     dkim_selectors = []
     for selector in DKIM_SELECTORS:
         for record in _txt_records(resolver, f"{selector}._domainkey.{domain}"):
-            if "DKIM1" in record or "p=" in record:
+            if _is_valid_dkim(record):
                 dkim_selectors.append(selector)
                 break
 
