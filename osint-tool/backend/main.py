@@ -16,6 +16,7 @@ from routers import (
     company,
     domain,
     email,
+    footprint,
     image,
     jobs,
     name,
@@ -124,6 +125,7 @@ app.include_router(email.router)
 app.include_router(phone.router)
 app.include_router(name.router)
 app.include_router(company.router)
+app.include_router(footprint.router)
 app.include_router(domain.router)
 app.include_router(image.router)
 app.include_router(catalog.router)
@@ -138,6 +140,7 @@ async def root():
         "endpoints": [
             "/api/name",
             "/api/company",
+            "/api/footprint",
             "/api/username",
             "/api/email",
             "/api/phone",

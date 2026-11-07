@@ -24,7 +24,12 @@ from tools.domain_intel import (
     rdap_lookup,
     subdomain_lookup,
 )
-from tools.email_domain import domain_mail_intel, email_domain_intel, gravatar_lookup
+from tools.email_domain import (
+    disposable_check,
+    domain_mail_intel,
+    email_domain_intel,
+    gravatar_lookup,
+)
 from tools.email_intel import lookup_emailrep, lookup_hibp
 from tools.holehe_runner import run_holehe
 from tools.image_intel import analyze_image, fetch_image_bytes
@@ -753,9 +758,180 @@ async def investigate_company(raw_query: str) -> dict:
     )
 
 
+def _gravatar_is_personal(results: list[dict]) -> bool:
+    for entry in results:
+        info = entry.get("info", "")
+        if any(k in info for k in ("Name:", "Location:", "Linked accounts")):
+            return True
+    return False
+
+
+def _exposure(platform_hits: int, breached, gravatar_personal: bool,
+              reused_identifier: bool) -> tuple[str, int, list[str]]:
+    score = 0
+    reasons = []
+    if platform_hits >= 8:
+        score += 3; reasons.append(f"accounts on {platform_hits} services")
+    elif platform_hits >= 4:
+        score += 2; reasons.append(f"accounts on {platform_hits} services")
+    elif platform_hits >= 1:
+        score += 1; reasons.append(f"accounts on {platform_hits} service(s)")
+    if breached is True:
+        score += 3; reasons.append("appears in known breaches")
+    if gravatar_personal:
+        score += 2; reasons.append("public Gravatar exposes personal details")
+    if reused_identifier:
+        score += 1; reasons.append("email name reused as a username")
+    level = "high" if score >= 6 else "medium" if score >= 3 else "low"
+    return level, min(score, 10), reasons
+
+
+def _opsec_tips(breached, platform_hits: int, gravatar_personal: bool,
+                reused_identifier: bool, disposable: bool) -> list[str]:
+    tips = []
+    if breached is True:
+        tips.append(
+            "You appear in data breaches: change those passwords and turn on "
+            "2FA. Never reuse a breached password elsewhere."
+        )
+    if platform_hits >= 4:
+        tips.append(
+            "You have accounts on many services. Close the ones you no longer "
+            "use - each old account widens your attack surface."
+        )
+    if gravatar_personal:
+        tips.append(
+            "Your public Gravatar reveals your name, location and linked "
+            "socials. Edit or remove it at gravatar.com if that is unintended."
+        )
+    if reused_identifier:
+        tips.append(
+            "The name before @ in your email is reused as a username. Use "
+            "distinct handles so accounts cannot be linked by name."
+        )
+    if disposable:
+        tips.append(
+            "This is a disposable email domain - fine for throwaway signups, "
+            "not for anything you need to keep."
+        )
+    tips.append(
+        "General hygiene: a password manager with unique passwords, 2FA "
+        "everywhere, and separate email aliases for signups."
+    )
+    return tips
+
+
+async def _investigate_footprint(query: str, mode: str, email: str, username: str) -> dict:
+    warnings: list[str] = []
+    results: list[dict] = []
+    pivots: list[dict] = []
+    breached = None  # None = unknown (no key), True/False otherwise
+    platform_hits = 0
+    gravatar_personal = False
+    disposable = False
+
+    if mode == "email":
+        lookups = {
+            "Registrations": run_holehe(email),
+            "Breaches": lookup_hibp(email),
+            "Reputation": lookup_emailrep(email),
+            "Gravatar": gravatar_lookup(email),
+            "Disposable": disposable_check(email.rsplit("@", 1)[-1]),
+            "Profiles": run_profile_sources(username),
+        }
+    else:
+        lookups = {"Profiles": run_profile_sources(username)}
+
+    outcomes, failures = await _collect(lookups)
+    warnings.extend(failures)
+
+    if "Registrations" in outcomes:
+        registrations = outcomes["Registrations"]["results"]
+        platform_hits += len(registrations)
+        results.extend(registrations)
+    if "Breaches" in outcomes:
+        entry, warning = outcomes["Breaches"]
+        if warning:
+            warnings.append(warning)
+        if entry:
+            results.append(entry)
+            breached = "No known breaches" not in entry.get("info", "")
+    if "Reputation" in outcomes:
+        results.append(outcomes["Reputation"])
+    if "Gravatar" in outcomes:
+        gravatar_results = outcomes["Gravatar"]["results"]
+        results.extend(gravatar_results)
+        pivots.extend(outcomes["Gravatar"]["pivots"])
+        gravatar_personal = _gravatar_is_personal(gravatar_results)
+    if outcomes.get("Disposable"):
+        results.append(outcomes["Disposable"])
+        disposable = True
+    reused_identifier = False
+    if "Profiles" in outcomes:
+        profile_results = outcomes["Profiles"]["results"]
+        platform_hits += len(profile_results)
+        results.extend(profile_results)
+        pivots.extend(outcomes["Profiles"]["pivots"])
+        reused_identifier = mode == "email" and bool(profile_results)
+
+    level, score, reasons = _exposure(
+        platform_hits, breached, gravatar_personal, reused_identifier
+    )
+    summary = {
+        "platform": "Exposure assessment",
+        "status": "found",
+        "info": (
+            f"Exposure: {level.upper()} ({score}/10). "
+            + ("; ".join(reasons) if reasons else "little public exposure found")
+            + "."
+        ),
+    }
+    opsec = [
+        {"platform": "OPSEC recommendation", "status": "found", "info": tip}
+        for tip in _opsec_tips(
+            breached, platform_hits, gravatar_personal, reused_identifier, disposable
+        )
+    ]
+    ordered = [summary] + results + opsec
+
+    response = {
+        "status": "success",
+        "category": "footprint",
+        "query": query,
+        "results": ordered,
+        "count": len(ordered),
+        "notice": (
+            "Self-check: run this on your OWN email or username. It aggregates "
+            "only public traces to show your exposure."
+        ),
+    }
+    if pivots:
+        response["pivots"] = _dedupe_pivots(pivots)
+    if warnings:
+        response["warnings"] = warnings
+    return response
+
+
+async def investigate_footprint(raw_query: str) -> dict:
+    candidate = raw_query.strip()
+    if EMAIL_RE.fullmatch(candidate.lower()):
+        email = normalize_email(candidate)
+        username = email.split("@", 1)[0]
+        return await _cached(
+            f"osint:footprint:email:{email}",
+            _investigate_footprint, email, "email", email, username,
+        )
+    username = normalize_username(candidate)
+    return await _cached(
+        f"osint:footprint:user:{username.casefold()}",
+        _investigate_footprint, username, "username", "", username,
+    )
+
+
 HANDLERS = {
     "name": investigate_name,
     "company": investigate_company,
+    "footprint": investigate_footprint,
     "username": investigate_username,
     "email": investigate_email,
     "phone": investigate_phone,

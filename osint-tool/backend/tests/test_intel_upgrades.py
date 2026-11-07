@@ -666,3 +666,33 @@ def test_murmur3_matches_known_vectors():
 def test_parse_robots_extracts_disallowed_paths():
     text = "User-agent: *\nDisallow: /admin\nDisallow: /private/\nDisallow: /\nAllow: /x"
     assert wr.parse_robots(text) == ["/admin", "/private/"]
+
+
+def test_exposure_scoring_levels():
+    level, score, reasons = svc._exposure(10, True, True, True)
+    assert level == "high" and score >= 6
+    assert svc._exposure(0, False, False, False)[0] == "low"
+    assert svc._exposure(4, None, False, False)[0] in ("low", "medium")
+
+
+def test_opsec_tips_react_to_signals():
+    tips = svc._opsec_tips(True, 6, True, True, False)
+    joined = " ".join(tips)
+    assert "breaches" in joined and "2FA" in joined
+    assert "Gravatar" in joined
+    assert any("General hygiene" in t for t in tips)
+
+
+async def test_footprint_username_mode_builds_report(monkeypatch):
+    async def profiles(_u):
+        return {"results": [{"platform": "GitHub", "url": "https://github.com/x", "status": "found"},
+                            {"platform": "Reddit", "url": "https://reddit.com/u/x", "status": "found"}],
+                "warnings": [], "pivots": [{"type": "domain", "value": "x.dev"}]}
+
+    monkeypatch.setattr(svc, "run_profile_sources", profiles)
+    result = await svc._investigate_footprint("bob", "username", "", "bob")
+
+    assert result["category"] == "footprint"
+    assert result["results"][0]["platform"] == "Exposure assessment"
+    assert any(r["platform"] == "OPSEC recommendation" for r in result["results"])
+    assert result["pivots"] == [{"type": "domain", "value": "x.dev"}]

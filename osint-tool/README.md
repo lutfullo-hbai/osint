@@ -107,6 +107,9 @@ bilan keshlanadi. Takroriy so'rovda natija `"cached": true` bilan qaytadi. Redis
 mavjud bo'lmasa, jarayon ichidagi xotira keshiga fallback qiladi.
 
 ### Qo'shimcha modullar
+- **Footprint** (self-OSINT): o'z email yoki username'ingiz bo'yicha barcha
+  ochiq izni (ro'yxatlar, breachlar, Gravatar, profillar) bitta hisobotga jamlaydi,
+  **ekspozitsiya bahosi** (low/medium/high) va moslashtirilgan **OPSEC tavsiyalari** beradi.
 - **Company**: GLEIF (ochiq LEI registri) orqali yuridik shaxs — rasmiy nom,
   manzil, yurisdiksiya, mahalliy reg-ID, LEI holati va ota-kompaniya zanjiri
   (direct/ultimate parent → pivot). Nom yoki LEI bo'yicha. Bepul, kalitsiz.
