@@ -1,49 +1,28 @@
-import re
-
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from security import limiter, light_limit, verify_api_key
+from services.investigate import InvestigationValidationError, investigate_name
 from tools.base import ToolError
-from tools.name_search import run_name_search
 
-router = APIRouter(tags=["name"])
-
-ALLOWED_NAME_PUNCTUATION = set(" '-.")
+router = APIRouter(tags=["name"], dependencies=[Depends(verify_api_key)])
 
 
 class NameRequest(BaseModel):
     query: str
 
 
-def _validate(raw_name: str) -> str | None:
-    if not (3 <= len(raw_name) <= 80):
-        return "Name must be between 3 and 80 characters."
-    letter_count = sum(1 for char in raw_name if char.isalpha())
-    if letter_count < 2:
-        return "Name must contain at least two letters."
-    if not all(
-        char.isalpha() or char in ALLOWED_NAME_PUNCTUATION for char in raw_name
-    ):
-        return (
-            "Name may only contain letters, spaces, apostrophes, "
-            "hyphens and dots."
-        )
-    return None
-
-
 @router.post("/api/name")
-async def search_name(request: NameRequest):
-    name = re.sub(r"\s+", " ", request.query.strip())
-    validation_error = _validate(name)
-    if validation_error:
+@limiter.limit(light_limit)
+async def search_name(request: Request, response: Response, payload: NameRequest):
+    try:
+        return await investigate_name(payload.query)
+    except InvestigationValidationError as exc:
         return JSONResponse(
             status_code=400,
-            content={"status": "error", "message": validation_error},
+            content={"status": "error", "message": str(exc)},
         )
-
-    try:
-        outcome = await run_name_search(name)
     except ToolError as exc:
         return JSONResponse(
             status_code=502,
@@ -57,17 +36,3 @@ async def search_name(request: NameRequest):
                 "message": f"Unexpected failure during name search: {exc}",
             },
         )
-
-    results = outcome["results"]
-    response = {
-        "status": "success",
-        "query": name,
-        "results": results,
-        "count": len(results),
-    }
-    if not results:
-        response["message"] = (
-            "No publicly indexed profiles found for this exact name. "
-            "Try quoting a nickname instead of the full name."
-        )
-    return response

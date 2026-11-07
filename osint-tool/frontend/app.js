@@ -1,4 +1,22 @@
 const API_BASE = "http://localhost:8000";
+const API_KEY_STORAGE = "osint_api_key";
+
+function getApiKey() {
+  try {
+    return localStorage.getItem(API_KEY_STORAGE) || "";
+  } catch (err) {
+    return "";
+  }
+}
+
+function authHeaders(extra = {}) {
+  const headers = { ...extra };
+  const key = getApiKey();
+  if (key) {
+    headers["X-API-Key"] = key;
+  }
+  return headers;
+}
 
 const panels = {};
 
@@ -77,6 +95,13 @@ function buildCard(item) {
   head.appendChild(badge);
   card.appendChild(head);
 
+  if (item.kind === "post") {
+    const tag = document.createElement("span");
+    tag.className = "tag";
+    tag.textContent = "post";
+    head.appendChild(tag);
+  }
+
   const url = item.url || item.profile_url || "";
   if (url && /^https?:\/\//i.test(url)) {
     const link = document.createElement("a");
@@ -97,6 +122,17 @@ function buildCard(item) {
           .join("")
     );
   }
+  if (item.title) {
+    metaParts.push(escapeHtml(item.title));
+  }
+  if (item.confidence) {
+    metaParts.push(
+      `account exists: <span class="tag">${escapeHtml(item.confidence)} confidence</span>`
+    );
+  }
+  if (item.match) {
+    metaParts.push(`name match: <span class="tag">${escapeHtml(item.match)}</span>`);
+  }
   if (item.info) {
     metaParts.push(escapeHtml(item.info));
   }
@@ -113,13 +149,167 @@ function buildCard(item) {
   return card;
 }
 
+function reportMarkdown(data) {
+  const lines = [
+    `# OSINT report: ${data.query}`,
+    "",
+    `Generated: ${new Date().toISOString()}`,
+    "",
+    "## Results",
+    "",
+  ];
+  const exportItems = [...(data.posts || []), ...data.results];
+  exportItems.forEach((item) => {
+    const title = item.platform || item.name || item.site || "Unknown";
+    const url = item.url || item.profile_url;
+    lines.push(`### ${title} (${item.status || "found"})`);
+    if (url) lines.push(`- URL: ${url}`);
+    if (item.title) lines.push(`- Title: ${item.title}`);
+    if (item.confidence) lines.push(`- Account exists: ${item.confidence} confidence`);
+    if (item.match) lines.push(`- Name match: ${item.match}`);
+    if (item.info) lines.push(`- ${item.info}`);
+    lines.push("");
+  });
+  if (Array.isArray(data.warnings) && data.warnings.length) {
+    lines.push("## Warnings", "");
+    data.warnings.forEach((warning) => lines.push(`- ${warning}`));
+    lines.push("");
+  }
+  if (Array.isArray(data.links) && data.links.length) {
+    lines.push("## Check manually (not verified)", "");
+    data.links.forEach((link) => lines.push(`- ${link.label}: ${link.url}`));
+    lines.push("");
+  }
+  if (data.notice) lines.push(`> ${data.notice}`);
+  return lines.join("\n");
+}
+
+function downloadReport(data, extension) {
+  const isJson = extension === "json";
+  const blob = new Blob(
+    [isJson ? JSON.stringify(data, null, 2) : reportMarkdown(data)],
+    { type: isJson ? "application/json" : "text/markdown" }
+  );
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  const safeName = String(data.query).replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 60);
+  link.download = `osint-${safeName}.${extension}`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+function buildActionButton(label, onClick) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "chip";
+  button.textContent = label;
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function pivotTo(pivot) {
+  const tabByType = { username: "username", company: "company", domain: "domain", ip: "domain" };
+  const tab = tabByType[pivot.type] || "domain";
+  activateTab(tab);
+  const panel = getPanel(tab);
+  panel.input.value = pivot.value;
+  panel.form.requestSubmit();
+}
+
+function buildToolbar(data) {
+  const toolbar = document.createElement("div");
+  toolbar.className = "toolbar";
+  if (data.results.length) {
+    const exports = document.createElement("div");
+    exports.className = "chip-row";
+    exports.appendChild(buildActionButton("Export MD", () => downloadReport(data, "md")));
+    exports.appendChild(buildActionButton("Export JSON", () => downloadReport(data, "json")));
+    toolbar.appendChild(exports);
+  }
+  if (Array.isArray(data.pivots) && data.pivots.length) {
+    const pivots = document.createElement("div");
+    pivots.className = "chip-row";
+    const label = document.createElement("span");
+    label.textContent = "pivot:";
+    pivots.appendChild(label);
+    data.pivots.forEach((pivot) => {
+      pivots.appendChild(buildActionButton(pivot.value, () => pivotTo(pivot)));
+    });
+    toolbar.appendChild(pivots);
+  }
+  if (Array.isArray(data.links) && data.links.length) {
+    const links = document.createElement("div");
+    links.className = "chip-row";
+    const label = document.createElement("span");
+    label.textContent = "open externally (unverified):";
+    links.appendChild(label);
+    data.links.forEach((item) => {
+      const link = document.createElement("a");
+      link.className = "chip";
+      link.href = item.url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = item.label;
+      links.appendChild(link);
+    });
+    toolbar.appendChild(links);
+  }
+  if (data.notice) {
+    const notice = document.createElement("div");
+    notice.className = "notice";
+    notice.textContent = data.notice;
+    toolbar.appendChild(notice);
+  }
+  return toolbar;
+}
+
 function renderResults(panel, data) {
   const queryText = data.query != null ? `"${data.query}"` : "your query";
+  const cachedLabel = data.cached
+    ? ' <span class="tag">cached</span>'
+    : "";
   panel.summary.innerHTML = `<strong>${data.count}</strong> result${
     data.count === 1 ? "" : "s"
-  } for ${escapeHtml(queryText)}`;
+  } for ${escapeHtml(queryText)}${cachedLabel}`;
+  panel.results.appendChild(buildToolbar(data));
 
-  if (!data.results.length) {
+  if (Array.isArray(data.warnings) && data.warnings.length) {
+    const warnings = document.createElement("div");
+    warnings.className = "warnings";
+    const head = document.createElement("div");
+    head.className = "warnings-head";
+    head.textContent = `${data.warnings.length} note${
+      data.warnings.length === 1 ? "" : "s"
+    } (skipped or unavailable sources)`;
+    warnings.appendChild(head);
+    data.warnings.forEach((warning) => {
+      const item = document.createElement("div");
+      item.className = "warning-item";
+      item.textContent = warning;
+      warnings.appendChild(item);
+    });
+    panel.results.appendChild(warnings);
+  }
+
+  if (Array.isArray(data.posts) && data.posts.length) {
+    const header = document.createElement("div");
+    header.className = "section-head";
+    header.textContent = `Public posts (${data.posts.length})`;
+    panel.results.appendChild(header);
+    data.posts.forEach((post, index) => {
+      const card = buildCard(post);
+      card.style.animationDelay = `${Math.min(index * 40, 400)}ms`;
+      panel.results.appendChild(card);
+    });
+    if (data.results.length) {
+      const divider = document.createElement("div");
+      divider.className = "section-head";
+      divider.textContent = `Profiles (${data.results.length})`;
+      panel.results.appendChild(divider);
+    }
+  }
+
+  if (!data.results.length && !(Array.isArray(data.posts) && data.posts.length)) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
     empty.textContent =
@@ -136,11 +326,95 @@ function renderResults(panel, data) {
   });
 }
 
+const JOB_POLL_INTERVAL_MS = 1500;
+const JOB_MAX_WAIT_MS = 20 * 60 * 1000;
+const DEFAULT_SPINNER_TEXT = "Searching public profiles...";
+
+function setSpinnerText(panel, text) {
+  const label = panel.spinner.querySelector("span");
+  if (label) {
+    label.textContent = text;
+  }
+}
+
+function sleep(ms, signal) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    function onAbort() {
+      clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    }
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+async function requestJson(url, options) {
+  const response = await fetch(url, options);
+  let data = null;
+  try {
+    data = await response.json();
+  } catch (parseError) {
+    throw new Error(`Backend returned a non-JSON response (HTTP ${response.status}).`);
+  }
+  if (!response.ok) {
+    const error = new Error(
+      data.message || data.detail || `Request failed with HTTP ${response.status}.`
+    );
+    error.jobsUnavailable = response.status === 503 || response.status === 404;
+    throw error;
+  }
+  return data;
+}
+
+async function startJob(category, query, signal) {
+  return requestJson(`${API_BASE}/api/jobs`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ category, query }),
+    signal,
+  });
+}
+
+async function waitForJob(jobId, signal) {
+  const deadline = Date.now() + JOB_MAX_WAIT_MS;
+  while (Date.now() < deadline) {
+    const data = await requestJson(`${API_BASE}/api/jobs/${jobId}`, {
+      headers: authHeaders(),
+      signal,
+    });
+    if (data.status === "complete") {
+      return data.result;
+    }
+    if (data.status === "failed") {
+      throw new Error(data.message || "Investigation job failed.");
+    }
+    await sleep(JOB_POLL_INTERVAL_MS, signal);
+  }
+  throw new Error("Investigation is taking too long. Try again later.");
+}
+
+async function runSyncSearch(endpoint, query, signal) {
+  const data = await requestJson(`${API_BASE}${endpoint}`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ query }),
+    signal,
+  });
+  if (data.status !== "success") {
+    throw new Error(data.message || data.detail || "Search failed.");
+  }
+  return data;
+}
+
 async function handleSubmit(event) {
   event.preventDefault();
   const panel = getPanel(event.currentTarget.closest(".panel").id.replace("panel-", ""));
   const query = panel.input.value.trim();
   const endpoint = panel.form.dataset.endpoint;
+  const category = panel.form.dataset.category;
 
   clearPanel(panel);
   if (!query) {
@@ -152,26 +426,31 @@ async function handleSubmit(event) {
     panel.controller.abort();
   }
   panel.controller = new AbortController();
+  const signal = panel.controller.signal;
 
   setLoading(panel, true);
+  setSpinnerText(panel, DEFAULT_SPINNER_TEXT);
   try {
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query }),
-      signal: panel.controller.signal,
-    });
-
     let data;
-    try {
-      data = await response.json();
-    } catch (parseError) {
-      showError(panel, `Backend returned a non-JSON response (HTTP ${response.status}).`);
-      return;
+    if (category) {
+      setSpinnerText(panel, "Queued — deep scan may take several minutes...");
+      try {
+        const job = await startJob(category, query, signal);
+        data = await waitForJob(job.job_id, signal);
+      } catch (jobError) {
+        if (jobError.name === "AbortError") return;
+        if (!jobError.jobsUnavailable) {
+          throw jobError;
+        }
+        setSpinnerText(panel, DEFAULT_SPINNER_TEXT);
+        data = await runSyncSearch(endpoint, query, signal);
+      }
+    } else {
+      data = await runSyncSearch(endpoint, query, signal);
     }
 
-    if (!response.ok || data.status !== "success") {
-      showError(panel, data.message || `Request failed with HTTP ${response.status}.`);
+    if (!data || data.status !== "success") {
+      showError(panel, (data && (data.message || data.detail)) || "Search failed.");
       return;
     }
 
@@ -180,9 +459,11 @@ async function handleSubmit(event) {
     if (err.name === "AbortError") return;
     showError(
       panel,
-      `Could not reach the backend at ${API_BASE}. Make sure it is running (docker-compose up).`
+      err.message ||
+        `Could not reach the backend at ${API_BASE}. Make sure it is running (docker-compose up).`
     );
   } finally {
+    setSpinnerText(panel, DEFAULT_SPINNER_TEXT);
     setLoading(panel, false);
   }
 }
@@ -278,10 +559,12 @@ async function loadCatalogOnce() {
   if (catalogLoaded) return;
   const list = document.getElementById("catalog-list");
   try {
-    const response = await fetch(`${API_BASE}/api/catalog`);
+    const response = await fetch(`${API_BASE}/api/catalog`, {
+      headers: authHeaders(),
+    });
     const data = await response.json();
     if (!response.ok || data.status !== "success") {
-      throw new Error(data.message || "failed");
+      throw new Error(data.message || data.detail || "failed");
     }
     catalogItems = data.categories;
     renderCatalog(catalogItems);

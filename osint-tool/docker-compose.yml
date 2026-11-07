@@ -1,13 +1,59 @@
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: osint-redis
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - osint-net
+    restart: unless-stopped
+
   backend:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: osint-backend
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       - HIBP_API_KEY=${HIBP_API_KEY:-}
+      - OPENSANCTIONS_API_KEY=${OPENSANCTIONS_API_KEY:-}
+      - OSINT_API_KEY=${OSINT_API_KEY:-}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://127.0.0.1:8080,http://localhost:8080}
+      - REDIS_URL=redis://redis:6379/0
+      - CACHE_TTL_SECONDS=${CACHE_TTL_SECONDS:-900}
+      - RATE_LIMIT_HEAVY=${RATE_LIMIT_HEAVY:-4/minute}
+      - RATE_LIMIT_LIGHT=${RATE_LIMIT_LIGHT:-15/minute}
+      - RATE_LIMIT_GENERAL=${RATE_LIMIT_GENERAL:-60/minute}
+      - RATE_LIMIT_POLL=${RATE_LIMIT_POLL:-120/minute}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - osint-net
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: osint-worker
+    command: ["arq", "worker.WorkerSettings"]
+    environment:
+      - HIBP_API_KEY=${HIBP_API_KEY:-}
+      - OPENSANCTIONS_API_KEY=${OPENSANCTIONS_API_KEY:-}
+      - REDIS_URL=redis://redis:6379/0
+      - CACHE_TTL_SECONDS=${CACHE_TTL_SECONDS:-900}
+      - WORKER_MAX_JOBS=${WORKER_MAX_JOBS:-4}
+      - WORKER_JOB_TIMEOUT=${WORKER_JOB_TIMEOUT:-1200}
+      - WORKER_KEEP_RESULT=${WORKER_KEEP_RESULT:-3600}
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - osint-net
     restart: unless-stopped
@@ -16,7 +62,7 @@ services:
     image: nginx:alpine
     container_name: osint-frontend
     ports:
-      - "8080:80"
+      - "127.0.0.1:8080:80"
     volumes:
       - ./frontend:/usr/share/nginx/html:ro
     depends_on:
@@ -24,6 +70,19 @@ services:
     networks:
       - osint-net
     restart: unless-stopped
+
+  tests:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        INSTALL_DEV: "true"
+    environment:
+      - OSINT_API_KEY=
+    command: ["python", "-m", "pytest", "-q", "tests"]
+    networks:
+      - osint-net
 
 networks:
   osint-net:

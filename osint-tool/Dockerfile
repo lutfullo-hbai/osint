@@ -8,7 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends gcc \
+    && apt-get install -y --no-install-recommends gcc tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt .
@@ -16,9 +16,19 @@ COPY backend/requirements.txt .
 RUN pip install --upgrade pip \
     && pip install -r requirements.txt
 
+COPY backend/requirements-dev.txt .
+ARG INSTALL_DEV=false
+RUN if [ "$INSTALL_DEV" = "true" ]; then pip install -r requirements-dev.txt; fi
+
 COPY backend/main.py .
+COPY backend/security.py .
+COPY backend/cache.py .
+COPY backend/worker.py .
+COPY backend/pytest.ini .
 COPY backend/routers ./routers
+COPY backend/services ./services
 COPY backend/tools ./tools
+COPY backend/tests ./tests
 
 RUN useradd --create-home --shell /bin/bash osint \
     && chown -R osint:osint /app

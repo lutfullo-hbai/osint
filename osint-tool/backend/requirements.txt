@@ -1,9 +1,15 @@
 fastapi>=0.110,<1.0
 uvicorn[standard]>=0.29,<1.0
 httpx>=0.26,<1.0
+slowapi>=0.1.9,<1.0
+arq>=0.26,<1.0
+redis>=5,<6
 holehe>=1.61
 maigret>=0.6.4
 sherlock-project>=0.16.0
 ddgs>=9,<10
 phonenumbers>=8.13,<9
 dnspython>=2.6,<3
+ExifRead>=3.0,<4.0
+pillow>=10,<12
+pytesseract>=0.3.10,<0.4

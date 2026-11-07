@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 import httpx
 
 from tools.base import ToolError
+from tools.net_guard import UnsafeURLError, safe_get
 
 SEARCH_TIMEOUT_SECONDS = 150
 DEFAULT_MAX_RESULTS = 15
@@ -51,6 +52,19 @@ PLATFORM_LABELS = {
     "kun.uz": "Kun.uz",
     "daryo.uz": "Daryo.uz",
     "gov.uz": "Gov.uz",
+    "wikipedia.org": "Wikipedia",
+    "gazeta.uz": "Gazeta.uz",
+    "uza.uz": "UzA",
+    "qalampir.uz": "Qalampir.uz",
+    "hh.uz": "hh.uz",
+    "hh.ru": "hh.ru",
+    "researchgate.net": "ResearchGate",
+    "academia.edu": "Academia.edu",
+    "habr.com": "Habr",
+    "twitch.tv": "Twitch",
+    "soundcloud.com": "SoundCloud",
+    "spotify.com": "Spotify",
+    "steamcommunity.com": "Steam",
 }
 
 
@@ -161,8 +175,8 @@ async def filter_results_containing(
             return False
         async with semaphore:
             try:
-                response = await client.get(url)
-            except httpx.HTTPError:
+                response = await safe_get(client, url)
+            except (httpx.HTTPError, UnsafeURLError):
                 return False
         if response.status_code != 200:
             return False
@@ -174,7 +188,7 @@ async def filter_results_containing(
     dropped = 0
     async with httpx.AsyncClient(
         headers=FETCH_HEADERS,
-        follow_redirects=True,
+        follow_redirects=False,
         timeout=httpx.Timeout(VERIFY_TIMEOUT_SECONDS),
     ) as client:
         checks = [page_matches(client, item.get("url", ""), semaphore) for item in results]
