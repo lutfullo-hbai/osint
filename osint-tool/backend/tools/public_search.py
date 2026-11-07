@@ -1,4 +1,5 @@
 import asyncio
+import os
 import re
 import time
 
@@ -12,6 +13,8 @@ from tools.net_guard import UnsafeURLError, safe_get
 SEARCH_TIMEOUT_SECONDS = 150
 DEFAULT_MAX_RESULTS = 15
 DELAY_BETWEEN_BATCHES_SECONDS = 2.5
+BRAVE_ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
+BRAVE_DELAY_SECONDS = 1.1
 
 VERIFY_TIMEOUT_SECONDS = 12
 MAX_CONCURRENT_FETCHES = 6
@@ -130,12 +133,66 @@ def _search_sync(
     return results
 
 
+async def _brave_search(
+    query_batches: list[str], max_results_per_batch: int
+) -> list[dict]:
+    """Brave Search API — richer, Google-grade results. Used when a key is set."""
+    api_key = os.environ.get("BRAVE_API_KEY", "").strip()
+    headers = {"Accept": "application/json", "X-Subscription-Token": api_key}
+    results = []
+    seen = set()
+    failed = 0
+    async with httpx.AsyncClient(timeout=20, headers=headers) as client:
+        for index, batch in enumerate(query_batches):
+            if index > 0:
+                await asyncio.sleep(BRAVE_DELAY_SECONDS)
+            try:
+                response = await client.get(
+                    BRAVE_ENDPOINT,
+                    params={"q": batch, "count": max_results_per_batch},
+                )
+                if response.status_code == 401:
+                    raise ToolError("Brave Search rejected the API key.")
+                if response.status_code != 200:
+                    failed += 1
+                    continue
+                web = (response.json().get("web") or {}).get("results") or []
+            except ToolError:
+                raise
+            except Exception:
+                failed += 1
+                continue
+            for item in web:
+                url = (item.get("url") or "").strip()
+                if not url.startswith("http"):
+                    continue
+                key = url.split("#")[0].lower().rstrip("/")
+                if key in seen:
+                    continue
+                seen.add(key)
+                results.append({
+                    "platform": platform_from_url(url),
+                    "url": url,
+                    "title": (item.get("title") or "").strip(),
+                    "info": (item.get("description") or "").strip()[:300],
+                    "status": "found",
+                })
+    if not results and failed == len(query_batches):
+        raise ToolError("Brave Search did not respond.")
+    return results
+
+
 async def search_public(
     query_batches: list[str],
     timeout: int = SEARCH_TIMEOUT_SECONDS,
     max_results_per_batch: int = DEFAULT_MAX_RESULTS,
 ) -> list[dict]:
     try:
+        if os.environ.get("BRAVE_API_KEY", "").strip():
+            return await asyncio.wait_for(
+                _brave_search(list(query_batches), max_results_per_batch),
+                timeout=timeout,
+            )
         return await asyncio.wait_for(
             asyncio.to_thread(
                 _search_sync, list(query_batches), max_results_per_batch

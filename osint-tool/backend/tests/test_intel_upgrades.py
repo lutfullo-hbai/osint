@@ -784,3 +784,44 @@ def test_dkim_validator_rejects_empty_and_null_keys():
     assert not ed._is_valid_dkim("v=DKIM1; p=")        # wildcard null key
     assert not ed._is_valid_dkim("v=DKIM1; p=short")   # too short to be real
     assert not ed._is_valid_dkim("some unrelated txt")
+
+
+async def test_securitytrails_skipped_without_key(monkeypatch):
+    from tools import domain_intel as di
+    monkeypatch.delenv("SECURITYTRAILS_API_KEY", raising=False)
+    import pytest as _pytest
+    with _pytest.raises(di.ToolError) as exc:
+        await di._securitytrails_subdomains(None, "example.com")
+    assert "SECURITYTRAILS_API_KEY" in str(exc.value)
+
+
+async def test_hunter_skipped_without_key(monkeypatch):
+    monkeypatch.delenv("HUNTER_API_KEY", raising=False)
+    import pytest as _pytest
+    with _pytest.raises(svc.ToolError) as exc:
+        await svc._hunter_emails(None, "example.com")
+    assert "HUNTER_API_KEY" in str(exc.value)
+
+
+async def test_brave_search_parses_results(monkeypatch):
+    from tools import public_search as ps
+    monkeypatch.setenv("BRAVE_API_KEY", "test-key")
+
+    class Resp:
+        status_code = 200
+        def json(self):
+            return {"web": {"results": [
+                {"url": "https://x.io/a", "title": "A", "description": "desc"},
+                {"url": "https://x.io/a#frag", "title": "dup", "description": ""},
+            ]}}
+
+    class Client:
+        def __init__(self, *a, **k): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def get(self, url, **kw): return Resp()
+
+    monkeypatch.setattr(ps.httpx, "AsyncClient", Client)
+    out = await ps._brave_search(['"bob" site:x.io'], 5)
+    assert len(out) == 1 and out[0]["url"] == "https://x.io/a"
+    assert out[0]["info"] == "desc"
