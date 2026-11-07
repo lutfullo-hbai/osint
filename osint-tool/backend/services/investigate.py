@@ -740,6 +740,8 @@ async def _investigate_company(query: str) -> dict:
     }
     if outcome["pivots"]:
         response["pivots"] = _dedupe_pivots(outcome["pivots"])
+    if outcome.get("warnings"):
+        response["warnings"] = outcome["warnings"]
     if not results:
         response["message"] = (
             "No legal entity with this name (or LEI) is in the GLEIF register. "

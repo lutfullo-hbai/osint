@@ -696,3 +696,45 @@ async def test_footprint_username_mode_builds_report(monkeypatch):
     assert result["results"][0]["platform"] == "Exposure assessment"
     assert any(r["platform"] == "OPSEC recommendation" for r in result["results"])
     assert result["pivots"] == [{"type": "domain", "value": "x.dev"}]
+
+
+async def test_sec_edgar_aggregates_entities_and_forms():
+    class Resp:
+        status_code = 200
+        def json(self):
+            return {"hits": {"total": {"value": 2}, "hits": [
+                {"_source": {"display_names": ["Tesla, Inc. (TSLA) (CIK 1)"],
+                             "root_forms": ["10-K"], "file_date": "2025-01-30"}},
+                {"_source": {"display_names": ["Tesla, Inc. (TSLA) (CIK 1)"],
+                             "root_forms": ["8-K"], "file_date": "2024-06-01"}},
+            ]}}
+
+    class Client:
+        async def get(self, url, **kw): return Resp()
+
+    entry = await ci.sec_edgar_search(Client(), "Tesla")
+    assert entry["platform"] == "SEC EDGAR"
+    assert "Tesla, Inc." in entry["info"]
+    assert "10-K" in entry["info"] and "8-K" in entry["info"]
+    assert "latest 2025-01-30" in entry["info"]
+
+
+async def test_opencorporates_skipped_without_key(monkeypatch):
+    monkeypatch.delenv("OPENCORPORATES_API_KEY", raising=False)
+    import pytest as _pytest
+    with _pytest.raises(ci.ToolError) as exc:
+        await ci.opencorporates_search(None, "Apple")
+    assert "OPENCORPORATES_API_KEY" in str(exc.value)
+
+
+async def test_gdelt_handles_rate_limit(monkeypatch):
+    class Resp:
+        status_code = 429
+        headers = {}
+        text = "Please limit requests"
+    class Client:
+        async def get(self, url, **kw): return Resp()
+    import pytest as _pytest
+    with _pytest.raises(ci.ToolError) as exc:
+        await ci.gdelt_news(Client(), "Tesla")
+    assert "rate limit" in str(exc.value).lower()
