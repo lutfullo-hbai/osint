@@ -3,15 +3,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OSINT Recon Console</title>
+  <meta name="theme-color" content="#07060f" />
+  <title>NEXUS · OSINT Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <div class="aurora" aria-hidden="true">
+    <span class="aurora-blob a1"></span>
+    <span class="aurora-blob a2"></span>
+    <span class="aurora-blob a3"></span>
+  </div>
   <div class="scanlines" aria-hidden="true"></div>
 
   <header class="header">
-    <h1 class="logo">&gt;_ OSINT<span>RECON</span></h1>
-    <p class="subtitle">local investigation toolkit // sherlock · maigret · holehe · truecaller</p>
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <h1 class="logo">NE<span>XUS</span></h1>
+    </div>
+    <p class="subtitle">open-source intelligence console</p>
+    <p class="subtitle-sub">sherlock · maigret · holehe · wikidata · gravatar · shodan</p>
   </header>
 
   <nav class="tabs" role="tablist">
