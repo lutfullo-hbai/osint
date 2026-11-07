@@ -669,3 +669,51 @@ a.chip { text-decoration: none; }
   .section-head::after { display: none; }
   .warning-item { color: #333; background: #f6f6f6; border-color: #ccc; }
 }
+
+/* ---------- entity graph ---------- */
+.graph-wrap {
+  grid-column: 1 / -1;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.graph-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.graph-edge {
+  stroke: rgba(255, 255, 255, 0.14);
+  stroke-width: 1;
+}
+.graph-center circle {
+  fill: var(--glass-strong);
+  stroke: url(#none);
+  stroke: var(--violet);
+  stroke-width: 2;
+}
+.graph-center text {
+  fill: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.graph-node text {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.graph-node:hover circle {
+  stroke: var(--text);
+  stroke-width: 2;
+}
+.graph-legend {
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+@media print { .graph-wrap { display: none !important; } }
