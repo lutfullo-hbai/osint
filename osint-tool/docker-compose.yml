@@ -17,6 +17,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: osint-backend
+    volumes:
+      - osint-data:/app/data
     ports:
       - "127.0.0.1:8000:8000"
     environment:
@@ -31,6 +33,7 @@ services:
       - OLLAMA_URL=${OLLAMA_URL:-http://127.0.0.1:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:7b}
       - OLLAMA_VISION_MODEL=${OLLAMA_VISION_MODEL:-qwen2.5vl:7b}
+      - CASES_DB_PATH=/app/data/cases.db
       - REDIS_URL=redis://redis:6379/0
       - CACHE_TTL_SECONDS=${CACHE_TTL_SECONDS:-900}
       - RATE_LIMIT_HEAVY=${RATE_LIMIT_HEAVY:-4/minute}
@@ -98,3 +101,6 @@ services:
 networks:
   osint-net:
     driver: bridge
+
+volumes:
+  osint-data:

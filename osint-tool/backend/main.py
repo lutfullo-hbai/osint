@@ -12,6 +12,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from routers import (
+    cases,
     catalog,
     company,
     config,
@@ -25,6 +26,7 @@ from routers import (
     phone,
     username,
 )
+import store
 from security import limiter
 
 app = FastAPI(
@@ -133,6 +135,7 @@ app.include_router(domain.router)
 app.include_router(image.router)
 app.include_router(catalog.router)
 app.include_router(config.router)
+app.include_router(cases.router)
 app.include_router(jobs.router)
 
 
@@ -153,10 +156,16 @@ async def root():
             "/api/image",
             "/api/catalog",
             "/api/config",
+            "/api/cases",
             "/api/jobs",
         ],
         "docs": "/docs",
     }
+
+
+@app.on_event("startup")
+async def _init_storage():
+    store.init_db()
 
 
 @app.get("/health")

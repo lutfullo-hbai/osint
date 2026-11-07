@@ -747,3 +747,56 @@ a.chip { text-decoration: none; }
   .ai-summary { background: #f5f0ff; border-color: #bbb; color: #000; }
   .ai-summary::before { color: #333; }
 }
+
+/* ---------- cases ---------- */
+.case-new {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.case-new input {
+  flex: 1 1 280px;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  color: var(--text);
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 15px;
+  outline: none;
+}
+.case-new input:focus { border-color: rgba(34, 211, 238, 0.6); box-shadow: var(--glow-cyan); }
+.case-new button {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: #06060f;
+  background: var(--grad);
+  border: 0;
+  border-radius: 12px;
+  padding: 0 22px;
+  cursor: pointer;
+}
+#case-list { margin-bottom: 12px; }
+.chip-active {
+  color: #06060f !important;
+  background: var(--grad) !important;
+  border-color: transparent !important;
+}
+.chip-danger:hover {
+  color: #06060f !important;
+  background: var(--red) !important;
+  border-color: transparent !important;
+}
+.case-finding-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.case-remove {
+  font-size: 0.68rem;
+  padding: 3px 8px;
+  -webkit-text-fill-color: initial;
+}
