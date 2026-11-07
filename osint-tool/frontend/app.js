@@ -241,7 +241,7 @@ function buildToolbar(data) {
     const links = document.createElement("div");
     links.className = "chip-row";
     const label = document.createElement("span");
-    label.textContent = "check manually (login required, not verified):";
+    label.textContent = "open externally (unverified):";
     links.appendChild(label);
     data.links.forEach((item) => {
       const link = document.createElement("a");

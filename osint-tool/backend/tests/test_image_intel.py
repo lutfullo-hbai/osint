@@ -44,7 +44,7 @@ def test_reverse_image_links_encode_the_source_url():
     links = reverse_image_links("https://example.com/a b.jpg")
 
     assert "https://lens.google.com/uploadbyurl?url=https%3A%2F%2Fexample.com%2Fa%20b.jpg" == links["Google Lens"]
-    assert set(links) == {"Google Lens", "Yandex", "TinEye", "Bing Visual Search"}
+    assert set(links) == {"Google Lens", "Yandex", "TinEye", "Baidu", "Bing Visual Search"}
 
 
 def test_analyze_image_reports_dimensions_and_reverse_links():
@@ -110,3 +110,53 @@ def test_analyze_image_reports_dhash_and_runs_ocr():
         assert platforms["OCR text"]["info"]
     else:
         assert any("OCR" in w for w in outcome["warnings"])
+
+
+from tools.image_intel import cardinal, decimal_to_dms, geo_links, sun_position
+import datetime as _dt
+
+
+def _utc(y, mo, d, h):
+    return _dt.datetime(y, mo, d, h, tzinfo=_dt.timezone.utc).timestamp()
+
+
+def test_sun_position_matches_known_geometry():
+    # London summer noon: sun roughly south, high in the sky.
+    az, alt = sun_position(_utc(2020, 6, 21, 12), 51.48, 0.0)
+    assert 170 < az < 190
+    assert alt > 55
+    # London winter noon: same bearing, much lower.
+    _, alt_winter = sun_position(_utc(2020, 12, 21, 12), 51.48, 0.0)
+    assert alt_winter < 20
+    # Southern hemisphere noon: sun to the north.
+    az_south, _ = sun_position(_utc(2020, 6, 21, 2), -33.87, 151.2)
+    assert az_south < 20 or az_south > 340
+
+
+def test_cardinal_and_dms_formatting():
+    assert cardinal(0) == "N"
+    assert cardinal(90) == "E"
+    assert cardinal(180) == "S"
+    assert decimal_to_dms(41.3111, "N", "S").startswith("41°18′")
+    assert decimal_to_dms(-0.5, "E", "W").endswith("W")
+
+
+def test_geo_links_include_major_map_providers():
+    links = geo_links(41.3, 69.25, _utc(2024, 6, 21, 7))
+    assert "Google Maps" in links and "Yandex Maps" in links
+    assert "suncalc.org" in links["SunCalc (shadows)"]
+    assert "2024.06.21" in links["SunCalc (shadows)"]
+
+
+def test_approx_datetime_utc_from_local_time_and_longitude():
+    from tools.image_intel import approx_datetime_utc
+    import datetime as dt
+
+    class Tag:
+        def __init__(self, v): self._v = v
+        def __str__(self): return self._v
+
+    # 15:00 local at lon 69 (~ +5h) -> 10:00 UTC
+    ts = approx_datetime_utc({"EXIF DateTimeOriginal": Tag("2024:06:21 15:00:00")}, 69.0)
+    assert dt.datetime.fromtimestamp(ts, tz=dt.timezone.utc).hour == 10
+    assert approx_datetime_utc({}, 69.0) is None

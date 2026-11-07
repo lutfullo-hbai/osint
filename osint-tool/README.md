@@ -126,9 +126,10 @@ mavjud bo'lmasa, jarayon ichidagi xotira keshiga fallback qiladi.
   (crt.sh + OTX + HackerTarget), TLS sertifikat, xavfsizlik sarlavhalari, urlscan,
   Wayback, HTTP fingerprint, IP geolokatsiya, reverse DNS, Shodan InternetDB va
   **reverse IP** (bir serverdagi qo'shni domenlar). Ochiq IP ham qabul qilinadi.
-- **Image**: EXIF, GPS, qurilma ma'lumoti, **OCR** (rasmdagi matn), **dHash**
-  (perceptual hash), EXIF thumbnail, va Google Lens/Yandex/TinEye/Bing teskari
-  qidiruv havolalari. Fayl yuklash yo'q — faqat `http(s)` URL.
+- **Image**: EXIF, GPS (decimal + DMS + balandlik + kamera yo'nalishi), **quyosh
+  holati** (soyalarni tekshirish uchun azimut/balandlik), xarita havolalari
+  (Google/OSM/Yandex/Bing/Earth/StreetView/SunCalc), **OCR**, **dHash**, EXIF
+  thumbnail va teskari rasm qidiruvi. Fayl yuklash yo'q — faqat `http(s)` URL.
 
 ### Audit log
 Har bir so'rov stdout'ga JSON-lines ko'rinishida yoziladi: `request_id`, metod, yo'l,

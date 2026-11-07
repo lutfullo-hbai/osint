@@ -682,6 +682,11 @@ async def _investigate_image(url: str) -> dict:
         "results": results,
         "count": len(results),
     }
+    links = outcome.get("links") or {}
+    if links:
+        response["links"] = [
+            {"label": label, "url": link_url} for label, link_url in links.items()
+        ]
     if outcome["warnings"]:
         response["warnings"] = outcome["warnings"]
     return response
