@@ -18,6 +18,99 @@ function authHeaders(extra = {}) {
   return headers;
 }
 
+// ---- Local AI (Ollama + Qwen) — runs in the browser, data stays on your machine ----
+const OLLAMA_URL_KEY = "osint_ollama_url";
+const OLLAMA_MODEL_KEY = "osint_ollama_model";
+
+function ollamaConfig() {
+  let url = "http://127.0.0.1:11434";
+  let model = "qwen2.5:7b";
+  try {
+    url = localStorage.getItem(OLLAMA_URL_KEY) || url;
+    model = localStorage.getItem(OLLAMA_MODEL_KEY) || model;
+  } catch (err) {
+    /* ignore */
+  }
+  return { url, model };
+}
+
+function findingsForPrompt(data) {
+  const items = [...(data.posts || []), ...(data.results || [])].slice(0, 40);
+  return items
+    .map((item) => {
+      const title = item.platform || item.name || item.site || "item";
+      const parts = [title];
+      if (item.title && item.title !== title) parts.push(item.title);
+      if (item.confidence) parts.push(`(${item.confidence} confidence)`);
+      if (item.status && item.status !== "found") parts.push(`[${item.status}]`);
+      const url = item.url || item.profile_url;
+      if (url) parts.push(url);
+      if (item.info) parts.push("— " + String(item.info).slice(0, 280));
+      return "- " + parts.join(" ");
+    })
+    .join("\n");
+}
+
+async function analyzeWithAI(data, container, button) {
+  const { url, model } = ollamaConfig();
+  button.disabled = true;
+  button.textContent = "Analyzing…";
+  container.classList.remove("hidden");
+  container.textContent = "Running local model (" + model + ")…";
+
+  const prompt =
+    `OSINT investigation — category: ${data.category || "-"}, query: "${data.query}".\n\n` +
+    `Findings:\n${findingsForPrompt(data)}\n\n` +
+    `Write a short intelligence summary (4-6 sentences): what was found, which ` +
+    `results corroborate each other, likely false positives or contradictions, an ` +
+    `overall confidence (low/medium/high), and the single best next step. ` +
+    `Only use the findings above. Do not invent facts.`;
+
+  try {
+    const response = await fetch(`${url}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a careful OSINT analyst. Be concise and factual, cite " +
+              "sources by platform name, never fabricate. A matching username or " +
+              "name is not proof of identity.",
+          },
+          { role: "user", content: prompt },
+        ],
+        stream: false,
+        options: { temperature: 0.2 },
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Ollama returned HTTP ${response.status}`);
+    }
+    const payload = await response.json();
+    const text = (payload.message && payload.message.content) || "(empty response)";
+    container.textContent = "";
+    text
+      .split(/\n{2,}/)
+      .filter((p) => p.trim())
+      .forEach((para) => {
+        const el = document.createElement("p");
+        el.textContent = para.trim();
+        container.appendChild(el);
+      });
+  } catch (err) {
+    container.textContent =
+      `Could not reach a local model at ${url}. Make sure Ollama is running ` +
+      `with a Qwen model (ollama pull qwen2.5:7b). ` +
+      `Override with localStorage ${OLLAMA_URL_KEY} / ${OLLAMA_MODEL_KEY}. [${err.message}]`;
+  } finally {
+    button.disabled = false;
+    button.textContent = "AI Summary";
+  }
+}
+
 const panels = {};
 
 function getPanel(tabName) {
@@ -314,7 +407,12 @@ function buildToolbar(data) {
     exports.appendChild(buildActionButton("Export MD", () => downloadReport(data, "md")));
     exports.appendChild(buildActionButton("Export JSON", () => downloadReport(data, "json")));
     exports.appendChild(buildActionButton("Print / PDF", () => window.print()));
+    const aiBox = document.createElement("div");
+    aiBox.className = "ai-summary hidden";
+    const aiButton = buildActionButton("AI Summary", () => analyzeWithAI(data, aiBox, aiButton));
+    exports.appendChild(aiButton);
     toolbar.appendChild(exports);
+    toolbar.appendChild(aiBox);
   }
   if (Array.isArray(data.pivots) && data.pivots.length) {
     const graph = buildGraph(data);

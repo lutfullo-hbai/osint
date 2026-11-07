@@ -15,6 +15,21 @@ docker compose up -d --build
 
 To'xtatish: `docker compose down`
 
+## AI tahlil (lokal Qwen)
+
+Har qanday natijada **"AI Summary"** tugmasi bor. Bosilganda brauzer
+to'g'ridan-to'g'ri lokal **Ollama** (Qwen) modeliga murojaat qiladi va natijalarni
+qisqa analitik xulosaga (topilganlar, qarama-qarshiliklar, ishonch darajasi,
+keyingi qadam) aylantiradi. **Kalit kerak emas, ma'lumot kompyuterдан chiqmaydi.**
+
+Talab: hostда Ollama + Qwen modeli ishlab turishi (`ollama pull qwen2.5:7b`).
+Standart: `http://127.0.0.1:11434`, model `qwen2.5:7b`. O'zgartirish:
+
+```js
+localStorage.setItem("osint_ollama_url", "http://127.0.0.1:11434");
+localStorage.setItem("osint_ollama_model", "qwen3:8b");
+```
+
 ## Xavfsizlik
 
 Backend faqat `127.0.0.1`ga bog'lanadi. Quyidagi himoyalar yoqilgan:

@@ -717,3 +717,33 @@ a.chip { text-decoration: none; }
   gap: 12px;
 }
 @media print { .graph-wrap { display: none !important; } }
+
+/* ---------- local AI summary ---------- */
+.ai-summary {
+  grid-column: 1 / -1;
+  background: var(--grad-soft);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.ai-summary::before {
+  content: "◆ AI analyst (local Qwen)";
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--violet);
+  margin-bottom: 8px;
+}
+.ai-summary p { margin-bottom: 8px; }
+.ai-summary p:last-child { margin-bottom: 0; }
+@media print {
+  .ai-summary { background: #f5f0ff; border-color: #bbb; color: #000; }
+  .ai-summary::before { color: #333; }
+}
