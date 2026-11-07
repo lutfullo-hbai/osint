@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import os
 import re
 
 import httpx
@@ -191,6 +192,23 @@ async def _hackertarget_subdomains(client: httpx.AsyncClient, domain: str) -> se
     return {name for name in names if is_subdomain(name, domain)}
 
 
+async def _securitytrails_subdomains(client: httpx.AsyncClient, domain: str) -> set[str]:
+    api_key = os.environ.get("SECURITYTRAILS_API_KEY", "").strip()
+    if not api_key:
+        raise ToolError("skipped (set SECURITYTRAILS_API_KEY)")
+    response = await client.get(
+        f"https://api.securitytrails.com/v1/domain/{domain}/subdomains",
+        headers={"APIKEY": api_key},
+        timeout=httpx.Timeout(20.0),
+    )
+    if response.status_code == 401:
+        raise ToolError("SecurityTrails rejected the API key")
+    if response.status_code != 200:
+        raise ToolError(f"HTTP {response.status_code}")
+    subs = response.json().get("subdomains") or []
+    return {f"{sub}.{domain}".lower() for sub in subs}
+
+
 async def subdomain_lookup(
     client: httpx.AsyncClient, domain: str
 ) -> tuple[dict, list[str], list[str]]:
@@ -199,6 +217,7 @@ async def subdomain_lookup(
         "crt.sh": _crtsh_subdomains,
         "AlienVault OTX": _otx_subdomains,
         "HackerTarget": _hackertarget_subdomains,
+        "SecurityTrails": _securitytrails_subdomains,
     }
     outcomes = await asyncio.gather(
         *(fetch(client, domain) for fetch in sources.values()),

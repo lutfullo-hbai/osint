@@ -66,6 +66,13 @@ IP bo'yicha, `slowapi` orqali (env bilan sozlanadi):
 
 Limitdan oshsa `429` va `X-RateLimit-*` / `Retry-After` sarlavhalari qaytadi.
 
+### Kalitli (ixtiyoriy) manbalar
+Kalit `.env`da bo'lsa ishlaydi, bo'lmasa o'sha manba o'tkazib yuboriladi:
+`BRAVE_API_KEY` (Google sifatidagi qidiruv, DuckDuckGo o'rniga), `HIBP_API_KEY`,
+`OPENSANCTIONS_API_KEY`, `OPENCORPORATES_API_KEY`, `SECURITYTRAILS_API_KEY`
+(subdomenlar/DNS tarixi), `HUNTER_API_KEY` (exposure email'lari). To'liq ro'yxat —
+`.env.example`.
+
 ### Async joblar (Redis + ARQ)
 Og'ir skanlar (ayniqsa Maigret — bir necha daqiqa) HTTP so'rovni bloklamaydi.
 Frontend avtomatik ravishda job API'dan foydalanadi, job queue mavjud bo'lmasa

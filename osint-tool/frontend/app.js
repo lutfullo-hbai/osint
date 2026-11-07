@@ -222,6 +222,89 @@ function pivotTo(pivot) {
   panel.form.requestSubmit();
 }
 
+const PIVOT_COLORS = {
+  username: "var(--cyan)",
+  domain: "var(--violet)",
+  ip: "var(--pink)",
+  company: "var(--mint)",
+};
+const GRAPH_MAX_NODES = 16;
+
+function svgEl(tag, attrs) {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    el.setAttribute(key, value);
+  }
+  return el;
+}
+
+function buildGraph(data) {
+  const pivots = (data.pivots || []).slice(0, GRAPH_MAX_NODES);
+  const width = 760;
+  const height = Math.max(320, 150 + pivots.length * 18);
+  const cx = width / 2;
+  const cy = height / 2;
+  const radius = Math.min(cx, cy) - 90;
+
+  const svg = svgEl("svg", {
+    viewBox: `0 0 ${width} ${height}`,
+    class: "graph-svg",
+    role: "img",
+  });
+
+  // edges first (under nodes)
+  const positions = pivots.map((pivot, index) => {
+    const angle = (2 * Math.PI * index) / pivots.length - Math.PI / 2;
+    return { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle), pivot };
+  });
+  positions.forEach(({ x, y }) => {
+    svg.appendChild(svgEl("line", {
+      x1: cx, y1: cy, x2: x, y2: y, class: "graph-edge",
+    }));
+  });
+
+  // center node
+  const center = svgEl("g", { class: "graph-node graph-center" });
+  center.appendChild(svgEl("circle", { cx, cy, r: 30 }));
+  const centerText = svgEl("text", { x: cx, y: cy + 4, "text-anchor": "middle" });
+  centerText.textContent =
+    String(data.query).length > 16 ? String(data.query).slice(0, 15) + "…" : data.query;
+  center.appendChild(centerText);
+  svg.appendChild(center);
+
+  // pivot nodes
+  positions.forEach(({ x, y, pivot }) => {
+    const g = svgEl("g", { class: "graph-node" });
+    g.style.cursor = "pointer";
+    const color = PIVOT_COLORS[pivot.type] || "var(--muted)";
+    const circle = svgEl("circle", { cx: x, cy: y, r: 7, fill: color });
+    g.appendChild(circle);
+    const onRight = x >= cx;
+    const label = svgEl("text", {
+      x: x + (onRight ? 12 : -12),
+      y: y + 4,
+      "text-anchor": onRight ? "start" : "end",
+      fill: color,
+    });
+    const value = String(pivot.value);
+    label.textContent = value.length > 22 ? value.slice(0, 21) + "…" : value;
+    g.appendChild(label);
+    g.addEventListener("click", () => pivotTo(pivot));
+    svg.appendChild(g);
+  });
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "graph-wrap hidden";
+  wrapper.appendChild(svg);
+  const legend = document.createElement("div");
+  legend.className = "graph-legend";
+  legend.innerHTML = Object.entries(PIVOT_COLORS)
+    .map(([type, color]) => `<span style="color:${color}">● ${type}</span>`)
+    .join(" ");
+  wrapper.appendChild(legend);
+  return wrapper;
+}
+
 function buildToolbar(data) {
   const toolbar = document.createElement("div");
   toolbar.className = "toolbar";
@@ -234,6 +317,16 @@ function buildToolbar(data) {
     toolbar.appendChild(exports);
   }
   if (Array.isArray(data.pivots) && data.pivots.length) {
+    const graph = buildGraph(data);
+    const toggle = buildActionButton("Graph", () => {
+      graph.classList.toggle("hidden");
+    });
+    const graphRow = document.createElement("div");
+    graphRow.className = "chip-row";
+    graphRow.appendChild(toggle);
+    toolbar.appendChild(graphRow);
+    toolbar.appendChild(graph);
+
     const pivots = document.createElement("div");
     pivots.className = "chip-row";
     const label = document.createElement("span");

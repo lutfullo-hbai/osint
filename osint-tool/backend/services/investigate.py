@@ -997,6 +997,33 @@ def _risk_level(score: int) -> str:
     return "high" if score >= 6 else "medium" if score >= 3 else "low"
 
 
+async def _hunter_emails(client, domain: str):
+    """Public corporate emails exposed for a domain. Requires HUNTER_API_KEY."""
+    import os as _os
+
+    api_key = _os.environ.get("HUNTER_API_KEY", "").strip()
+    if not api_key:
+        raise ToolError("skipped: set HUNTER_API_KEY to list exposed emails.")
+    response = await client.get(
+        "https://api.hunter.io/v2/domain-search",
+        params={"domain": domain, "api_key": api_key, "limit": 10},
+    )
+    if response.status_code == 401:
+        raise ToolError("hunter.io rejected the API key.")
+    if response.status_code != 200:
+        raise ToolError(f"HTTP {response.status_code}.")
+    data = response.json().get("data", {})
+    emails = [e.get("value") for e in data.get("emails", []) if e.get("value")]
+    if not emails:
+        raise ToolError("no public emails found.")
+    pattern = data.get("pattern") or "unknown"
+    return {
+        "platform": "Exposed emails (hunter.io)",
+        "status": "error",
+        "info": f"Pattern: {pattern}; {len(emails)} email(s): " + ", ".join(emails[:10]),
+    }
+
+
 async def _investigate_exposure(domain: str) -> dict:
     findings: list[dict] = []
     recommendations: list[str] = []
@@ -1057,6 +1084,13 @@ async def _investigate_exposure(domain: str) -> dict:
         if "Disclosure" in outcomes:
             disc_results, _dw = outcomes["Disclosure"]
             findings.extend(disc_results)
+
+        try:
+            hunter_entry = await _hunter_emails(client, domain)
+            if hunter_entry:
+                findings.append(hunter_entry)
+        except ToolError as exc:
+            warnings.append(f"hunter.io: {exc}")
 
     level = _risk_level(risk)
     summary = {
