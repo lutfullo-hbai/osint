@@ -130,7 +130,10 @@ async def test_email_survives_holehe_failure(monkeypatch):
         "Web",
     }
     assert result["warnings"] == ["Holehe: holehe crashed"]
-    assert result["pivots"] == [{"type": "domain", "value": "example.com"}]
+    assert result["pivots"] == [
+        {"type": "domain", "value": "example.com"},
+        {"type": "username", "value": "user"},
+    ]
 
 
 @pytest.mark.parametrize(
@@ -418,3 +421,65 @@ async def test_name_includes_knowledge_base_first_with_its_pivots(monkeypatch):
     assert result["results"][0]["platform"] == "Wikidata"
     assert {"type": "username", "value": "janedoe"} in result["pivots"]
     assert any("Sanctions" in w for w in result["warnings"])
+
+
+from tools import email_domain as ed
+
+
+def test_parse_gravatar_profile_extracts_fields_and_pivots():
+    entry = {
+        "profileUrl": "https://gravatar.com/beau",
+        "displayName": "Beau Lebens",
+        "currentLocation": "Golden, CO",
+        "job_title": "Lead",
+        "aboutMe": "builder",
+        "accounts": [
+            {"shortname": "twitter", "name": "Twitter", "username": "beaulebens",
+             "url": "https://x.com/beaulebens"},
+            {"shortname": "github", "name": "GitHub", "username": "beaulebens",
+             "url": "https://github.com/beaulebens"},
+            {"shortname": "wordpress", "name": "WP", "username": "beau",
+             "url": "https://x.io"},
+        ],
+    }
+    result, pivots = ed.parse_gravatar_profile(entry, "https://gravatar.com/img")
+    assert "Name: Beau Lebens" in result["info"]
+    assert "Linked accounts" in result["info"]
+    assert pivots == [
+        {"type": "username", "value": "beaulebens"},
+        {"type": "username", "value": "beaulebens"},
+    ]
+
+
+async def test_email_adds_local_part_and_gravatar_pivots(monkeypatch):
+    async def holehe(_e):
+        return {"results": []}
+
+    async def rep(_e):
+        raise ToolError("skip")
+
+    async def hibp(_e):
+        return None, None
+
+    async def dom(_e):
+        return [], []
+
+    async def grav(_e):
+        return {"results": [{"platform": "Gravatar profile", "status": "found"}],
+                "pivots": [{"type": "username", "value": "beaulebens"}]}
+
+    async def mentions(_b, max_results_per_batch):
+        return []
+
+    monkeypatch.setattr(svc, "run_holehe", holehe)
+    monkeypatch.setattr(svc, "lookup_emailrep", rep)
+    monkeypatch.setattr(svc, "lookup_hibp", hibp)
+    monkeypatch.setattr(svc, "email_domain_intel", dom)
+    monkeypatch.setattr(svc, "gravatar_lookup", grav)
+    monkeypatch.setattr(svc, "search_public", mentions)
+
+    result = await svc._investigate_email("john.doe@example.com")
+
+    assert {"type": "domain", "value": "example.com"} in result["pivots"]
+    assert {"type": "username", "value": "beaulebens"} in result["pivots"]
+    assert {"type": "username", "value": "john.doe"} in result["pivots"]

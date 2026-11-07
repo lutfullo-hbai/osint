@@ -104,16 +104,75 @@ async def email_domain_intel(email: str) -> tuple[list[dict], list[str]]:
     return await domain_mail_intel(email.rsplit("@", 1)[-1].lower())
 
 
-async def gravatar_lookup(email: str) -> dict | None:
-    digest = hashlib.md5(email.strip().lower().encode("utf-8")).hexdigest()
-    url = GRAVATAR_URL.format(digest=digest)
-    async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
-        response = await client.get(url)
-    if response.status_code == 200:
-        return {
-            "platform": "Gravatar",
-            "url": url,
-            "status": "found",
-            "info": "A public Gravatar image is registered for this email.",
-        }
-    return None
+# Gravatar accounts map to a username pivot on these platforms.
+GRAVATAR_PIVOT_SERVICES = {"twitter", "github", "instagram", "tiktok", "telegram"}
+
+
+def parse_gravatar_profile(entry: dict, image_url: str) -> tuple[dict, list[dict]]:
+    fields = []
+    for label, key in (
+        ("Name", "displayName"),
+        ("Location", "currentLocation"),
+        ("Job", "job_title"),
+        ("Company", "company"),
+        ("Pronouns", "pronouns"),
+    ):
+        value = entry.get(key)
+        if value:
+            fields.append(f"{label}: {value}")
+    about = (entry.get("aboutMe") or "").strip()
+    if about:
+        fields.append(f"About: {about[:200]}")
+
+    pivots = []
+    account_notes = []
+    for account in entry.get("accounts") or []:
+        shortname = str(account.get("shortname") or "").lower()
+        username = account.get("username") or account.get("display") or ""
+        url = account.get("url") or ""
+        account_notes.append(f"{account.get('name') or shortname}: {url or username}")
+        if shortname in GRAVATAR_PIVOT_SERVICES and username:
+            pivots.append({"type": "username", "value": username})
+    if account_notes:
+        fields.append("Linked accounts: " + "; ".join(account_notes[:8]))
+
+    entry_out = {
+        "platform": "Gravatar profile",
+        "url": entry.get("profileUrl") or image_url,
+        "status": "found",
+        "title": entry.get("displayName") or "",
+        "info": "; ".join(fields) or "A public Gravatar profile exists for this email.",
+    }
+    return entry_out, pivots
+
+
+async def gravatar_lookup(email: str) -> dict:
+    digest = hashlib.sha256(email.strip().lower().encode("utf-8")).hexdigest()
+    image_url = GRAVATAR_URL.format(digest=digest)
+    async with httpx.AsyncClient(
+        timeout=10, follow_redirects=True, headers={"User-Agent": "osint-tool/1.0"}
+    ) as client:
+        response = await client.get(f"https://gravatar.com/{digest}.json")
+        if response.status_code == 404:
+            # No profile, but an avatar may still be registered (d=404 probe).
+            avatar = await client.get(image_url, params={"d": "404"})
+            if avatar.status_code == 200:
+                return {
+                    "results": [{
+                        "platform": "Gravatar",
+                        "url": image_url,
+                        "status": "found",
+                        "info": "A public Gravatar image is registered for this email.",
+                    }],
+                    "pivots": [],
+                }
+            return {"results": [], "pivots": []}
+        if response.status_code != 200:
+            return {"results": [], "pivots": []}
+
+    try:
+        entry = response.json()["entry"][0]
+    except (ValueError, KeyError, IndexError):
+        return {"results": [], "pivots": []}
+    result, pivots = parse_gravatar_profile(entry, image_url)
+    return {"results": [result], "pivots": pivots}

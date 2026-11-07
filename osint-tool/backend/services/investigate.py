@@ -148,6 +148,17 @@ async def _cached(key: str, producer, *args) -> dict:
     return result
 
 
+def _dedupe_pivots(pivots: list[dict]) -> list[dict]:
+    seen = set()
+    unique = []
+    for pivot in pivots:
+        key = (pivot["type"], pivot["value"].casefold())
+        if key not in seen:
+            seen.add(key)
+            unique.append(pivot)
+    return unique
+
+
 async def _collect(lookups: dict) -> tuple[dict, list[str]]:
     """Run lookups concurrently so one failing source cannot sink the others."""
     labels = list(lookups)
@@ -381,8 +392,14 @@ async def _investigate_email(email: str) -> dict:
         domain_results, domain_warnings = outcomes["Email domain checks"]
         results.extend(domain_results)
         warnings.extend(domain_warnings)
+    email_pivots = [{"type": "domain", "value": email.rsplit("@", 1)[-1]}]
     if outcomes.get("Gravatar"):
-        results.append(outcomes["Gravatar"])
+        results.extend(outcomes["Gravatar"]["results"])
+        email_pivots.extend(outcomes["Gravatar"]["pivots"])
+    # The local part is often reused as a username elsewhere.
+    local_part = email.split("@", 1)[0]
+    if local_part and set(local_part) <= ALLOWED_USERNAME_CHARS and len(local_part) >= 3:
+        email_pivots.append({"type": "username", "value": local_part})
     # Search engines ignore quotes, so keep only pages that really show the address.
     results.extend(
         item
@@ -398,7 +415,7 @@ async def _investigate_email(email: str) -> dict:
         "query": email,
         "results": results,
         "count": len(results),
-        "pivots": [{"type": "domain", "value": email.rsplit("@", 1)[-1]}],
+        "pivots": _dedupe_pivots(email_pivots),
     }
     if warnings:
         response["warnings"] = warnings
