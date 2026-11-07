@@ -153,7 +153,13 @@ function reportMarkdown(data) {
   const lines = [
     `# OSINT report: ${data.query}`,
     "",
-    `Generated: ${new Date().toISOString()}`,
+    `- Tool: NEXUS OSINT Console`,
+    `- Category: ${data.category || "-"}`,
+    `- Generated: ${new Date().toISOString()}`,
+    `- Results: ${data.results.length}` +
+      (data.cached ? " (served from cache)" : ""),
+    "",
+    "> Open-source intelligence from public sources. Verify each fact independently.",
     "",
     "## Results",
     "",
@@ -224,6 +230,7 @@ function buildToolbar(data) {
     exports.className = "chip-row";
     exports.appendChild(buildActionButton("Export MD", () => downloadReport(data, "md")));
     exports.appendChild(buildActionButton("Export JSON", () => downloadReport(data, "json")));
+    exports.appendChild(buildActionButton("Print / PDF", () => window.print()));
     toolbar.appendChild(exports);
   }
   if (Array.isArray(data.pivots) && data.pivots.length) {
