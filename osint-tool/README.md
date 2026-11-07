@@ -107,6 +107,9 @@ bilan keshlanadi. Takroriy so'rovda natija `"cached": true` bilan qaytadi. Redis
 mavjud bo'lmasa, jarayon ichidagi xotira keshiga fallback qiladi.
 
 ### Qo'shimcha modullar
+- **Exposure** (korporativ): domen bo'yicha xavfsizlik hisoboti — SPF/DMARC/DKIM,
+  HTTP xavfsizlik sarlavhalari, TLS, domen yoshi, subdomenlar. **Risk bahosi** +
+  aniq tavsiyalar. Faqat o'z/ruxsat etilgan domenlar uchun.
 - **Footprint** (self-OSINT): o'z email yoki username'ingiz bo'yicha barcha
   ochiq izni (ro'yxatlar, breachlar, Gravatar, profillar) bitta hisobotga jamlaydi,
   **ekspozitsiya bahosi** (low/medium/high) va moslashtirilgan **OPSEC tavsiyalari** beradi.

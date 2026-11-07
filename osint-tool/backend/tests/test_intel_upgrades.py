@@ -738,3 +738,49 @@ async def test_gdelt_handles_rate_limit(monkeypatch):
     with _pytest.raises(ci.ToolError) as exc:
         await ci.gdelt_news(Client(), "Tesla")
     assert "rate limit" in str(exc.value).lower()
+
+
+def test_mail_findings_scores_missing_auth():
+    findings, risk, recs = svc._mail_findings({"txt": [], "dmarc": [], "dkim": []})
+    platforms = {f["platform"]: f for f in findings}
+    assert platforms["SPF"]["status"] == "error"
+    assert platforms["DMARC"]["status"] == "error"
+    assert risk >= 5
+    assert any("SPF" in r for r in recs)
+
+
+def test_mail_findings_passes_full_auth():
+    findings, risk, recs = svc._mail_findings({
+        "txt": ["v=spf1 -all"], "dmarc": ["v=DMARC1; p=reject"], "dkim": ["google"]})
+    assert all(f["status"] == "found" for f in findings)
+    assert risk == 0 and recs == []
+
+
+def test_risk_level_thresholds():
+    assert svc._risk_level(0) == "low"
+    assert svc._risk_level(3) == "medium"
+    assert svc._risk_level(7) == "high"
+
+
+async def test_exposure_report_structure(monkeypatch):
+    import services.investigate as s
+
+    def records(domain): return {"txt": ["v=spf1 -all"], "dmarc": ["v=DMARC1; p=none"], "dkim": []}
+    async def no_headers(client, domain): return [], 0, []
+    async def collect(lookups): return {}, []
+
+    monkeypatch.setattr(s, "gather_dns_records", records)
+    monkeypatch.setattr(s, "_header_findings", no_headers)
+    monkeypatch.setattr(s, "_collect", collect)
+
+    result = await s._investigate_exposure("example.com")
+    assert result["category"] == "exposure"
+    assert result["results"][0]["platform"] == "Exposure score"
+    assert any(r["platform"] == "Recommendation" for r in result["results"])
+
+
+def test_dkim_validator_rejects_empty_and_null_keys():
+    assert ed._is_valid_dkim("v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB")
+    assert not ed._is_valid_dkim("v=DKIM1; p=")        # wildcard null key
+    assert not ed._is_valid_dkim("v=DKIM1; p=short")   # too short to be real
+    assert not ed._is_valid_dkim("some unrelated txt")
