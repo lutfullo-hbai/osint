@@ -1,0 +1,360 @@
+import calendar
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+import main
+from services import investigate as svc
+from tools.base import ToolError
+from tools.domain_enrich import audit_security_headers, detect_technologies, summarize_cert
+from tools.domain_intel import (
+    DomainValidationError,
+    is_subdomain,
+    normalize_domain,
+    parse_crtsh,
+)
+from tools.ip_intel import summarize_internetdb
+
+
+def test_is_subdomain_rejects_lookalike_domains():
+    assert is_subdomain("a.example.com", "example.com")
+    assert not is_subdomain("notexample.com", "example.com")
+    assert not is_subdomain("example.com", "example.com")
+
+
+def test_parse_crtsh_strips_wildcards_and_lookalikes():
+    rows = [{"name_value": "*.a.example.com\nb.example.com\nnotexample.com"}, "bad"]
+    assert parse_crtsh(rows, "example.com") == {"a.example.com", "b.example.com"}
+
+
+def test_normalize_domain_rejects_numeric_tld():
+    with pytest.raises(DomainValidationError):
+        normalize_domain("999.1.1.1")
+
+
+def test_private_ip_query_is_rejected():
+    for query in ("127.0.0.1", "10.0.0.1", "::1"):
+        with pytest.raises(svc.InvestigationValidationError):
+            svc.parse_ip_query(query)
+
+
+def test_parse_ip_query_passes_public_ip_and_ignores_domains():
+    assert svc.parse_ip_query(" 8.8.8.8 ") == "8.8.8.8"
+    assert svc.parse_ip_query("example.com") is None
+
+
+def test_security_headers_audit_counts_frame_ancestors_as_clickjacking_cover():
+    present, missing = audit_security_headers(
+        {"content-security-policy": "frame-ancestors 'none'"}
+    )
+    assert "Content-Security-Policy" in present
+    assert "X-Frame-Options" in present
+    assert "Strict-Transport-Security" in missing
+
+
+def test_detect_technologies_ignores_server_names_in_page_text():
+    body = "Licensed under the Apache License. My reaction to nginx and cloudflare."
+    assert detect_technologies({"server": "unknown"}, body) == []
+
+
+def test_summarize_cert_reports_expiry_and_sans():
+    cert = {
+        "issuer": ((("organizationName", "Let's Encrypt"),),),
+        "notAfter": "Jan  1 00:00:00 2027 GMT",
+        "subjectAltName": (("DNS", "example.com"), ("DNS", "www.example.com")),
+    }
+    info = summarize_cert(cert, "TLSv1.3", now=calendar.timegm((2027, 1, 1, 0, 0, 0)) - 86400 * 30)
+    assert "Let's Encrypt" in info
+    assert "TLSv1.3" in info
+    assert "SANs (2)" in info
+    assert "30 day(s) left" in info
+
+
+def test_summarize_internetdb_truncates_long_cve_list():
+    data = {"ports": [80], "vulns": [f"CVE-2024-{i}" for i in range(20)]}
+    info = summarize_internetdb("1.1.1.1", data)["info"]
+    assert "Open ports: 80" in info
+    assert "Known CVEs (20)" in info
+    assert "+5 more" in info
+
+
+def test_merge_marks_corroborated_hits_high_confidence_and_first():
+    merged = svc._merge(
+        [
+            {"platform": "Zed", "url": "https://zed.dev/bob/", "status": "found"},
+            {"platform": "Abc", "url": "https://abc.io/bob", "status": "found"},
+        ],
+        [{"platform": "Zed", "url": "https://www.zed.dev/bob", "status": "found"}],
+    )
+    assert [item["platform"] for item in merged] == ["Zed", "Abc"]
+    assert merged[0]["confidence"] == "high"
+    assert merged[0]["sources"] == ["sherlock", "maigret"]
+    assert merged[1]["confidence"] == "medium"
+
+
+async def test_email_survives_holehe_failure(monkeypatch):
+    async def broken(_email):
+        raise ToolError("holehe crashed")
+
+    async def emailrep(_email):
+        return {"platform": "EmailRep", "status": "found"}
+
+    async def hibp(_email):
+        return None, None
+
+    async def domain_intel(_email):
+        return [{"platform": "Email authentication", "status": "found"}], []
+
+    async def gravatar(_email):
+        return None
+
+    monkeypatch.setattr(svc, "run_holehe", broken)
+    monkeypatch.setattr(svc, "lookup_emailrep", emailrep)
+    monkeypatch.setattr(svc, "lookup_hibp", hibp)
+    monkeypatch.setattr(svc, "email_domain_intel", domain_intel)
+    monkeypatch.setattr(svc, "gravatar_lookup", gravatar)
+
+    async def mentions(_batches, max_results_per_batch):
+        return [
+            {"platform": "Web", "title": "Contact user@example.com", "info": ""},
+            {"platform": "Noise", "title": "Unrelated page", "info": ""},
+        ]
+
+    monkeypatch.setattr(svc, "search_public", mentions)
+
+    result = await svc._investigate_email("user@example.com")
+
+    assert {r["platform"] for r in result["results"]} == {
+        "EmailRep",
+        "Email authentication",
+        "Web",
+    }
+    assert result["warnings"] == ["Holehe: holehe crashed"]
+    assert result["pivots"] == [{"type": "domain", "value": "example.com"}]
+
+
+@pytest.mark.parametrize(
+    ("origin", "allowed"),
+    [("http://127.0.0.1:8080", True), ("https://evil.example", False)],
+)
+async def test_cors_only_allows_the_local_frontend(origin, allowed):
+    transport = ASGITransport(app=main.app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.options(
+            "/api/domain",
+            headers={
+                "Origin": origin,
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type",
+            },
+        )
+    assert (response.headers.get("access-control-allow-origin") == origin) is allowed
+
+
+from tools import name_search as ns
+from tools import public_profiles as pp
+
+
+def test_telegram_parser_reads_public_page_and_rejects_contact_stub():
+    page = (
+        '<meta property="og:title" content="Tech &amp; News">'
+        '<meta property="og:description" content="Daily digest">'
+        '<div class="tgme_page_title"><span>Tech</span></div>'
+        '<div class="tgme_page_extra">12 345 subscribers</div>'
+    )
+    entry = pp.parse_telegram(page, "technews")
+    assert entry["url"] == "https://t.me/technews"
+    assert "Tech & News" in entry["info"]
+    assert "12 345 subscribers" in entry["info"]
+    assert pp.parse_telegram('<meta property="og:title" content="Telegram: Contact @x">', "xxxxx") is None
+
+
+def test_telegram_parser_drops_boilerplate_bio():
+    page = (
+        '<meta property="og:title" content="Bob">'
+        '<meta property="og:description" content="You can contact @bobby right away.">'
+        '<div class="tgme_page_title">Bob</div>'
+        '<div class="tgme_page_extra">@bobby</div>'
+    )
+    assert pp.parse_telegram(page, "bobby")["info"] == "Name: Bob"
+
+
+def test_github_parser_exposes_pivots_only_through_extract():
+    entry = pp.parse_github(
+        {"html_url": "https://github.com/bob", "name": "Bob", "blog": "https://bob.dev/x",
+         "twitter_username": "bobby", "company": None}
+    )
+    assert "Company" not in entry["info"]
+    assert pp.extract_pivots([entry]) == [
+        {"type": "domain", "value": "bob.dev"},
+        {"type": "username", "value": "bobby"},
+    ]
+    assert "website" not in entry and "linked_username" not in entry
+
+
+async def test_profile_sources_isolate_failures(monkeypatch):
+    async def ok(_client, _username):
+        return {"platform": "A", "url": "https://a.io/x", "status": "found"}
+
+    async def missing(_client, _username):
+        return None
+
+    async def limited(_client, _username):
+        raise ToolError("rate limit reached.")
+
+    monkeypatch.setattr(pp, "PROFILE_SOURCES", {"A": ok, "B": missing, "C": limited})
+    outcome = await pp.run_profile_sources("bob")
+    assert [r["platform"] for r in outcome["results"]] == ["A"]
+    assert outcome["warnings"] == ["C: rate limit reached."]
+
+
+def test_name_variants_cover_order_and_script():
+    variants = ns.name_variants("Ali Valiyev")
+    assert variants == ["Ali Valiyev", "Valiyev Ali", "Али Валиев", "Валиев Али"]
+
+
+def test_transliterate_handles_uzbek_digraphs_and_cyrillic_input():
+    assert ns.transliterate("Shohruh G'ulomov") == "Шохрух Гуломов"
+    assert ns.transliterate("Шохрух") == "Shoxrux"
+
+
+def test_filter_by_name_drops_unrelated_and_ranks_exact_first():
+    variants = ns.name_variants("Ali Valiyev")
+    items = [
+        {"title": "Valiyev, Ali - profile", "info": "", "url": "https://a.io"},
+        {"title": "Unrelated person", "info": "Ali only", "url": "https://b.io"},
+        {"title": "Али Валиев", "info": "", "url": "https://c.io"},
+    ]
+    kept, dropped = ns.filter_by_name(items, variants)
+    assert [item["url"] for item in kept] == ["https://c.io", "https://a.io"]
+    assert [item["match"] for item in kept] == ["exact", "partial"]
+    assert dropped == 1
+
+
+def test_merge_ranks_api_above_engines_above_search_index():
+    merged = svc._merge(
+        [{"platform": "GitHub", "url": "https://github.com/bob", "status": "found"}],
+        [{"platform": "Zed", "url": "https://zed.dev/bob", "status": "found"}],
+        direct=[{"platform": "GitHub", "url": "https://www.github.com/bob",
+                 "status": "found", "info": "Name: Bob"}],
+        indexed=[{"platform": "Instagram", "url": "https://instagram.com/bob",
+                  "status": "found"}],
+    )
+    assert [(m["platform"], m["confidence"]) for m in merged] == [
+        ("GitHub", "high"), ("Zed", "medium"), ("Instagram", "low"),
+    ]
+    assert merged[0]["info"] == "Name: Bob"
+    assert merged[0]["sources"] == ["public-api", "sherlock"]
+
+
+async def test_username_lists_manual_links_only_for_platforms_without_hits(monkeypatch):
+    async def engine(_username):
+        return {"results": []}
+
+    async def profiles(_username):
+        return {"results": [], "warnings": ["Reddit: HTTP 403."], "pivots": []}
+
+    async def web(_username):
+        return {"results": [{"platform": "Instagram", "url": "https://instagram.com/bob/",
+                             "status": "found"}], "posts": [], "pivots": []}
+
+    monkeypatch.setattr(svc, "run_sherlock", engine)
+    monkeypatch.setattr(svc, "run_maigret", engine)
+    monkeypatch.setattr(svc, "run_profile_sources", profiles)
+    monkeypatch.setattr(svc, "run_username_web", web)
+
+    result = await svc._investigate_username("bob")
+
+    labels = [link["label"] for link in result["links"]]
+    assert "Instagram" not in labels and "TikTok" in labels
+    assert result["warnings"] == ["Reddit: HTTP 403."]
+    assert result["notice"]
+
+
+async def test_name_keeps_structured_sources_when_web_search_fails(monkeypatch):
+    async def broken(_name):
+        raise ToolError("rate limited")
+
+    async def sources(_name):
+        return {"results": [{"platform": "ORCID", "url": "https://orcid.org/1",
+                             "status": "found", "title": "Ali Valiyev"}],
+                "warnings": [], "pivots": []}
+
+    monkeypatch.setattr(svc, "run_name_search", broken)
+    monkeypatch.setattr(svc, "run_name_sources", sources)
+
+    result = await svc._investigate_name("Ali Valiyev")
+
+    assert [r["platform"] for r in result["results"]] == ["ORCID"]
+    assert result["warnings"] == ["Web search: rate limited"]
+
+
+def test_sherlock_command_uses_only_flags_the_installed_version_accepts():
+    import subprocess
+
+    from tools.sherlock_runner import _build_command
+
+    command = _build_command("bob")
+    usage = subprocess.run(
+        [command[0], "--help"], capture_output=True, text=True, check=True
+    ).stdout
+    for flag in (part for part in command[1:] if part.startswith("--")):
+        assert flag in usage
+
+
+def test_extract_tagged_handles_skips_the_subject_and_dedupes():
+    handles = ns.extract_tagged_handles(
+        "with @axror.xs @alishercr @axror.xs and @solievsm", "solievsm"
+    )
+    assert handles == ["axror.xs", "alishercr"]
+
+
+async def test_social_presence_keeps_posts_and_turns_tags_into_pivots(monkeypatch):
+    async def fake_search(batches, max_results_per_batch):
+        return [
+            {"platform": "x", "url": "https://instagram.com/p/1",
+             "title": "solievsm reel", "info": "fun with @axror.xs @alishercr"},
+            {"platform": "x", "url": "https://instagram.com/p/2",
+             "title": "unrelated", "info": "no mention here"},
+        ]
+
+    monkeypatch.setattr(ns, "search_public", fake_search)
+    outcome = await ns.run_username_web("solievsm")
+
+    assert [p["url"] for p in outcome["posts"]] == ["https://instagram.com/p/1"]
+    assert outcome["posts"][0]["kind"] == "post"
+    assert outcome["posts"][0]["platform"] == "Instagram"
+    assert outcome["results"] == []
+    assert outcome["pivots"] == [
+        {"type": "username", "value": "axror.xs"},
+        {"type": "username", "value": "alishercr"},
+    ]
+
+
+async def test_username_merges_post_pivots_without_duplicating(monkeypatch):
+    async def engine(_username):
+        return {"results": []}
+
+    async def profiles(_username):
+        return {"results": [], "warnings": [],
+                "pivots": [{"type": "username", "value": "axror.xs"}]}
+
+    async def web(_username):
+        return {"results": [],
+                "posts": [{"platform": "Instagram", "url": "https://instagram.com/p/1",
+                           "status": "found", "kind": "post"}],
+                "pivots": [{"type": "username", "value": "axror.xs"},
+                           {"type": "username", "value": "alishercr"}]}
+
+    monkeypatch.setattr(svc, "run_sherlock", engine)
+    monkeypatch.setattr(svc, "run_maigret", engine)
+    monkeypatch.setattr(svc, "run_profile_sources", profiles)
+    monkeypatch.setattr(svc, "run_username_web", web)
+
+    result = await svc._investigate_username("solievsm")
+
+    assert result["posts"][0]["platform"] == "Instagram"
+    assert result["pivots"] == [
+        {"type": "username", "value": "axror.xs"},
+        {"type": "username", "value": "alishercr"},
+    ]

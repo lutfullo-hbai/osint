@@ -20,7 +20,7 @@ def normalize_domain(raw: str) -> str:
     domain = raw.strip().lower()
     domain = re.sub(r"^https?://", "", domain)
     domain = domain.split("/")[0].split(":")[0].strip(".")
-    if not DOMAIN_RE.fullmatch(domain):
+    if not DOMAIN_RE.fullmatch(domain) or domain.rsplit(".", 1)[-1].isdigit():
         raise DomainValidationError(
             f"'{raw}' is not a valid domain name (e.g. example.com)."
         )
@@ -86,7 +86,7 @@ def _dns_sync(domain: str) -> list[tuple[str, list[str]]]:
     resolver.timeout = 5
 
     collected = []
-    for record_type in ("A", "MX", "NS", "TXT"):
+    for record_type in ("A", "AAAA", "CNAME", "MX", "NS", "SOA", "CAA", "TXT"):
         try:
             answers = resolver.resolve(domain, record_type)
         except Exception:
@@ -123,38 +123,99 @@ async def dns_lookup(domain: str) -> tuple[dict, str]:
     return entry, first_ipv4
 
 
-async def crtsh_lookup(client: httpx.AsyncClient, domain: str) -> dict:
-    response = await client.get(
-        f"https://crt.sh/?q=%.{domain}&output=json",
-        timeout=httpx.Timeout(30.0),
-    )
-    if response.status_code != 200:
-        raise ToolError(f"crt.sh returned HTTP {response.status_code}.")
+def is_subdomain(name: str, domain: str) -> bool:
+    return name.endswith(f".{domain}")
 
-    try:
-        rows = response.json()
-    except ValueError as exc:
-        raise ToolError("crt.sh returned malformed JSON.") from exc
 
+def parse_crtsh(rows, domain: str) -> set[str]:
     subdomains = set()
     for row in rows if isinstance(rows, list) else []:
         if not isinstance(row, dict):
             continue
         for line in str(row.get("name_value", "")).splitlines():
-            name = line.strip().lstrip("*.").lower()
-            if name.endswith(domain) and name != domain:
+            name = line.strip().removeprefix("*.").lower()
+            if is_subdomain(name, domain):
                 subdomains.add(name)
+    return subdomains
 
-    if not subdomains:
-        raise ToolError("No certificate-transparency subdomains found.")
-    ordered = sorted(subdomains)
+
+async def _crtsh_subdomains(client: httpx.AsyncClient, domain: str) -> set[str]:
+    response = await client.get(
+        f"https://crt.sh/?q=%.{domain}&output=json",
+        timeout=httpx.Timeout(30.0),
+    )
+    if response.status_code != 200:
+        raise ToolError(f"HTTP {response.status_code}")
+    try:
+        return parse_crtsh(response.json(), domain)
+    except ValueError as exc:
+        raise ToolError("malformed JSON") from exc
+
+
+async def _otx_subdomains(client: httpx.AsyncClient, domain: str) -> set[str]:
+    response = await client.get(
+        f"https://otx.alienvault.com/api/v1/indicators/domain/{domain}/passive_dns",
+        timeout=httpx.Timeout(20.0),
+    )
+    if response.status_code != 200:
+        raise ToolError(f"HTTP {response.status_code}")
+    records = response.json().get("passive_dns") or []
+    names = {str(record.get("hostname", "")).lower() for record in records}
+    return {name for name in names if is_subdomain(name, domain)}
+
+
+async def _hackertarget_subdomains(client: httpx.AsyncClient, domain: str) -> set[str]:
+    response = await client.get(
+        f"https://api.hackertarget.com/hostsearch/?q={domain}"
+    )
+    if response.status_code != 200:
+        raise ToolError(f"HTTP {response.status_code}")
+    # Quota and error messages also arrive as HTTP 200 plain text.
+    if "," not in response.text:
+        raise ToolError(response.text.strip()[:80] or "empty response")
+    names = {line.split(",")[0].strip().lower() for line in response.text.splitlines()}
+    return {name for name in names if is_subdomain(name, domain)}
+
+
+async def subdomain_lookup(
+    client: httpx.AsyncClient, domain: str
+) -> tuple[dict, list[str], list[str]]:
+    """Union several passive sources, since each one is often down or rate limited."""
+    sources = {
+        "crt.sh": _crtsh_subdomains,
+        "AlienVault OTX": _otx_subdomains,
+        "HackerTarget": _hackertarget_subdomains,
+    }
+    outcomes = await asyncio.gather(
+        *(fetch(client, domain) for fetch in sources.values()),
+        return_exceptions=True,
+    )
+
+    found: set[str] = set()
+    used = []
+    warnings = []
+    for label, outcome in zip(sources, outcomes):
+        if isinstance(outcome, ToolError):
+            warnings.append(f"{label}: {outcome}")
+        elif isinstance(outcome, BaseException):
+            warnings.append(f"{label}: {type(outcome).__name__}")
+        else:
+            found |= outcome
+            used.append(f"{label} ({len(outcome)})")
+
+    if not found:
+        raise ToolError(
+            "; ".join(warnings) or "No passive subdomains found in any source."
+        )
+    ordered = sorted(found)
     preview = ", ".join(ordered[:25]) + (" ..." if len(ordered) > 25 else "")
-    return {
-        "platform": "Subdomains (crt.sh)",
+    entry = {
+        "platform": "Subdomains",
         "url": f"https://crt.sh/?q=%.{domain}",
         "status": "found",
-        "info": f"{len(subdomains)} unique subdomains: {preview}",
+        "info": f"{len(ordered)} unique from {', '.join(used)}: {preview}",
     }
+    return entry, ordered, warnings
 
 
 async def ip_geo_lookup(client: httpx.AsyncClient, ip_address: str) -> dict:

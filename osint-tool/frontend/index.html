@@ -20,12 +20,13 @@
     <button class="tab" data-tab="email" role="tab" aria-selected="false">Email</button>
     <button class="tab" data-tab="phone" role="tab" aria-selected="false">Phone</button>
     <button class="tab" data-tab="domain" role="tab" aria-selected="false">Domain/IP</button>
+    <button class="tab" data-tab="image" role="tab" aria-selected="false">Image</button>
     <button class="tab" data-tab="catalog" role="tab" aria-selected="false">Catalog</button>
   </nav>
 
   <main>
     <section class="panel active" id="panel-name" role="tabpanel">
-      <form class="search-form" data-endpoint="/api/name" autocomplete="off">
+      <form class="search-form" data-endpoint="/api/name" data-category="name" autocomplete="off">
         <input
           type="text"
           name="query"
@@ -42,7 +43,7 @@
     </section>
 
     <section class="panel" id="panel-username" role="tabpanel">
-      <form class="search-form" data-endpoint="/api/username" autocomplete="off">
+      <form class="search-form" data-endpoint="/api/username" data-category="username" autocomplete="off">
         <input
           type="text"
           name="query"
@@ -59,7 +60,7 @@
     </section>
 
     <section class="panel" id="panel-email" role="tabpanel">
-      <form class="search-form" data-endpoint="/api/email" autocomplete="off">
+      <form class="search-form" data-endpoint="/api/email" data-category="email" autocomplete="off">
         <input
           type="email"
           name="query"
@@ -76,7 +77,7 @@
     </section>
 
     <section class="panel" id="panel-phone" role="tabpanel">
-      <form class="search-form" data-endpoint="/api/phone" autocomplete="off">
+      <form class="search-form" data-endpoint="/api/phone" data-category="phone" autocomplete="off">
         <input
           type="tel"
           name="query"
@@ -93,17 +94,34 @@
     </section>
 
     <section class="panel" id="panel-domain" role="tabpanel">
-      <form class="search-form" data-endpoint="/api/domain" autocomplete="off">
+      <form class="search-form" data-endpoint="/api/domain" data-category="domain" autocomplete="off">
         <input
           type="text"
           name="query"
-          placeholder="Enter domain, e.g. example.com"
+          placeholder="Enter domain or IP, e.g. example.com or 8.8.8.8"
           spellcheck="false"
           required
         />
         <button type="submit">Search</button>
       </form>
       <div class="spinner hidden"><div class="loader"></div><span>Resolving infrastructure...</span></div>
+      <div class="error-box hidden"></div>
+      <div class="summary"></div>
+      <div class="results"></div>
+    </section>
+
+    <section class="panel" id="panel-image" role="tabpanel">
+      <form class="search-form" data-endpoint="/api/image" data-category="image" autocomplete="off">
+        <input
+          type="url"
+          name="query"
+          placeholder="Image URL, e.g. https://example.com/photo.jpg"
+          spellcheck="false"
+          required
+        />
+        <button type="submit">Analyze</button>
+      </form>
+      <div class="spinner hidden"><div class="loader"></div><span>Downloading and analyzing image...</span></div>
       <div class="error-box hidden"></div>
       <div class="summary"></div>
       <div class="results"></div>

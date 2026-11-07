@@ -46,6 +46,11 @@ CATALOG = [
     {"name": "Telegram web", "url": "https://web.telegram.org/", "category": "Social Media", "note": "Public channels preview at t.me/s/channelname"},
     {"name": "Reddit search", "url": "https://redditsearch.io/", "category": "Social Media", "note": "Keyword search across Reddit history"},
     {"name": "Bluesky/Grake/Mastodon lists", "url": "https://github.com/jivoi/awesome-osint#social-media", "category": "Social Media", "note": "Per-platform tool lists in upstream repo"},
+    {"name": "Google Lens", "url": "https://lens.google.com/", "category": "Images & Geospatial", "note": "Reverse-image search from URL or upload (linked from Image tab)"},
+    {"name": "Bing Visual Search", "url": "https://www.bing.com/visualsearch", "category": "Images & Geospatial", "note": "Alternative reverse-image index (linked from Image tab)"},
+    {"name": "Gravatar", "url": "https://gravatar.com/", "category": "Email", "note": "Public avatar lookup by email MD5 (integrated here)"},
+    {"name": "MXToolbox", "url": "https://mxtoolbox.com/", "category": "Email", "note": "MX, SPF and DMARC diagnostics"},
+    {"name": "EasyDMARC", "url": "https://easydmarc.com/tools/dmarc-lookup", "category": "Email", "note": "DMARC record and policy checker"},
 ]
 
 CATEGORY_ORDER = [

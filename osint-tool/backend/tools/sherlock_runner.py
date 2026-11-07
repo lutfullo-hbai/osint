@@ -42,7 +42,6 @@ def _build_command(username: str) -> list[str]:
         "--timeout",
         "15",
         "--no-color",
-        "--no-txt",
         "--print-found",
     ]
 
