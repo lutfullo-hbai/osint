@@ -41,6 +41,7 @@
     <button class="tab" data-tab="domain" role="tab" aria-selected="false">Domain/IP</button>
     <button class="tab" data-tab="exposure" role="tab" aria-selected="false">Exposure</button>
     <button class="tab" data-tab="image" role="tab" aria-selected="false">Image</button>
+    <button class="tab" data-tab="cases" role="tab" aria-selected="false">Cases</button>
     <button class="tab" data-tab="catalog" role="tab" aria-selected="false">Catalog</button>
   </nav>
 
@@ -196,6 +197,16 @@
       <div class="error-box hidden"></div>
       <div class="summary"></div>
       <div class="results"></div>
+    </section>
+
+    <section class="panel" id="panel-cases" role="tabpanel">
+      <div class="case-new">
+        <input type="text" id="case-new-name" placeholder="New case name, e.g. Acme due diligence" spellcheck="false" autocomplete="off" />
+        <button type="button" id="case-new-btn">Create case</button>
+      </div>
+      <div id="case-list" class="chip-row"></div>
+      <div class="summary" id="case-summary"></div>
+      <div class="results" id="case-results"></div>
     </section>
 
     <section class="panel" id="panel-catalog" role="tabpanel">

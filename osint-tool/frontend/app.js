@@ -225,6 +225,9 @@ function activateTab(name) {
   if (name === "catalog") {
     loadCatalogOnce();
   }
+  if (name === "cases") {
+    loadCases();
+  }
 }
 
 function setLoading(panel, isLoading) {
@@ -483,6 +486,7 @@ function buildToolbar(data) {
     exports.appendChild(buildActionButton("Export MD", () => downloadReport(data, "md")));
     exports.appendChild(buildActionButton("Export JSON", () => downloadReport(data, "json")));
     exports.appendChild(buildActionButton("Print / PDF", () => window.print()));
+    exports.appendChild(buildActionButton("Save to case", () => saveToCase(data)));
     const aiBox = document.createElement("div");
     aiBox.className = "ai-summary hidden";
     const aiButton = buildActionButton("AI Summary", () => analyzeWithAI(data, aiBox, aiButton));
@@ -862,3 +866,203 @@ document.getElementById("catalog-filter").addEventListener("input", (event) => {
 checkApiStatus();
 setInterval(checkApiStatus, 30000);
 loadAiDefaults();
+
+const caseNewBtn = document.getElementById("case-new-btn");
+if (caseNewBtn) {
+  const createFromInput = async () => {
+    const input = document.getElementById("case-new-name");
+    const name = input.value.trim();
+    if (!name) return;
+    try {
+      const created = await caseApi("", { method: "POST", body: JSON.stringify({ name }) });
+      setActiveCase(created.id);
+      input.value = "";
+      loadCases();
+    } catch (err) {
+      alert("Could not create case: " + err.message);
+    }
+  };
+  caseNewBtn.addEventListener("click", createFromInput);
+  document.getElementById("case-new-name").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") createFromInput();
+  });
+}
+
+
+// ============================================================
+//  Cases — group findings from many searches into one investigation
+// ============================================================
+const ACTIVE_CASE_KEY = "osint_active_case";
+
+function activeCaseId() {
+  try {
+    return localStorage.getItem(ACTIVE_CASE_KEY) || "";
+  } catch (err) {
+    return "";
+  }
+}
+function setActiveCase(id) {
+  try {
+    if (id) localStorage.setItem(ACTIVE_CASE_KEY, id);
+    else localStorage.removeItem(ACTIVE_CASE_KEY);
+  } catch (err) {
+    /* ignore */
+  }
+}
+
+async function caseApi(path, options = {}) {
+  return requestJson(`${API_BASE}/api/cases${path}`, {
+    ...options,
+    headers: authHeaders({ "Content-Type": "application/json", ...(options.headers || {}) }),
+  });
+}
+
+async function saveToCase(data) {
+  let id = activeCaseId();
+  try {
+    if (!id) {
+      const name = prompt("New case name:", `${data.category || "case"} - ${data.query}`);
+      if (!name) return;
+      const created = await caseApi("", { method: "POST", body: JSON.stringify({ name }) });
+      id = created.id;
+      setActiveCase(id);
+    }
+    await caseApi(`/${id}/findings`, {
+      method: "POST",
+      body: JSON.stringify({
+        category: data.category || "search",
+        query: String(data.query),
+        result: data,
+      }),
+    });
+    alert("Saved to case.");
+  } catch (err) {
+    alert("Could not save to case: " + err.message);
+  }
+}
+
+function aggregateCase(detail) {
+  const results = [];
+  const pivots = [];
+  const seen = new Set();
+  detail.findings.forEach((f) => {
+    (f.result.results || []).forEach((r) => results.push(r));
+    (f.result.posts || []).forEach((r) => results.push(r));
+    (f.result.pivots || []).forEach((p) => {
+      const key = `${p.type}:${String(p.value).toLowerCase()}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        pivots.push(p);
+      }
+    });
+  });
+  return {
+    query: detail.case.name,
+    category: "case",
+    results,
+    pivots,
+    notice: "Combined case report aggregating every saved search.",
+  };
+}
+
+async function loadCases() {
+  const listEl = document.getElementById("case-list");
+  const summaryEl = document.getElementById("case-summary");
+  const resultsEl = document.getElementById("case-results");
+  listEl.innerHTML = "";
+  summaryEl.innerHTML = "";
+  resultsEl.innerHTML = "";
+  let cases;
+  try {
+    cases = (await caseApi("", { method: "GET" })).cases;
+  } catch (err) {
+    summaryEl.textContent = "Could not load cases: " + err.message;
+    return;
+  }
+  if (!cases.length) {
+    resultsEl.innerHTML =
+      '<div class="empty-state">No cases yet. Create one, then use "Save to case" on any result.</div>';
+    return;
+  }
+  const active = activeCaseId();
+  cases.forEach((c) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "chip" + (c.id === active ? " chip-active" : "");
+    chip.textContent = `${c.name} (${c.findings})`;
+    chip.addEventListener("click", () => {
+      setActiveCase(c.id);
+      openCase(c.id);
+      loadCases();
+    });
+    listEl.appendChild(chip);
+  });
+  const current = active && cases.some((c) => c.id === active) ? active : cases[0].id;
+  setActiveCase(current);
+  openCase(current);
+}
+
+async function openCase(caseId) {
+  const summaryEl = document.getElementById("case-summary");
+  const resultsEl = document.getElementById("case-results");
+  resultsEl.innerHTML = "";
+  let detail;
+  try {
+    detail = await caseApi(`/${caseId}`, { method: "GET" });
+  } catch (err) {
+    summaryEl.textContent = "Could not open case: " + err.message;
+    return;
+  }
+  const n = detail.findings.length;
+  summaryEl.innerHTML = `<strong>${detail.case.name}</strong> — ${n} finding${
+    n === 1 ? "" : "s"
+  }`;
+
+  const combined = aggregateCase(detail);
+  const toolbar = buildToolbar(combined);
+  const del = buildActionButton("Delete case", async () => {
+    if (!confirm(`Delete case "${detail.case.name}"?`)) return;
+    await caseApi(`/${caseId}`, { method: "DELETE" });
+    setActiveCase("");
+    loadCases();
+  });
+  del.classList.add("chip-danger");
+  const delRow = document.createElement("div");
+  delRow.className = "chip-row";
+  delRow.appendChild(del);
+  toolbar.appendChild(delRow);
+  resultsEl.appendChild(toolbar);
+
+  if (!n) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = 'This case is empty. Use "Save to case" on a search result.';
+    resultsEl.appendChild(empty);
+    return;
+  }
+
+  detail.findings.forEach((f) => {
+    const head = document.createElement("div");
+    head.className = "section-head case-finding-head";
+    const when = (f.created_at || "").replace("T", " ").replace("+00:00", " UTC");
+    head.textContent = `${f.category}: ${f.query} — ${when}`;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "chip chip-danger case-remove";
+    remove.textContent = "remove";
+    remove.addEventListener("click", async () => {
+      await caseApi(`/${caseId}/findings/${f.id}`, { method: "DELETE" });
+      openCase(caseId);
+    });
+    head.appendChild(remove);
+    resultsEl.appendChild(head);
+    const items = [...(f.result.results || []), ...(f.result.posts || [])];
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.textContent = f.result.message || "No results in this finding.";
+      resultsEl.appendChild(empty);
+    }
+    items.forEach((item) => resultsEl.appendChild(buildCard(item)));
+  });
+}

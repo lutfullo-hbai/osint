@@ -15,6 +15,17 @@ docker compose up -d --build
 
 To'xtatish: `docker compose down`
 
+## Case (tergov) boshqaruvi
+
+Har bir qidiruv alohida emas — bir **case**ga yig'iladi:
+- **Cases** bo'limida case ochasiz; istalgan natijada **"Save to case"** bosasiz
+- Case ichida barcha topilmalar manba va vaqt (provenance) bilan saqlanadi (SQLite,
+  restart'da yo'qolmaydi)
+- **Birlashtirilgan hisobot**: butun case bo'yicha Export MD/JSON, Print/PDF, entity
+  graf va **AI xulosa** (barcha topilmalar ustidan)
+
+Ma'lumotlar `osint-data` volume'ida (`/app/data/cases.db`) saqlanadi.
+
 ## AI tahlil (lokal Qwen)
 
 Har qanday natijada **"AI Summary"** tugmasi bor. Bosilganda brauzer

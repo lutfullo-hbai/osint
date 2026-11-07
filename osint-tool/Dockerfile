@@ -23,6 +23,7 @@ RUN if [ "$INSTALL_DEV" = "true" ]; then pip install -r requirements-dev.txt; fi
 COPY backend/main.py .
 COPY backend/security.py .
 COPY backend/cache.py .
+COPY backend/store.py .
 COPY backend/worker.py .
 COPY backend/pytest.ini .
 COPY backend/routers ./routers
@@ -31,6 +32,7 @@ COPY backend/tools ./tools
 COPY backend/tests ./tests
 
 RUN useradd --create-home --shell /bin/bash osint \
+    && mkdir -p /app/data \
     && chown -R osint:osint /app
 
 USER osint
