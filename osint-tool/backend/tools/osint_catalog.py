@@ -44,7 +44,7 @@ CATALOG = [
     {"name": "SunCalc", "url": "https://www.suncalc.org/", "category": "Images & Geospatial", "note": "Shadow-based time-of-photo estimation"},
     {"name": "LinkedIn", "url": "https://www.linkedin.com/", "category": "Social Media", "note": "Company/person employment graph; X-ray via site:linkedin.com/in"},
     {"name": "Telegram web", "url": "https://web.telegram.org/", "category": "Social Media", "note": "Public channels preview at t.me/s/channelname"},
-    {"name": "Reddit search", "url": "https://redditsearch.io/", "category": "Social Media", "note": "Keyword search across Reddit history"},
+    {"name": "Reddit search", "url": "https://www.reddit.com/search/", "category": "Social Media", "note": "Keyword search across Reddit (native)"},
     {"name": "Bluesky/Grake/Mastodon lists", "url": "https://github.com/jivoi/awesome-osint#social-media", "category": "Social Media", "note": "Per-platform tool lists in upstream repo"},
     {"name": "Google Lens", "url": "https://lens.google.com/", "category": "Images & Geospatial", "note": "Reverse-image search from URL or upload (linked from Image tab)"},
     {"name": "Bing Visual Search", "url": "https://www.bing.com/visualsearch", "category": "Images & Geospatial", "note": "Alternative reverse-image index (linked from Image tab)"},
