@@ -41,6 +41,9 @@ so'rovlar `X-API-Key` sarlavhasini talab qiladi (`/health` ochiq qoladi).
 OSINT_API_KEY=my-secret docker compose up -d --build
 ```
 
+Barcha sozlamalar `.env.example` faylida hujjatlashtirilgan (nusxalab `.env` qiling).
+Kalit bo'lmasa, tegishli manba o'tkazib yuboriladi (buzilmaydi).
+
 Frontend kalitni brauzer `localStorage`'ida saqlaydi:
 
 ```js

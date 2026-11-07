@@ -634,3 +634,38 @@ a.chip { text-decoration: none; }
   .tab { padding: 9px 15px; font-size: 0.8rem; }
   .search-form button { flex: 1 1 100%; padding: 14px; }
 }
+
+/* ---------- print / PDF ---------- */
+@media print {
+  .aurora, .scanlines, .tabs, .search-form, .spinner, .error-box,
+  .footer, .toolbar, #catalog-filter { display: none !important; }
+  body { background: #fff !important; color: #000; padding: 0; }
+  .header { padding: 0 0 12px; }
+  .logo, .logo span { color: #000 !important; -webkit-text-fill-color: #000; }
+  .brand-mark { display: none; }
+  .subtitle, .subtitle-sub { color: #444; }
+  .panel { display: none !important; }
+  .panel.active { display: block !important; }
+  .summary, .summary strong { color: #000; }
+  .results { display: block; }
+  .card {
+    background: #fff !important;
+    border: 1px solid #bbb;
+    box-shadow: none;
+    color: #000;
+    break-inside: avoid;
+    margin-bottom: 10px;
+    animation: none;
+  }
+  .card::before { display: none; }
+  .card-title { color: #000; }
+  .card-url { color: #0645ad; }
+  .card-meta, .notice { color: #222; }
+  .badge, .tag { background: #eee !important; color: #333 !important; border: 1px solid #999; }
+  .badge.error { color: #a00 !important; border-color: #a00; }
+  .section-head, .catalog-heading {
+    color: #000 !important; -webkit-text-fill-color: #000; background: none;
+  }
+  .section-head::after { display: none; }
+  .warning-item { color: #333; background: #f6f6f6; border-color: #ccc; }
+}
