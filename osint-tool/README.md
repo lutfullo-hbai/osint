@@ -107,15 +107,25 @@ bilan keshlanadi. Takroriy so'rovda natija `"cached": true` bilan qaytadi. Redis
 mavjud bo'lmasa, jarayon ichidagi xotira keshiga fallback qiladi.
 
 ### Qo'shimcha modullar
-- **Image** (`POST /api/image`): URL orqali rasm yuklab olinadi (SSRF guard orqali),
-  EXIF metadata, GPS koordinatalari va qurilma ma'lumotlari ajratiladi hamda Google
-  Lens, Yandex, TinEye va Bing Visual Search uchun teskari qidiruv havolalari
-  qaytariladi. Fayl yuklash yo'q — faqat `http(s)` URL.
-- **Email domain intel**: MX, SPF va DMARC yozuvlari tekshiriladi, xavfsizlik
-  ogohlantirishlari beriladi, Gravatar avatar bor-yo'qligi aniqlanadi.
-- **Domain enrichment**: RDAP, crt.sh va DNS bilan birga urlscan.io, Wayback Machine
-  va HTTP fingerprint (server, `X-Powered-By`, texnologiya imzolari) ma'lumotlari
-  yig'iladi. Har bir manba mustaqil ishlaydi; xato bo'lsa `warnings`ga yoziladi.
+- **Name**: veb-qidiruv (ism tartibi + lotin/kirill transliteratsiya), ORCID,
+  OpenAlex, GitHub va **Wikidata/Wikipedia** shaxs kartasi (tug'ilgan sana, kasb,
+  mamlakat, ulangan ijtimoiy handle'lar → pivot). OpenSanctions sanksiya/PEP
+  tekshiruvi `OPENSANCTIONS_API_KEY` bo'lsa ishlaydi.
+- **Username**: Sherlock + Maigret + 14 ta ochiq API (Telegram, GitHub, GitLab,
+  Chess.com, npm, Gravatar, Keybase, Mastodon, Bluesky, Docker Hub, Lichess,
+  Codeforces, Hacker News, DEV) + ochiq postlar (Instagram/TikTok/... indeks,
+  login'siz). Ishonch darajasi va teg qilingan `@do'stlar` pivoti.
+- **Email**: Holehe, HIBP, EmailRep, MX/SPF/DMARC va **Gravatar profil** (ism,
+  joylashuv, ish, ulangan tarmoqlar → pivot). Local qism ham username pivoti.
+- **Phone**: numbering-plan ma'lumoti (operator, geo, liniya turi, timezone),
+  ommaviy eslatmalar va WhatsApp/Viber/Telegram/Truecaller qo'lda tekshirish havolalari.
+- **Domain/IP**: RDAP, DNS (A/AAAA/CNAME/MX/NS/SOA/CAA/TXT), subdomenlar
+  (crt.sh + OTX + HackerTarget), TLS sertifikat, xavfsizlik sarlavhalari, urlscan,
+  Wayback, HTTP fingerprint, IP geolokatsiya, reverse DNS, Shodan InternetDB va
+  **reverse IP** (bir serverdagi qo'shni domenlar). Ochiq IP ham qabul qilinadi.
+- **Image**: EXIF, GPS, qurilma ma'lumoti, **OCR** (rasmdagi matn), **dHash**
+  (perceptual hash), EXIF thumbnail, va Google Lens/Yandex/TinEye/Bing teskari
+  qidiruv havolalari. Fayl yuklash yo'q — faqat `http(s)` URL.
 
 ### Audit log
 Har bir so'rov stdout'ga JSON-lines ko'rinishida yoziladi: `request_id`, metod, yo'l,
