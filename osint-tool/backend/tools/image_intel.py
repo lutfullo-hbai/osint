@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import io
 import datetime
@@ -11,6 +12,7 @@ from tools.base import ToolError
 from tools.net_guard import safe_get
 
 MAX_IMAGE_BYTES = 15 * 1024 * 1024
+PREVIEW_MAX_PX = 1024
 IMAGE_HEADERS = {"User-Agent": "osint-tool/1.0 (local self-audit)"}
 
 EXIF_FIELDS = [
@@ -199,6 +201,15 @@ def dhash(image, hash_size: int = 8) -> str:
     return f"{bits:016x}"
 
 
+def make_preview(image) -> str:
+    """A small base64 JPEG so a local vision model can look at the image cheaply."""
+    copy = image.convert("RGB")
+    copy.thumbnail((PREVIEW_MAX_PX, PREVIEW_MAX_PX), Image.LANCZOS)
+    buffer = io.BytesIO()
+    copy.save(buffer, format="JPEG", quality=80)
+    return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
 def ocr_text(data: bytes) -> str:
     try:
         import pytesseract
@@ -228,11 +239,16 @@ def analyze_image(data: bytes, url: str) -> dict:
     width = height = None
     image_format = "unknown"
     perceptual = ""
+    preview = ""
     try:
         with Image.open(io.BytesIO(data)) as image:
             width, height = image.size
             image_format = image.format or "unknown"
             perceptual = dhash(image)
+            try:
+                preview = make_preview(image)
+            except Exception:
+                preview = ""
     except Exception as exc:
         warnings.append(f"Could not decode image: {exc}")
 
@@ -375,7 +391,7 @@ def analyze_image(data: bytes, url: str) -> dict:
             }
         )
 
-    return {"results": results, "warnings": warnings, "links": links}
+    return {"results": results, "warnings": warnings, "links": links, "preview": preview}
 
 
 async def fetch_image_bytes(client, url: str) -> tuple[bytes, str, str]:

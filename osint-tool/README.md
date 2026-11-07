@@ -23,6 +23,11 @@ qisqa analitik xulosaga (topilganlar, qarama-qarshiliklar, ishonch darajasi,
 keyingi qadam) aylantiradi. **Kalit kerak emas, ma'lumot kompyuterдан chiqmaydi.**
 
 Talab: hostда Ollama + Qwen modeli ishlab turishi (`ollama pull qwen2.5:7b`).
+
+**Rasm tahlili (AI Vision):** Image bo'limida "AI Vision" tugmasi rasmni lokal
+vision modelga yuboradi (joy, belgilar, til, ob'ektlar — geolokatsiyaga yordam).
+Vision model kerak: `ollama pull qwen2.5vl:7b` (yoki `llava`, `moondream`).
+Standart model `qwen2.5vl:7b`, `osint_ollama_vision_model` bilan o'zgartiriladi.
 Standart: `http://127.0.0.1:11434`, model `qwen2.5:7b`. O'zgartirish:
 
 ```js

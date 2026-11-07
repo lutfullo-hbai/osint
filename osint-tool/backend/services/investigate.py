@@ -715,6 +715,8 @@ async def _investigate_image(url: str) -> dict:
         response["links"] = [
             {"label": label, "url": link_url} for label, link_url in links.items()
         ]
+    if outcome.get("preview"):
+        response["preview_b64"] = outcome["preview"]
     if outcome["warnings"]:
         response["warnings"] = outcome["warnings"]
     return response

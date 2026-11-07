@@ -21,6 +21,7 @@ function authHeaders(extra = {}) {
 // ---- Local AI (Ollama + Qwen) — runs in the browser, data stays on your machine ----
 const OLLAMA_URL_KEY = "osint_ollama_url";
 const OLLAMA_MODEL_KEY = "osint_ollama_model";
+const OLLAMA_VISION_KEY = "osint_ollama_vision_model";
 
 function ollamaConfig() {
   let url = "http://127.0.0.1:11434";
@@ -31,7 +32,13 @@ function ollamaConfig() {
   } catch (err) {
     /* ignore */
   }
-  return { url, model };
+  let vision = "qwen2.5vl:7b";
+  try {
+    vision = localStorage.getItem(OLLAMA_VISION_KEY) || vision;
+  } catch (err) {
+    /* ignore */
+  }
+  return { url, model, vision };
 }
 
 function findingsForPrompt(data) {
@@ -108,6 +115,55 @@ async function analyzeWithAI(data, container, button) {
   } finally {
     button.disabled = false;
     button.textContent = "AI Summary";
+  }
+}
+
+async function analyzeVision(data, container, button) {
+  const { url, vision } = ollamaConfig();
+  if (!data.preview_b64) {
+    container.classList.remove("hidden");
+    container.textContent = "No image preview available to analyze.";
+    return;
+  }
+  button.disabled = true;
+  button.textContent = "Looking…";
+  container.classList.remove("hidden");
+  container.textContent = "Running local vision model (" + vision + ")…";
+
+  const prompt =
+    "Describe this image for an OSINT geolocation analysis. List: visible text / " +
+    "signs (and language), landmarks or notable buildings, vehicles and licence-plate " +
+    "style, terrain and vegetation, clothing, and any clue to the country or city. " +
+    "State what you are unsure about. Do not invent details.";
+
+  try {
+    const response = await fetch(`${url}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: vision,
+        messages: [{ role: "user", content: prompt, images: [data.preview_b64] }],
+        stream: false,
+        options: { temperature: 0.2 },
+      }),
+    });
+    if (!response.ok) throw new Error(`Ollama returned HTTP ${response.status}`);
+    const payload = await response.json();
+    const text = (payload.message && payload.message.content) || "(empty response)";
+    container.textContent = "";
+    text.split(/\n{2,}/).filter((p) => p.trim()).forEach((para) => {
+      const el = document.createElement("p");
+      el.textContent = para.trim();
+      container.appendChild(el);
+    });
+  } catch (err) {
+    container.textContent =
+      `Could not reach a local vision model at ${url}. Pull one first, e.g. ` +
+      `"ollama pull qwen2.5vl:7b" (or llava / moondream), then set ` +
+      `localStorage ${OLLAMA_VISION_KEY}. [${err.message}]`;
+  } finally {
+    button.disabled = false;
+    button.textContent = "AI Vision";
   }
 }
 
@@ -411,6 +467,12 @@ function buildToolbar(data) {
     aiBox.className = "ai-summary hidden";
     const aiButton = buildActionButton("AI Summary", () => analyzeWithAI(data, aiBox, aiButton));
     exports.appendChild(aiButton);
+    if (data.preview_b64) {
+      const visionButton = buildActionButton("AI Vision", () =>
+        analyzeVision(data, aiBox, visionButton)
+      );
+      exports.appendChild(visionButton);
+    }
     toolbar.appendChild(exports);
     toolbar.appendChild(aiBox);
   }
