@@ -12,6 +12,7 @@ from tools.domain_enrich import (
     http_fingerprint,
     tls_lookup,
     urlscan_lookup,
+    wayback_cdx,
     wayback_lookup,
 )
 from tools.domain_intel import (
@@ -34,6 +35,7 @@ from tools.ip_intel import (
     reverse_ip_lookup,
 )
 from tools.net_guard import UnsafeURLError, is_public_ip
+from tools.web_recon import disclosure_files, favicon_hash
 from tools.maigret_runner import run_maigret
 from tools.company_intel import (
     CompanyValidationError,
@@ -544,13 +546,30 @@ async def _investigate_domain(domain: str) -> dict:
                 "TLS": tls_lookup(domain),
                 "Mail": domain_mail_intel(domain),
                 "DNS": dns_lookup(domain),
+                "Archived URLs": wayback_cdx(client, domain),
+                "Favicon": favicon_hash(client, domain),
+                "Disclosure": disclosure_files(client, domain),
             }
         )
 
+        san_domains: list[str] = []
         results: list[dict] = []
-        for label in ("RDAP", "urlscan.io", "Wayback Machine", "HTTP fingerprint", "TLS"):
+        for label in (
+            "RDAP", "urlscan.io", "Wayback Machine", "Archived URLs",
+            "HTTP fingerprint", "TLS", "Favicon",
+        ):
             if label in outcomes:
-                results.append(outcomes[label])
+                entry = outcomes[label]
+                if label == "TLS":
+                    san_domains = [
+                        s for s in entry.pop("_sans", []) if s and "*" not in s
+                    ]
+                results.append(entry)
+
+        if "Disclosure" in outcomes:
+            disclosure_results, disclosure_warnings = outcomes["Disclosure"]
+            results.extend(disclosure_results)
+            warnings.extend(disclosure_warnings)
 
         subdomains: list[str] = []
         if "Subdomains" in outcomes:
@@ -582,14 +601,16 @@ async def _investigate_domain(domain: str) -> dict:
     if not results:
         raise ToolError("All lookups failed: " + "; ".join(warnings))
 
-    other_domains = [d for d in neighbours if d != domain]
+    other_domains = list(dict.fromkeys(
+        d for d in (subdomains + san_domains + neighbours) if d != domain
+    ))
     response = {
         "status": "success",
         "category": "domain",
         "query": domain,
         "results": results,
         "count": len(results),
-        "pivots": _pivots([first_ip], subdomains + other_domains),
+        "pivots": _dedupe_pivots(_pivots([first_ip], other_domains)),
     }
     if warnings:
         response["warnings"] = warnings

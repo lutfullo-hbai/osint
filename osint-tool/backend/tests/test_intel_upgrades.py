@@ -651,3 +651,18 @@ def test_rdap_flags_newly_registered_domain(monkeypatch):
     registered = events["registration"]
     days = (dt.date.today() - dt.date.fromisoformat(registered[:10])).days
     assert 0 <= days < 90  # sanity for the test itself
+
+
+from tools import web_recon as wr
+
+
+def test_murmur3_matches_known_vectors():
+    def unsigned(v): return v & 0xFFFFFFFF
+    assert unsigned(wr.murmur3_32(b"", 0)) == 0
+    assert unsigned(wr.murmur3_32(b"", 1)) == 0x514E28B7
+    assert unsigned(wr.murmur3_32(b"test", 0)) == 0xBA6BD213
+
+
+def test_parse_robots_extracts_disallowed_paths():
+    text = "User-agent: *\nDisallow: /admin\nDisallow: /private/\nDisallow: /\nAllow: /x"
+    assert wr.parse_robots(text) == ["/admin", "/private/"]

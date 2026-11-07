@@ -124,8 +124,10 @@ mavjud bo'lmasa, jarayon ichidagi xotira keshiga fallback qiladi.
   ommaviy eslatmalar va WhatsApp/Viber/Telegram/Truecaller qo'lda tekshirish havolalari.
 - **Domain/IP**: RDAP, DNS (A/AAAA/CNAME/MX/NS/SOA/CAA/TXT), subdomenlar
   (crt.sh + OTX + HackerTarget), TLS sertifikat, xavfsizlik sarlavhalari, urlscan,
-  Wayback, HTTP fingerprint, IP geolokatsiya, reverse DNS, Shodan InternetDB va
-  **reverse IP** (bir serverdagi qo'shni domenlar). Ochiq IP ham qabul qilinadi.
+  Wayback (+ CDX: arxivlangan/o'chirilgan URL'lar), HTTP fingerprint, IP
+  geolokatsiya, reverse DNS, Shodan InternetDB, **reverse IP**, favicon hash
+  (Shodan), robots.txt/security.txt/sitemap.xml va sertifikat SAN pivotlari.
+  Ochiq IP ham qabul qilinadi.
 - **Image**: EXIF, GPS (decimal + DMS + balandlik + kamera yo'nalishi), **quyosh
   holati** (soyalarni tekshirish uchun azimut/balandlik), xarita havolalari
   (Google/OSM/Yandex/Bing/Earth/StreetView/SunCalc), **OCR**, **dHash**, EXIF
