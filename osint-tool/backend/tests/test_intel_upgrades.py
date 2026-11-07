@@ -513,3 +513,13 @@ def test_epoch_to_date_formats_and_tolerates_junk():
     assert pp._epoch_to_date(1389043258) == "2014-01-06"
     assert pp._epoch_to_date(None) == ""
     assert pp._epoch_to_date("x") == ""
+
+
+from tools import phone_intel as ph
+
+
+def test_phone_manual_check_links():
+    links = {l["label"]: l["url"] for l in ph.manual_check_links("+998901234567")}
+    assert links["WhatsApp"] == "https://wa.me/998901234567"
+    assert "998901234567" in links["Telegram"]
+    assert "%22+998901234567%22" in links["Google"]

@@ -32,7 +32,7 @@ from tools.net_guard import UnsafeURLError, is_public_ip
 from tools.maigret_runner import run_maigret
 from tools.entity_intel import run_person_entity, run_sanctions_check
 from tools.name_search import run_name_search, run_username_web
-from tools.phone_intel import PhoneParseError, analyze
+from tools.phone_intel import PhoneParseError, analyze, manual_check_links
 from tools.public_profiles import manual_links, run_name_sources, run_profile_sources
 from tools.public_search import filter_results_containing, search_public
 from tools.sherlock_runner import run_sherlock
@@ -495,6 +495,11 @@ async def _investigate_phone(raw_query: str) -> dict:
         "query": raw_query,
         "results": results,
         "count": len(results),
+        "links": manual_check_links(e164),
+        "notice": (
+            "Phone metadata is from the numbering plan, not a live lookup. "
+            "Owner identity needs independent confirmation."
+        ),
     }
     if warnings:
         response["warnings"] = warnings

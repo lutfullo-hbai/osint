@@ -24,6 +24,17 @@ TYPE_LABELS = {
 
 DEFAULT_REGION_HINT = "UZ"
 
+def manual_check_links(e164: str) -> list[dict]:
+    digits = e164.lstrip("+")
+    return [
+        {"label": "WhatsApp", "url": f"https://wa.me/{digits}"},
+        {"label": "Viber", "url": f"viber://chat?number=%2B{digits}"},
+        {"label": "Telegram", "url": f"https://t.me/+{digits}"},
+        {"label": "Truecaller", "url": f"https://www.truecaller.com/search/intl/{e164}"},
+        {"label": "Facebook", "url": f"https://www.facebook.com/search/top?q={e164}"},
+        {"label": "Google", "url": f"https://www.google.com/search?q=%22{e164}%22"},
+    ]
+
 
 class PhoneParseError(ValueError):
     pass
