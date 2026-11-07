@@ -8,6 +8,7 @@ def test_summarize_auth_reports_present_spf_and_dmarc():
             "mx": ["mx1.example.com", "mx2.example.com"],
             "txt": ["v=spf1 include:_spf.example.com ~all"],
             "dmarc": ["v=DMARC1; p=reject; rua=mailto:dmarc@example.com"],
+            "dkim": ["google"],
         }
     )
 
@@ -21,13 +22,13 @@ def test_summarize_auth_reports_present_spf_and_dmarc():
 
 
 def test_summarize_auth_warns_when_records_are_missing():
-    results, warnings = summarize_auth({"mx": [], "txt": [], "dmarc": []})
+    results, warnings = summarize_auth({"mx": [], "txt": [], "dmarc": [], "dkim": []})
 
     platforms = {item["platform"]: item for item in results}
     assert "MX records" not in platforms
     assert "SPF: no" in platforms["Email authentication"]["info"]
     assert "DMARC: no" in platforms["Email authentication"]["info"]
-    assert len(warnings) == 3
+    assert len(warnings) == 4
 
 
 def test_detect_technologies_matches_headers_and_body():

@@ -1,9 +1,22 @@
 import asyncio
 import hashlib
+import time
 
 import httpx
 
 RESOLVER_TIMEOUT = 5
+# Selectors big mail providers and platforms commonly publish DKIM under.
+DKIM_SELECTORS = (
+    "google", "selector1", "selector2", "default", "k1", "s1", "s2",
+    "dkim", "mail", "mandrill", "mailjet", "sendgrid", "zoho", "amazonses",
+)
+DISPOSABLE_URL = (
+    "https://raw.githubusercontent.com/disposable-email-domains/"
+    "disposable-email-domains/master/disposable_email_blocklist.conf"
+)
+_DISPOSABLE_CACHE: dict = {"domains": None, "fetched": 0.0}
+_DISPOSABLE_TTL = 86400
+_disposable_lock = asyncio.Lock()
 GRAVATAR_URL = "https://www.gravatar.com/avatar/{digest}?d=404&s=200"
 
 
@@ -35,10 +48,18 @@ def gather_dns_records(domain: str) -> dict:
     except Exception:
         pass
 
+    dkim_selectors = []
+    for selector in DKIM_SELECTORS:
+        for record in _txt_records(resolver, f"{selector}._domainkey.{domain}"):
+            if "DKIM1" in record or "p=" in record:
+                dkim_selectors.append(selector)
+                break
+
     return {
         "mx": mx_records,
         "txt": _txt_records(resolver, domain),
         "dmarc": _txt_records(resolver, f"_dmarc.{domain}"),
+        "dkim": dkim_selectors,
     }
 
 
@@ -71,9 +92,11 @@ def summarize_auth(records: dict) -> tuple[list[dict], list[str]]:
         "",
     )
 
+    dkim_selectors = records.get("dkim") or []
     auth_parts = [
         f"SPF: {'yes' if spf else 'no'}",
         f"DMARC: {'yes' if dmarc else 'no'}",
+        f"DKIM: {'yes (' + ', '.join(dkim_selectors) + ')' if dkim_selectors else 'none found'}",
     ]
     if spf:
         auth_parts.append(f"SPF policy: {spf[:160]}")
@@ -91,6 +114,10 @@ def summarize_auth(records: dict) -> tuple[list[dict], list[str]]:
         warnings.append("No SPF record found - sender spoofing may be easier.")
     if not dmarc:
         warnings.append("No DMARC record found - domain has no DMARC policy.")
+    if not dkim_selectors:
+        warnings.append(
+            "No DKIM selector found among common names (it may use a custom one)."
+        )
 
     return results, warnings
 
@@ -100,8 +127,54 @@ async def domain_mail_intel(domain: str) -> tuple[list[dict], list[str]]:
     return summarize_auth(records)
 
 
+async def load_disposable_domains() -> set[str]:
+    now = time.monotonic()
+    if (
+        _DISPOSABLE_CACHE["domains"] is not None
+        and now - _DISPOSABLE_CACHE["fetched"] < _DISPOSABLE_TTL
+    ):
+        return _DISPOSABLE_CACHE["domains"]
+    async with _disposable_lock:
+        if (
+            _DISPOSABLE_CACHE["domains"] is not None
+            and now - _DISPOSABLE_CACHE["fetched"] < _DISPOSABLE_TTL
+        ):
+            return _DISPOSABLE_CACHE["domains"]
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.get(DISPOSABLE_URL)
+        domains = {
+            line.strip().lower() for line in response.text.split() if line.strip()
+        }
+        _DISPOSABLE_CACHE["domains"] = domains
+        _DISPOSABLE_CACHE["fetched"] = now
+        return domains
+
+
+async def disposable_check(domain: str) -> dict | None:
+    try:
+        domains = await load_disposable_domains()
+    except Exception:
+        return None
+    if domain.lower() in domains:
+        return {
+            "platform": "Disposable email",
+            "status": "found",
+            "info": (
+                "This domain is a known disposable / throwaway email provider. "
+                "Treat the address as temporary and low-trust."
+            ),
+        }
+    return None
+
+
 async def email_domain_intel(email: str) -> tuple[list[dict], list[str]]:
-    return await domain_mail_intel(email.rsplit("@", 1)[-1].lower())
+    domain = email.rsplit("@", 1)[-1].lower()
+    results, warnings = await domain_mail_intel(domain)
+    disposable = await disposable_check(domain)
+    if disposable:
+        results.append(disposable)
+        warnings.append("Disposable email domain.")
+    return results, warnings
 
 
 # Gravatar accounts map to a username pivot on these platforms.

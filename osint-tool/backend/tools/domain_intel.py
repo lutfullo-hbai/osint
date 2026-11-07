@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import re
 
 import httpx
@@ -62,7 +63,20 @@ async def rdap_lookup(client: httpx.AsyncClient, domain: str) -> dict:
     if registrar:
         info_parts.append(f"Registrar: {registrar}")
     if "registration" in events:
-        info_parts.append(f"Registered: {events['registration']}")
+        registered = events["registration"]
+        age_note = ""
+        try:
+            days = (
+                datetime.date.today()
+                - datetime.date.fromisoformat(registered[:10])
+            ).days
+            if 0 <= days < 90:
+                age_note = f" ({days} days ago - NEW DOMAIN, common scam signal)"
+            elif days >= 0:
+                age_note = f" ({days // 365} yr {days % 365 // 30} mo ago)"
+        except ValueError:
+            pass
+        info_parts.append(f"Registered: {registered}{age_note}")
     if "expiration" in events:
         info_parts.append(f"Expires: {events['expiration']}")
     if nameservers:
