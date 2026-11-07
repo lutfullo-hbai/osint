@@ -20,6 +20,18 @@ TIMEOUT = httpx.Timeout(12.0)
 TELEGRAM_USERNAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{3,31}$")
 MAX_NAME_MATCHES = 5
 
+
+def _epoch_to_date(value) -> str:
+    import datetime
+    if not isinstance(value, (int, float)):
+        return ""
+    try:
+        return datetime.datetime.fromtimestamp(
+            value, tz=datetime.timezone.utc
+        ).strftime("%Y-%m-%d")
+    except (ValueError, OSError, OverflowError):
+        return ""
+
 LOGIN_WALLED_PROFILES = {
     "Instagram": "https://www.instagram.com/{u}/",
     "TikTok": "https://www.tiktok.com/@{u}",
@@ -283,7 +295,73 @@ async def codeforces_profile(client, username):
     )
 
 
+async def chesscom_profile(client, username):
+    data = await fetch_json(client, f"https://api.chess.com/pub/player/{username}")
+    if not data or data.get("status") == "closed:fair_play_violations":
+        return None
+    return _entry(
+        "Chess.com",
+        data.get("url", ""),
+        [
+            ("Name", data.get("name")),
+            ("Location", data.get("location")),
+            ("Followers", data.get("followers")),
+            ("Joined", _epoch_to_date(data.get("joined"))),
+        ],
+    )
+
+
+async def npm_profile(client, username):
+    data = await fetch_json(
+        client,
+        f"https://registry.npmjs.org/-/v1/search?text=author:{quote(username)}&size=5",
+    )
+    packages = (data or {}).get("objects") or []
+    if not packages:
+        return None
+    names = [pkg.get("package", {}).get("name", "") for pkg in packages]
+    return _entry(
+        "npm",
+        f"https://www.npmjs.com/~{username}",
+        [("Packages", ", ".join(n for n in names if n)[:200])],
+    )
+
+
+async def gravatar_username(client, username):
+    data = await fetch_json(client, f"https://gravatar.com/{username}.json")
+    try:
+        entry = data["entry"][0]
+    except (TypeError, KeyError, IndexError):
+        return None
+    fields = []
+    for label, key in (("Name", "displayName"), ("Location", "currentLocation"),
+                       ("Job", "job_title"), ("Company", "company")):
+        if entry.get(key):
+            fields.append((label, entry[key]))
+    accounts = entry.get("accounts") or []
+    linked = ""
+    if accounts:
+        fields.append(("Linked", ", ".join(
+            f"{a.get('shortname')}:{a.get('username')}" for a in accounts[:6]
+        )))
+        for account in accounts:
+            if str(account.get("shortname")).lower() in GITHUB_LIKE and account.get("username"):
+                linked = account["username"]
+                break
+    return _entry(
+        "Gravatar",
+        entry.get("profileUrl", f"https://gravatar.com/{username}"),
+        fields,
+        linked_username=linked,
+    )
+
+
+GITHUB_LIKE = {"github", "twitter", "instagram", "tiktok"}
+
 PROFILE_SOURCES = {
+    "Chess.com": chesscom_profile,
+    "npm": npm_profile,
+    "Gravatar": gravatar_username,
     "Telegram": telegram_profile,
     "GitHub": github_profile,
     "GitLab": gitlab_profile,

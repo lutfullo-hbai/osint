@@ -483,3 +483,33 @@ async def test_email_adds_local_part_and_gravatar_pivots(monkeypatch):
     assert {"type": "domain", "value": "example.com"} in result["pivots"]
     assert {"type": "username", "value": "beaulebens"} in result["pivots"]
     assert {"type": "username", "value": "john.doe"} in result["pivots"]
+
+
+async def test_chesscom_and_npm_and_gravatar_username_sources(monkeypatch):
+    calls = {}
+
+    async def fake_fetch(client, url, **kw):
+        calls["url"] = url
+        if "chess.com" in url:
+            return {"url": "https://chess.com/member/x", "name": "X", "followers": 3}
+        if "npmjs.org" in url:
+            return {"objects": [{"package": {"name": "leftpad"}}]}
+        if "gravatar" in url:
+            return {"entry": [{"profileUrl": "https://gravatar.com/x", "displayName": "X",
+                               "accounts": [{"shortname": "github", "username": "xdev"}]}]}
+        return None
+
+    monkeypatch.setattr(pp, "fetch_json", fake_fetch)
+    chess = await pp.chesscom_profile(None, "x")
+    npm = await pp.npm_profile(None, "x")
+    grav = await pp.gravatar_username(None, "x")
+    assert chess["platform"] == "Chess.com" and "Followers: 3" in chess["info"]
+    assert "leftpad" in npm["info"]
+    assert grav["linked_username"] == "xdev"
+    assert pp.extract_pivots([grav]) == [{"type": "username", "value": "xdev"}]
+
+
+def test_epoch_to_date_formats_and_tolerates_junk():
+    assert pp._epoch_to_date(1389043258) == "2014-01-06"
+    assert pp._epoch_to_date(None) == ""
+    assert pp._epoch_to_date("x") == ""
