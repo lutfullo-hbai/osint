@@ -65,3 +65,48 @@ def test_analyze_image_reports_dimensions_and_reverse_links():
 async def test_investigate_image_rejects_non_http_url():
     with pytest.raises(InvestigationValidationError):
         await investigate_image("ftp://example.com/photo.jpg")
+
+
+import io as _io
+
+from PIL import Image as _Image, ImageDraw as _ImageDraw
+
+from tools.image_intel import analyze_image, dhash, ocr_text
+
+
+def _png_bytes(image) -> bytes:
+    buffer = _io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def test_dhash_is_stable_and_similar_for_similar_images():
+    base = _Image.new("RGB", (64, 64), "white")
+    _ImageDraw.Draw(base).rectangle([10, 10, 40, 40], fill="black")
+    near = base.resize((60, 60)).resize((64, 64))
+    far = _Image.new("RGB", (64, 64), "black")
+
+    h_base = int(dhash(base), 16)
+    h_near = int(dhash(near), 16)
+    h_far = int(dhash(far), 16)
+
+    def distance(a, b):
+        return bin(a ^ b).count("1")
+
+    assert distance(h_base, h_near) <= 6
+    assert distance(h_base, h_far) > distance(h_base, h_near)
+
+
+def test_analyze_image_reports_dhash_and_runs_ocr():
+    image = _Image.new("RGB", (220, 80), "white")
+    _ImageDraw.Draw(image).text((10, 30), "HELLO OSINT", fill="black")
+    data = _png_bytes(image)
+
+    outcome = analyze_image(data, "https://example.com/x.png")
+    platforms = {entry["platform"]: entry for entry in outcome["results"]}
+    assert "dHash:" in platforms["Image info"]["info"]
+    # OCR is best-effort: either it read text, or it was cleanly skipped.
+    if "OCR text" in platforms:
+        assert platforms["OCR text"]["info"]
+    else:
+        assert any("OCR" in w for w in outcome["warnings"])

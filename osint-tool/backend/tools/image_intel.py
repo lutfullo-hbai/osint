@@ -66,6 +66,39 @@ def reverse_image_links(url: str) -> dict[str, str]:
     }
 
 
+OCR_MIN_CHARS = 3
+OCR_MAX_CHARS = 600
+
+
+def dhash(image, hash_size: int = 8) -> str:
+    """Difference hash: stays close for visually similar images. Pure PIL."""
+    small = image.convert("L").resize((hash_size + 1, hash_size), Image.LANCZOS)
+    pixels = list(small.getdata())
+    bits = 0
+    for row in range(hash_size):
+        for col in range(hash_size):
+            left = pixels[row * (hash_size + 1) + col]
+            right = pixels[row * (hash_size + 1) + col + 1]
+            bits = (bits << 1) | (1 if left > right else 0)
+    return f"{bits:016x}"
+
+
+def ocr_text(data: bytes) -> str:
+    try:
+        import pytesseract
+    except ImportError as exc:
+        raise ToolError("pytesseract is not installed") from exc
+    try:
+        with Image.open(io.BytesIO(data)) as image:
+            text = pytesseract.image_to_string(image)
+    except pytesseract.TesseractNotFoundError as exc:
+        raise ToolError("the tesseract OCR engine is not installed") from exc
+    except Exception as exc:
+        raise ToolError(f"OCR failed: {type(exc).__name__}") from exc
+    cleaned = " ".join(text.split())
+    return cleaned
+
+
 def analyze_image(data: bytes, url: str) -> dict:
     warnings: list[str] = []
     results: list[dict] = []
@@ -78,10 +111,12 @@ def analyze_image(data: bytes, url: str) -> dict:
 
     width = height = None
     image_format = "unknown"
+    perceptual = ""
     try:
         with Image.open(io.BytesIO(data)) as image:
             width, height = image.size
             image_format = image.format or "unknown"
+            perceptual = dhash(image)
     except Exception as exc:
         warnings.append(f"Could not decode image: {exc}")
 
@@ -94,6 +129,7 @@ def analyze_image(data: bytes, url: str) -> dict:
             "info": (
                 f"Format: {image_format} | Size: {width}x{height} | "
                 f"Bytes: {len(data)} | SHA-256: {digest}"
+                + (f" | dHash: {perceptual}" if perceptual else "")
             ),
         }
     )
@@ -116,6 +152,36 @@ def analyze_image(data: bytes, url: str) -> dict:
             "No readable EXIF metadata found (the image may have been "
             "stripped by the platform)."
         )
+
+    thumbnail = tags.get("JPEGThumbnail")
+    if isinstance(thumbnail, (bytes, bytearray)) and thumbnail:
+        results.append(
+            {
+                "platform": "Embedded thumbnail",
+                "status": "found",
+                "info": (
+                    f"An EXIF thumbnail is embedded ({len(thumbnail)} bytes, "
+                    f"SHA-256: {hashlib.sha256(bytes(thumbnail)).hexdigest()}). "
+                    "It can differ from the edited full image."
+                ),
+            }
+        )
+
+    try:
+        text = ocr_text(data)
+        if len(text) >= OCR_MIN_CHARS:
+            results.append(
+                {
+                    "platform": "OCR text",
+                    "status": "found",
+                    "info": text[:OCR_MAX_CHARS]
+                    + ("..." if len(text) > OCR_MAX_CHARS else ""),
+                }
+            )
+        else:
+            warnings.append("OCR found no readable text in the image.")
+    except ToolError as exc:
+        warnings.append(f"OCR skipped: {exc}")
 
     coordinates = gps_coordinates(tags)
     if coordinates:
