@@ -30,6 +30,7 @@ from tools.image_intel import analyze_image, fetch_image_bytes
 from tools.ip_intel import internetdb_lookup, rdap_ip_lookup, reverse_dns_lookup
 from tools.net_guard import UnsafeURLError, is_public_ip
 from tools.maigret_runner import run_maigret
+from tools.entity_intel import run_person_entity, run_sanctions_check
 from tools.name_search import run_name_search, run_username_web
 from tools.phone_intel import PhoneParseError, analyze
 from tools.public_profiles import manual_links, run_name_sources, run_profile_sources
@@ -169,6 +170,8 @@ async def _investigate_name(name: str) -> dict:
         {
             "Web search": run_name_search(name),
             "Public sources": run_name_sources(name),
+            "Knowledge base": run_person_entity(name),
+            "Sanctions": run_sanctions_check(name),
         }
     )
     if not outcomes:
@@ -176,6 +179,14 @@ async def _investigate_name(name: str) -> dict:
 
     results = []
     pivots = []
+    # Knowledge-base identity (Wikidata/Wikipedia) first: it is the most
+    # authoritative when the person is notable.
+    if "Knowledge base" in outcomes:
+        results.extend(outcomes["Knowledge base"]["results"])
+        pivots.extend(outcomes["Knowledge base"]["pivots"])
+    if "Sanctions" in outcomes:
+        results.extend(outcomes["Sanctions"]["results"])
+        warnings.extend(outcomes["Sanctions"]["warnings"])
     if "Public sources" in outcomes:
         sources = outcomes["Public sources"]
         results.extend(sources["results"])

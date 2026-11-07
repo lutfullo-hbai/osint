@@ -280,8 +280,16 @@ async def test_name_keeps_structured_sources_when_web_search_fails(monkeypatch):
                              "status": "found", "title": "Ali Valiyev"}],
                 "warnings": [], "pivots": []}
 
+    async def no_entity(_name):
+        return {"results": [], "pivots": []}
+
+    async def no_sanctions(_name):
+        return {"results": [], "warnings": []}
+
     monkeypatch.setattr(svc, "run_name_search", broken)
     monkeypatch.setattr(svc, "run_name_sources", sources)
+    monkeypatch.setattr(svc, "run_person_entity", no_entity)
+    monkeypatch.setattr(svc, "run_sanctions_check", no_sanctions)
 
     result = await svc._investigate_name("Ali Valiyev")
 
@@ -358,3 +366,55 @@ async def test_username_merges_post_pivots_without_duplicating(monkeypatch):
         {"type": "username", "value": "axror.xs"},
         {"type": "username", "value": "alishercr"},
     ]
+
+
+from tools import entity_intel as ei
+
+
+def test_wikidata_time_formatting_respects_precision():
+    assert ei._format_wikidata_time({"time": "+1969-12-28T00:00:00Z", "precision": 11}) == "1969-12-28"
+    assert ei._format_wikidata_time({"time": "+1969-00-00T00:00:00Z", "precision": 9}) == "1969"
+    assert ei._format_wikidata_time(None) == ""
+
+
+def test_claim_helpers_tolerate_missing_and_malformed():
+    claims = {"P569": [{"mainsnak": {"datavalue": {"value": {"time": "+2000-01-01T00:00:00Z"}}}}],
+              "P106": [{"mainsnak": {"datavalue": {"value": {"id": "Q1"}}}}, {"mainsnak": {}}]}
+    assert ei._claim_value(claims, "P569")["time"].startswith("+2000")
+    assert ei._claim_value(claims, "P999") is None
+    assert ei._claim_ids(claims, "P106") == ["Q1"]
+
+
+async def test_sanctions_skipped_without_key(monkeypatch):
+    monkeypatch.delenv("OPENSANCTIONS_API_KEY", raising=False)
+    outcome = await ei.run_sanctions_check("Jane Doe")
+    assert outcome["results"] == []
+    assert "OPENSANCTIONS_API_KEY" in outcome["warnings"][0]
+
+
+async def test_name_includes_knowledge_base_first_with_its_pivots(monkeypatch):
+    async def web(_name):
+        return {"results": [{"platform": "GitHub", "url": "https://github.com/x",
+                             "status": "found", "match": "exact"}], "dropped": 0}
+
+    async def sources(_name):
+        return {"results": [], "warnings": [], "pivots": []}
+
+    async def entity(_name):
+        return {"results": [{"platform": "Wikidata", "url": "https://www.wikidata.org/wiki/Q1",
+                             "status": "found", "title": "Jane Doe", "info": "Born: 1980"}],
+                "pivots": [{"type": "username", "value": "janedoe"}]}
+
+    async def sanctions(_name):
+        return {"results": [], "warnings": ["Sanctions/PEP screening skipped: ..."]}
+
+    monkeypatch.setattr(svc, "run_name_search", web)
+    monkeypatch.setattr(svc, "run_name_sources", sources)
+    monkeypatch.setattr(svc, "run_person_entity", entity)
+    monkeypatch.setattr(svc, "run_sanctions_check", sanctions)
+
+    result = await svc._investigate_name("Jane Doe")
+
+    assert result["results"][0]["platform"] == "Wikidata"
+    assert {"type": "username", "value": "janedoe"} in result["pivots"]
+    assert any("Sanctions" in w for w in result["warnings"])

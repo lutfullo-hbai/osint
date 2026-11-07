@@ -51,6 +51,15 @@ async def test_investigation_result_is_cached(monkeypatch):
     monkeypatch.setattr(investigate, "run_name_search", fake_run_name_search)
     monkeypatch.setattr(investigate, "run_name_sources", fake_run_name_sources)
 
+    async def empty_results(name: str) -> dict:
+        return {"results": [], "pivots": []}
+
+    async def empty_sanctions(name: str) -> dict:
+        return {"results": [], "warnings": []}
+
+    monkeypatch.setattr(investigate, "run_person_entity", empty_results)
+    monkeypatch.setattr(investigate, "run_sanctions_check", empty_sanctions)
+
     first = await investigate.investigate_name("John Doe")
     second = await investigate.investigate_name("john doe")
 
