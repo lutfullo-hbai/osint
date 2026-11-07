@@ -523,3 +523,44 @@ def test_phone_manual_check_links():
     assert links["WhatsApp"] == "https://wa.me/998901234567"
     assert "998901234567" in links["Telegram"]
     assert "%22+998901234567%22" in links["Google"]
+
+
+async def test_reverse_ip_lookup_parses_and_rejects_quota(monkeypatch):
+    from tools import ip_intel as ii
+
+    class Resp:
+        def __init__(self, text, code=200):
+            self.text = text
+            self.status_code = code
+
+    class Client:
+        def __init__(self, text):
+            self._text = text
+
+        async def get(self, url):
+            return Resp(self._text)
+
+    entry, domains = await ii.reverse_ip_lookup(Client("a.com\nb.com\na.com"), "1.2.3.4")
+    assert domains == ["a.com", "b.com"]
+    assert "2 domain(s)" in entry["info"]
+
+    import pytest as _pytest
+    with _pytest.raises(ii.ToolError):
+        await ii.reverse_ip_lookup(Client("API count exceeded"), "1.2.3.4")
+
+
+async def test_reverse_ip_filters_ptr_arpa_noise(monkeypatch):
+    from tools import ip_intel as ii
+
+    class Resp:
+        status_code = 200
+        def __init__(self, text): self.text = text
+
+    class Client:
+        def __init__(self, text): self._text = text
+        async def get(self, url): return Resp(self._text)
+
+    _entry, domains = await ii.reverse_ip_lookup(
+        Client("real.com\n0.d.5.ip6.arpa\nother.org"), "8.8.8.8"
+    )
+    assert domains == ["other.org", "real.com"]

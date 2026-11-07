@@ -89,3 +89,33 @@ async def rdap_ip_lookup(client: httpx.AsyncClient, ip_address: str) -> dict:
         "status": "found",
         "info": "; ".join(info_parts) or "Record retrieved",
     }
+
+
+async def reverse_ip_lookup(
+    client: httpx.AsyncClient, ip_address: str
+) -> tuple[dict, list[str]]:
+    """Other domains that resolve to the same IP (shared hosting neighbours)."""
+    response = await client.get(
+        f"https://api.hackertarget.com/reverseiplookup/?q={ip_address}"
+    )
+    if response.status_code != 200:
+        raise ToolError(f"HTTP {response.status_code}.")
+    text = response.text.strip()
+    # Quota and "no records" messages come back as plain HTTP 200 text.
+    if not text or "." not in text or "error" in text.lower() or "API count" in text:
+        raise ToolError(text[:80] or "no records")
+    domains = sorted({
+        line.strip().lower()
+        for line in text.splitlines()
+        if "." in line and not line.strip().lower().endswith((".arpa", ".in-addr"))
+    })
+    if not domains:
+        raise ToolError("no domains share this IP")
+    preview = ", ".join(domains[:25]) + (" ..." if len(domains) > 25 else "")
+    entry = {
+        "platform": "Reverse IP (shared hosting)",
+        "url": f"https://api.hackertarget.com/reverseiplookup/?q={ip_address}",
+        "status": "found",
+        "info": f"{len(domains)} domain(s) on this IP: {preview}",
+    }
+    return entry, domains

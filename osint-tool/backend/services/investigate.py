@@ -27,7 +27,12 @@ from tools.email_domain import domain_mail_intel, email_domain_intel, gravatar_l
 from tools.email_intel import lookup_emailrep, lookup_hibp
 from tools.holehe_runner import run_holehe
 from tools.image_intel import analyze_image, fetch_image_bytes
-from tools.ip_intel import internetdb_lookup, rdap_ip_lookup, reverse_dns_lookup
+from tools.ip_intel import (
+    internetdb_lookup,
+    rdap_ip_lookup,
+    reverse_dns_lookup,
+    reverse_ip_lookup,
+)
 from tools.net_guard import UnsafeURLError, is_public_ip
 from tools.maigret_runner import run_maigret
 from tools.entity_intel import run_person_entity, run_sanctions_check
@@ -554,6 +559,7 @@ async def _investigate_domain(domain: str) -> dict:
             warnings.extend(mail_warnings)
 
         first_ip = ""
+        neighbours: list[str] = []
         if "DNS" in outcomes:
             dns_entry, first_ip = outcomes["DNS"]
             results.append(dns_entry)
@@ -562,17 +568,23 @@ async def _investigate_domain(domain: str) -> dict:
                     results.append(await ip_geo_lookup(client, first_ip))
                 except ToolError as exc:
                     warnings.append(f"IP geolocation: {exc}")
+                try:
+                    neighbour_entry, neighbours = await reverse_ip_lookup(client, first_ip)
+                    results.append(neighbour_entry)
+                except ToolError as exc:
+                    warnings.append(f"Reverse IP: {exc}")
 
     if not results:
         raise ToolError("All lookups failed: " + "; ".join(warnings))
 
+    other_domains = [d for d in neighbours if d != domain]
     response = {
         "status": "success",
         "category": "domain",
         "query": domain,
         "results": results,
         "count": len(results),
-        "pivots": _pivots([first_ip], subdomains),
+        "pivots": _pivots([first_ip], subdomains + other_domains),
     }
     if warnings:
         response["warnings"] = warnings
@@ -591,6 +603,7 @@ async def _investigate_ip(ip_address: str) -> dict:
                 "RDAP": rdap_ip_lookup(client, ip_address),
                 "IP geolocation": ip_geo_lookup(client, ip_address),
                 "Shodan InternetDB": internetdb_lookup(client, ip_address),
+                "Reverse IP": reverse_ip_lookup(client, ip_address),
             }
         )
 
@@ -599,7 +612,7 @@ async def _investigate_ip(ip_address: str) -> dict:
     for label in ("RDAP", "IP geolocation"):
         if label in outcomes:
             results.append(outcomes[label])
-    for label in ("Reverse DNS", "Shodan InternetDB"):
+    for label in ("Reverse DNS", "Shodan InternetDB", "Reverse IP"):
         if label in outcomes:
             entry, names = outcomes[label]
             results.append(entry)
