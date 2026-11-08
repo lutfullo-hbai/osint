@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 
+from services.correlate import correlate
 from services.investigate import (
     InvestigationValidationError,
     investigate_company,
@@ -174,6 +175,8 @@ async def run_deep_scan(seed_query: str, seed_type: str | None = None) -> dict:
             edge_seen.add(ek)
             uniq_edges.append(e)
 
+    correlation = correlate(nodes)
+
     response = {
         "status": "success",
         "category": "deep_scan",
@@ -182,6 +185,8 @@ async def run_deep_scan(seed_query: str, seed_type: str | None = None) -> dict:
         "nodes": nodes,
         "edges": uniq_edges,
         "node_count": len(nodes),
+        "clusters": correlation["clusters"],
+        "cluster_count": correlation["cluster_count"],
         "truncated": truncated,
         "notice": (
             "Deep Scan auto-follows public-source pivots from your seed. "
