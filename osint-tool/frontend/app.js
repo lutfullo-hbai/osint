@@ -872,6 +872,78 @@ function buildDeepGraph(data) {
   return wrapper;
 }
 
+function buildClusters(data) {
+  const clusters = (data.clusters || []).filter(
+    (c) => (c.members || []).length > 1
+  );
+  if (!clusters.length) return null;
+
+  const wrap = document.createElement("div");
+  const head = document.createElement("div");
+  head.className = "section-head";
+  head.textContent = `Identity clusters (${clusters.length})`;
+  wrap.appendChild(head);
+
+  clusters.forEach((c) => {
+    const card = document.createElement("div");
+    card.className = "card cluster-card";
+
+    const top = document.createElement("div");
+    top.className = "card-head";
+    const title = document.createElement("h3");
+    title.className = "card-title";
+    title.textContent = c.label || "entity";
+    top.appendChild(title);
+    const badge = document.createElement("span");
+    badge.className = `badge conf-${c.confidence}`;
+    badge.textContent = `${c.confidence} · ${c.members.length} nodes`;
+    top.appendChild(badge);
+    card.appendChild(top);
+
+    const idLine = [];
+    const ids = c.identifiers || {};
+    if (ids.names && ids.names.length) idLine.push("names: " + ids.names.join(", "));
+    if (ids.emails && ids.emails.length) idLine.push("emails: " + ids.emails.join(", "));
+    if (ids.usernames && ids.usernames.length)
+      idLine.push("handles: " + ids.usernames.map((u) => "@" + u).join(", "));
+    if (ids.domains && ids.domains.length) idLine.push("domains: " + ids.domains.join(", "));
+    if (idLine.length) {
+      const meta = document.createElement("div");
+      meta.className = "card-meta";
+      meta.innerHTML = idLine.map((l) => escapeHtml(l)).join("<br />");
+      card.appendChild(meta);
+    }
+
+    if (c.signals && c.signals.length) {
+      const sig = document.createElement("div");
+      sig.className = "cluster-signals";
+      sig.innerHTML =
+        "why linked: " +
+        c.signals.map((s) => `<span class="tag">${escapeHtml(s)}</span>`).join(" ");
+      card.appendChild(sig);
+    }
+
+    if (c.contradictions && c.contradictions.length) {
+      c.contradictions.forEach((x) => {
+        const warn = document.createElement("div");
+        warn.className = "cluster-contradiction";
+        warn.textContent = "⚠ " + x;
+        card.appendChild(warn);
+      });
+    }
+
+    if (c.platforms && c.platforms.length) {
+      const plat = document.createElement("div");
+      plat.className = "card-meta";
+      plat.textContent = "seen on: " + c.platforms.join(", ");
+      card.appendChild(plat);
+    }
+
+    wrap.appendChild(card);
+  });
+  return wrap;
+}
+
 function renderDeepScan(panel, data) {
   const nodes = data.nodes || [];
   panel.summary.innerHTML =
@@ -882,6 +954,9 @@ function renderDeepScan(panel, data) {
 
   // toolbar (export / AI / save) via flattened view
   panel.results.appendChild(buildToolbar(deepScanToFlat(data)));
+
+  const clusters = buildClusters(data);
+  if (clusters) panel.results.appendChild(clusters);
 
   const graph = buildDeepGraph(data);
   if (graph) {
