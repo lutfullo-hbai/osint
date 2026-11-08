@@ -85,7 +85,12 @@ def format_record(record: dict, label: str = "Company (GLEIF)") -> dict:
 
 
 async def _get(client: httpx.AsyncClient, path: str, **kwargs):
-    response = await client.get(f"{GLEIF_BASE}{path}", **kwargs)
+    try:
+        response = await client.get(f"{GLEIF_BASE}{path}", **kwargs)
+    except httpx.HTTPError as exc:
+        # connection/timeout failures must surface as ToolError so the router
+        # returns a clean 502, not an unhandled 500 echoing the raw error.
+        raise ToolError(f"GLEIF is unreachable: {exc}") from exc
     if response.status_code == 404:
         return None
     if response.status_code == 429:

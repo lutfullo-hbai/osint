@@ -386,7 +386,15 @@ function buildActionButton(label, onClick) {
 }
 
 function pivotTo(pivot) {
-  const tabByType = { username: "username", company: "company", domain: "domain", ip: "domain" };
+  const tabByType = {
+    username: "username",
+    company: "company",
+    domain: "domain",
+    ip: "domain",
+    email: "email",
+    phone: "phone",
+    name: "name",
+  };
   const tab = tabByType[pivot.type] || "domain";
   activateTab(tab);
   const panel = getPanel(tab);
@@ -399,6 +407,9 @@ const PIVOT_COLORS = {
   domain: "var(--violet)",
   ip: "var(--pink)",
   company: "var(--mint)",
+  email: "var(--amber, #f0b429)",
+  phone: "var(--rose, #fb7185)",
+  name: "var(--sky, #38bdf8)",
 };
 const GRAPH_MAX_NODES = 16;
 
@@ -752,6 +763,225 @@ async function handleSubmit(event) {
   }
 }
 
+const DEEP_NODE_TYPE_TAB = {
+  username: "username",
+  email: "email",
+  name: "name",
+  phone: "phone",
+  domain: "domain",
+  ip: "domain",
+  company: "company",
+};
+
+function deepScanToFlat(data) {
+  // Flatten a deep-scan graph into the normal {results, pivots} shape so the
+  // existing toolbar (export / AI summary / save-to-case) works unchanged.
+  const results = [];
+  (data.nodes || []).forEach((node) => {
+    (node.results || []).forEach((item) => {
+      const clone = Object.assign({}, item);
+      clone.info = `via ${node.type} "${node.query}"` +
+        (clone.info ? " — " + clone.info : "");
+      results.push(clone);
+    });
+  });
+  return {
+    status: "success",
+    category: "deep_scan",
+    query: data.query,
+    results,
+    count: results.length,
+    pivots: [],
+    warnings: data.warnings,
+    notice: data.notice,
+  };
+}
+
+function buildDeepGraph(data) {
+  const nodes = data.nodes || [];
+  if (!nodes.length) return null;
+
+  const byDepth = {};
+  nodes.forEach((n) => {
+    (byDepth[n.depth] = byDepth[n.depth] || []).push(n);
+  });
+  const depths = Object.keys(byDepth).map(Number).sort((a, b) => a - b);
+
+  const colW = 230;
+  const rowH = 64;
+  const padX = 24;
+  const padY = 40;
+  const maxRows = Math.max(...depths.map((d) => byDepth[d].length));
+  const width = padX * 2 + (depths.length - 1) * colW + 170;
+  const height = Math.max(240, padY * 2 + (maxRows - 1) * rowH + 40);
+
+  const svg = svgEl("svg", {
+    viewBox: `0 0 ${width} ${height}`,
+    class: "graph-svg deep-graph",
+    role: "img",
+  });
+
+  const pos = {};
+  depths.forEach((d, di) => {
+    const col = byDepth[d];
+    const colH = (col.length - 1) * rowH;
+    const startY = (height - colH) / 2;
+    col.forEach((n, ni) => {
+      pos[n.key] = { x: padX + di * colW + 30, y: startY + ni * rowH, node: n };
+    });
+  });
+
+  // edges first
+  (data.edges || []).forEach((e) => {
+    const a = pos[e.from];
+    const b = pos[e.to];
+    if (!a || !b) return;
+    const path = svgEl("path", {
+      d: `M ${a.x} ${a.y} C ${a.x + colW / 2} ${a.y}, ${b.x - colW / 2} ${b.y}, ${b.x} ${b.y}`,
+      class: "graph-edge",
+      fill: "none",
+    });
+    svg.appendChild(path);
+  });
+
+  // nodes
+  Object.values(pos).forEach(({ x, y, node }) => {
+    const color = PIVOT_COLORS[node.type] || "var(--muted)";
+    const g = svgEl("g", { class: "graph-node" });
+    g.style.cursor = "pointer";
+    g.appendChild(svgEl("circle", { cx: x, cy: y, r: node.depth === 0 ? 9 : 6, fill: color }));
+    const label = svgEl("text", { x: x + 12, y: y + 4, "text-anchor": "start", fill: color });
+    const v = String(node.query);
+    label.textContent = (v.length > 20 ? v.slice(0, 19) + "…" : v) +
+      (node.count ? ` (${node.count})` : "");
+    g.appendChild(label);
+    g.addEventListener("click", () => pivotTo({ type: node.type, value: node.query }));
+    svg.appendChild(g);
+  });
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "graph-wrap deep-graph-wrap";
+  wrapper.appendChild(svg);
+  const legend = document.createElement("div");
+  legend.className = "graph-legend";
+  const usedTypes = [...new Set(nodes.map((n) => n.type))];
+  legend.innerHTML = usedTypes
+    .map((t) => `<span style="color:${PIVOT_COLORS[t] || "var(--muted)"}">● ${t}</span>`)
+    .join(" ");
+  wrapper.appendChild(legend);
+  return wrapper;
+}
+
+function renderDeepScan(panel, data) {
+  const nodes = data.nodes || [];
+  panel.summary.innerHTML =
+    `<strong>${data.node_count}</strong> node${data.node_count === 1 ? "" : "s"} ` +
+    `mapped from ${escapeHtml(`"${data.query}"`)} ` +
+    `<span class="tag">${escapeHtml(data.seed_type)}</span>` +
+    (data.truncated ? ' <span class="tag">truncated at scan limit</span>' : "");
+
+  // toolbar (export / AI / save) via flattened view
+  panel.results.appendChild(buildToolbar(deepScanToFlat(data)));
+
+  const graph = buildDeepGraph(data);
+  if (graph) {
+    graph.classList.remove("hidden");
+    panel.results.appendChild(graph);
+  }
+
+  if (Array.isArray(data.warnings) && data.warnings.length) {
+    const warnings = document.createElement("div");
+    warnings.className = "warnings";
+    const head = document.createElement("div");
+    head.className = "warnings-head";
+    head.textContent = `${data.warnings.length} note${data.warnings.length === 1 ? "" : "s"} (skipped or unavailable)`;
+    warnings.appendChild(head);
+    data.warnings.forEach((w) => {
+      const item = document.createElement("div");
+      item.className = "warning-item";
+      item.textContent = w;
+      warnings.appendChild(item);
+    });
+    panel.results.appendChild(warnings);
+  }
+
+  if (!nodes.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "No public traces found from this seed.";
+    panel.results.appendChild(empty);
+    return;
+  }
+
+  nodes.forEach((node) => {
+    const header = document.createElement("div");
+    header.className = "section-head deep-node-head";
+    const tab = DEEP_NODE_TYPE_TAB[node.type] || "domain";
+    header.innerHTML =
+      `<span class="tag" style="color:${PIVOT_COLORS[node.type] || "var(--muted)"}">${escapeHtml(node.type)}</span> ` +
+      `${escapeHtml(node.query)} · depth ${node.depth} · ${node.count} result${node.count === 1 ? "" : "s"}`;
+    const open = buildActionButton("Open in " + tab, () =>
+      pivotTo({ type: node.type, value: node.query })
+    );
+    open.classList.add("chip-sm");
+    header.appendChild(open);
+    panel.results.appendChild(header);
+
+    if (!node.results || !node.results.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.textContent = node.message || "No results for this node.";
+      panel.results.appendChild(empty);
+      return;
+    }
+    node.results.slice(0, 20).forEach((item, index) => {
+      const card = buildCard(item);
+      card.style.animationDelay = `${Math.min(index * 30, 300)}ms`;
+      panel.results.appendChild(card);
+    });
+  });
+}
+
+async function handleDeepScan(event) {
+  event.preventDefault();
+  const panel = getPanel("deepscan");
+  const query = panel.input.value.trim();
+  const type = document.getElementById("deep-scan-type").value;
+
+  clearPanel(panel);
+  if (!query) {
+    showError(panel, "Please enter a seed before scanning.");
+    return;
+  }
+  if (panel.controller) panel.controller.abort();
+  panel.controller = new AbortController();
+  const signal = panel.controller.signal;
+
+  setLoading(panel, true);
+  try {
+    const data = await requestJson(`${API_BASE}/api/deep-scan`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ query, type: type || null }),
+      signal,
+    });
+    if (!data || data.status !== "success") {
+      showError(panel, (data && (data.message || data.detail)) || "Deep scan failed.");
+      return;
+    }
+    renderDeepScan(panel, data);
+  } catch (err) {
+    if (err.name === "AbortError") return;
+    showError(
+      panel,
+      err.message ||
+        `Could not reach the backend at ${API_BASE}. Make sure it is running.`
+    );
+  } finally {
+    setLoading(panel, false);
+  }
+}
+
 async function checkApiStatus() {
   const el = document.getElementById("api-status");
   try {
@@ -775,9 +1005,11 @@ document.querySelectorAll(".tab").forEach((btn) => {
   btn.addEventListener("click", () => activateTab(btn.dataset.tab));
 });
 
-document.querySelectorAll(".search-form").forEach((form) => {
+document.querySelectorAll(".search-form:not(#deep-scan-form)").forEach((form) => {
   form.addEventListener("submit", handleSubmit);
 });
+
+document.getElementById("deep-scan-form").addEventListener("submit", handleDeepScan);
 
 let catalogItems = [];
 let catalogLoaded = false;

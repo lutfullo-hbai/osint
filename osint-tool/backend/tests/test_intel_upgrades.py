@@ -740,6 +740,21 @@ async def test_gdelt_handles_rate_limit(monkeypatch):
     assert "rate limit" in str(exc.value).lower()
 
 
+async def test_company_get_wraps_connection_error():
+    # a connection failure must become a ToolError (clean 502), not bubble up
+    # as an unhandled exception that the router turns into a 500.
+    import httpx as _httpx
+    import pytest as _pytest
+
+    class Client:
+        async def get(self, url, **kw):
+            raise _httpx.ConnectError("All connection attempts failed")
+
+    with _pytest.raises(ci.ToolError) as exc:
+        await ci._get(Client(), "/lei-records")
+    assert "unreachable" in str(exc.value).lower()
+
+
 def test_mail_findings_scores_missing_auth():
     findings, risk, recs = svc._mail_findings({"txt": [], "dmarc": [], "dkim": []})
     platforms = {f["platform"]: f for f in findings}

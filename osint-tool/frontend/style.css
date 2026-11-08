@@ -800,3 +800,40 @@ a.chip { text-decoration: none; }
   padding: 3px 8px;
   -webkit-text-fill-color: initial;
 }
+
+/* ---- Deep Scan ---- */
+.deep-form select {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  background: var(--glass);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 0.8rem;
+  cursor: pointer;
+  outline: none;
+}
+.deep-form select:focus {
+  border-color: var(--border-strong);
+}
+.deep-hint {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.deep-node-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.chip-sm {
+  padding: 0.18rem 0.6rem;
+  font-size: 0.72rem;
+}
+.deep-graph-wrap {
+  overflow-x: auto;
+}
+.deep-graph {
+  min-width: 480px;
+}

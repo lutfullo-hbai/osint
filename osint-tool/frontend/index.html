@@ -33,6 +33,7 @@
 
   <nav class="tabs" role="tablist">
     <button class="tab active" data-tab="name" role="tab" aria-selected="true">Name</button>
+    <button class="tab" data-tab="deepscan" role="tab" aria-selected="false">Deep Scan</button>
     <button class="tab" data-tab="company" role="tab" aria-selected="false">Company</button>
     <button class="tab" data-tab="footprint" role="tab" aria-selected="false">Footprint</button>
     <button class="tab" data-tab="username" role="tab" aria-selected="false">Username</button>
@@ -75,6 +76,33 @@
         <button type="submit">Scan</button>
       </form>
       <div class="spinner hidden"><div class="loader"></div><span>Aggregating your public footprint...</span></div>
+      <div class="error-box hidden"></div>
+      <div class="summary"></div>
+      <div class="results"></div>
+    </section>
+
+    <section class="panel" id="panel-deepscan" role="tabpanel">
+      <form class="search-form deep-form" id="deep-scan-form" autocomplete="off">
+        <input
+          type="text"
+          name="query"
+          placeholder="One seed — e.g. johndoe, you@example.com, example.com, Tesla Inc"
+          spellcheck="false"
+          required
+        />
+        <select name="type" id="deep-scan-type" aria-label="Seed type">
+          <option value="">Auto-detect</option>
+          <option value="username">Username</option>
+          <option value="email">Email</option>
+          <option value="name">Name</option>
+          <option value="phone">Phone</option>
+          <option value="domain">Domain / IP</option>
+          <option value="company">Company</option>
+        </select>
+        <button type="submit">Deep Scan</button>
+      </form>
+      <p class="deep-hint">Follows public-source pivots automatically from one seed and maps how they connect. Leads, not proof.</p>
+      <div class="spinner hidden"><div class="loader"></div><span>Following pivots across public sources...</span></div>
       <div class="error-box hidden"></div>
       <div class="summary"></div>
       <div class="results"></div>
