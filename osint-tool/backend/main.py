@@ -16,6 +16,7 @@ from routers import (
     catalog,
     company,
     config,
+    deep_scan,
     domain,
     email,
     exposure,
@@ -136,6 +137,7 @@ app.include_router(image.router)
 app.include_router(catalog.router)
 app.include_router(config.router)
 app.include_router(cases.router)
+app.include_router(deep_scan.router)
 app.include_router(jobs.router)
 
 
