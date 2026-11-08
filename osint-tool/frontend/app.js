@@ -376,6 +376,41 @@ function downloadReport(data, extension) {
   URL.revokeObjectURL(link.href);
 }
 
+async function downloadDossier(data, button) {
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = "Building PDF…";
+  try {
+    const response = await fetch(`${API_BASE}/api/dossier`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ data }),
+    });
+    if (!response.ok) {
+      let msg = `HTTP ${response.status}`;
+      try {
+        const err = await response.json();
+        msg = err.message || msg;
+      } catch (e) {}
+      throw new Error(msg);
+    }
+    const blob = await response.blob();
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    const safe = String(data.query || "report").replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 60);
+    link.download = `osint-dossier-${safe}.pdf`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  } catch (err) {
+    button.textContent = "PDF failed";
+    setTimeout(() => (button.textContent = original), 2500);
+    return;
+  } finally {
+    button.disabled = false;
+    if (button.textContent === "Building PDF…") button.textContent = original;
+  }
+}
+
 function buildActionButton(label, onClick) {
   const button = document.createElement("button");
   button.type = "button";
@@ -496,7 +531,11 @@ function buildToolbar(data) {
     exports.className = "chip-row";
     exports.appendChild(buildActionButton("Export MD", () => downloadReport(data, "md")));
     exports.appendChild(buildActionButton("Export JSON", () => downloadReport(data, "json")));
-    exports.appendChild(buildActionButton("Print / PDF", () => window.print()));
+    exports.appendChild(buildActionButton("Print", () => window.print()));
+    const dossierBtn = buildActionButton("PDF Dossier", () =>
+      downloadDossier(data, dossierBtn)
+    );
+    exports.appendChild(dossierBtn);
     exports.appendChild(buildActionButton("Save to case", () => saveToCase(data)));
     const aiBox = document.createElement("div");
     aiBox.className = "ai-summary hidden";
@@ -794,6 +833,11 @@ function deepScanToFlat(data) {
     pivots: [],
     warnings: data.warnings,
     notice: data.notice,
+    // carry the graph so the PDF dossier keeps nodes, edges and clusters
+    seed_type: data.seed_type,
+    nodes: data.nodes,
+    edges: data.edges,
+    clusters: data.clusters,
   };
 }
 
