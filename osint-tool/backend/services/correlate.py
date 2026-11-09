@@ -23,6 +23,22 @@ W_HANDLE = 2         # the same username handle across nodes
 W_LOCALPART = 2      # an email's local-part equals a username handle
 W_NAME = 1           # the same full name (names collide — weak on its own)
 
+# A generic handle links nothing: common words collide across unrelated people.
+# Two defences: a stoplist of dictionary/role handles, and a frequency cap —
+# a handle registered on an implausible number of platforms is a common word,
+# not a person's identity. Both only suppress the handle LINK; the individual
+# nodes still appear, just not glued into one cluster.
+STOPLIST_HANDLES = {
+    "hello", "admin", "info", "test", "tests", "user", "users", "contact",
+    "support", "mail", "email", "root", "account", "accounts", "official",
+    "team", "news", "home", "login", "signup", "help", "service", "services",
+    "welcome", "default", "guest", "demo", "sample", "example", "public",
+    "private", "social", "socials", "me", "null", "none", "name", "username",
+    "password", "anonymous", "unknown", "nobody", "everyone", "staff", "sales",
+    "office", "online", "world", "global", "main", "web", "app", "site",
+}
+GENERIC_PLATFORM_THRESHOLD = 18  # a handle seen on >= this many platforms is generic
+
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 _LOC_RE = re.compile(r"Location:\s*([^;]+)", re.IGNORECASE)
 _NAME_RE = re.compile(r"Name:\s*([^;]+)", re.IGNORECASE)
@@ -61,6 +77,8 @@ def _extract(node: dict) -> dict:
         "avatars": set(),
         "locations": set(),
         "platforms": set(),
+        # handle -> platforms it was seen on, to spot generic (over-common) ones
+        "handle_platforms": defaultdict(set),
     }
     ntype = node.get("type")
     query = str(node.get("query", "")).strip()
@@ -84,7 +102,10 @@ def _extract(node: dict) -> dict:
         url = item.get("url") or item.get("profile_url") or ""
         m = _HANDLE_URL_RE.match(url)
         if m and len(norm_handle(m.group(1))) >= MIN_HANDLE_LEN:
-            ids["usernames"].add(norm_handle(m.group(1)))
+            h = norm_handle(m.group(1))
+            ids["usernames"].add(h)
+            if platform:
+                ids["handle_platforms"][h].add(platform)
 
         linked = item.get("linked_username")
         if linked and len(norm_handle(linked)) >= MIN_HANDLE_LEN:
@@ -176,6 +197,18 @@ def correlate(nodes: list[dict]) -> dict:
     extracted = [_extract(node) for node in nodes]
     uf = _Union(n)
 
+    # global handle frequency across all nodes -> spot over-common handles
+    handle_freq: dict[str, set] = defaultdict(set)
+    for e in extracted:
+        for handle, platforms in e["handle_platforms"].items():
+            handle_freq[handle] |= platforms
+
+    def is_generic(handle: str) -> bool:
+        return (
+            handle in STOPLIST_HANDLES
+            or len(handle_freq.get(handle, ())) >= GENERIC_PLATFORM_THRESHOLD
+        )
+
     # pairwise link scoring
     pair_score: dict[tuple[int, int], int] = defaultdict(int)
     pair_signals: dict[tuple[int, int], list[str]] = defaultdict(list)
@@ -192,18 +225,20 @@ def correlate(nodes: list[dict]) -> dict:
             shared_email = ei["emails"] & ej["emails"]
             if shared_email:
                 link(i, j, W_EMAIL, f"shared email {sorted(shared_email)[0]}")
-            shared_handle = ei["usernames"] & ej["usernames"]
+            # only link on SPECIFIC handles; generic/common ones collide
+            shared_handle = {
+                h for h in (ei["usernames"] & ej["usernames"]) if not is_generic(h)
+            }
             if shared_handle:
                 link(i, j, W_HANDLE, f"shared handle @{sorted(shared_handle)[0]}")
             shared_avatar = ei["avatars"] & ej["avatars"]
             if shared_avatar:
                 link(i, j, W_AVATAR, "identical avatar image hash")
-            # email local-part of one == a handle of the other
-            local_i = {e.split("@", 1)[0] for e in ei["emails"]}
-            local_j = {e.split("@", 1)[0] for e in ej["emails"]}
-            if ({norm_handle(x) for x in local_i} & ej["usernames"]) or (
-                {norm_handle(x) for x in local_j} & ei["usernames"]
-            ):
+            # email local-part of one == a handle of the other (skip generic)
+            local_i = {norm_handle(e.split("@", 1)[0]) for e in ei["emails"]}
+            local_j = {norm_handle(e.split("@", 1)[0]) for e in ej["emails"]}
+            localpart_match = (local_i & ej["usernames"]) | (local_j & ei["usernames"])
+            if any(not is_generic(h) for h in localpart_match):
                 link(i, j, W_LOCALPART, "email name reused as handle")
             shared_name = ei["names"] & ej["names"]
             if shared_name:
