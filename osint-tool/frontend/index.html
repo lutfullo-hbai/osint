@@ -43,6 +43,7 @@
     <button class="tab" data-tab="exposure" role="tab" aria-selected="false">Exposure</button>
     <button class="tab" data-tab="image" role="tab" aria-selected="false">Image</button>
     <button class="tab" data-tab="cases" role="tab" aria-selected="false">Cases</button>
+    <button class="tab" data-tab="watch" role="tab" aria-selected="false">Watch</button>
     <button class="tab" data-tab="catalog" role="tab" aria-selected="false">Catalog</button>
   </nav>
 
@@ -235,6 +236,33 @@
       <div id="case-list" class="chip-row"></div>
       <div class="summary" id="case-summary"></div>
       <div class="results" id="case-results"></div>
+    </section>
+
+    <section class="panel" id="panel-watch" role="tabpanel">
+      <form class="search-form watch-form" id="watch-form" autocomplete="off">
+        <input type="text" name="name" placeholder="Watch name, e.g. Acme domain" spellcheck="false" required />
+        <select name="category" id="watch-category" aria-label="Category">
+          <option value="domain">Domain/IP</option>
+          <option value="username">Username</option>
+          <option value="email">Email</option>
+          <option value="name">Name</option>
+          <option value="company">Company</option>
+          <option value="exposure">Exposure</option>
+          <option value="phone">Phone</option>
+        </select>
+        <input type="text" name="query" placeholder="Target, e.g. example.com" spellcheck="false" required />
+        <select name="interval" id="watch-interval" aria-label="Interval">
+          <option value="60">every 1h</option>
+          <option value="360">every 6h</option>
+          <option value="720">every 12h</option>
+          <option value="1440" selected>every 24h</option>
+          <option value="10080">weekly</option>
+        </select>
+        <button type="submit">Add watch</button>
+      </form>
+      <p class="deep-hint">Re-runs a public-source scan on a schedule and logs what changed. No new source, no stored credentials — just a timed refresh of a public surface.</p>
+      <div class="error-box hidden"></div>
+      <div id="watch-list" class="results"></div>
     </section>
 
     <section class="panel" id="panel-catalog" role="tabpanel">

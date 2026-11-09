@@ -1,9 +1,16 @@
 import os
 
+from arq import cron
 from arq.connections import RedisSettings
 
+import store
 from services.investigate import InvestigationValidationError, investigate
+from services.monitor import check_one_watch, run_watch_cycle
 from tools.base import ToolError
+
+# how often the worker wakes to check for due watches (per-watch interval is
+# enforced inside run_watch_cycle, so this is just the polling granularity)
+WATCH_POLL_MINUTES = int(os.environ.get("WATCH_POLL_MINUTES", "5"))
 
 
 async def run_investigation(ctx, category: str, query: str) -> dict:
@@ -17,8 +24,20 @@ async def run_investigation(ctx, category: str, query: str) -> dict:
         return {"status": "error", "message": f"Unexpected failure: {exc}"}
 
 
+async def startup(ctx) -> None:
+    store.init_db()
+
+
 class WorkerSettings:
-    functions = [run_investigation]
+    functions = [run_investigation, check_one_watch]
+    on_startup = startup
+    cron_jobs = [
+        cron(
+            run_watch_cycle,
+            minute=set(range(0, 60, max(1, min(WATCH_POLL_MINUTES, 59)))),
+            run_at_startup=False,
+        )
+    ]
     redis_settings = RedisSettings.from_dsn(
         os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
     )

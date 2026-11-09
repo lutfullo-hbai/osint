@@ -26,6 +26,16 @@ Har bir qidiruv alohida emas — bir **case**ga yig'iladi:
 
 Ma'lumotlar `osint-data` volume'ida (`/app/data/cases.db`) saqlanadi.
 
+## Watch (jadval bo'yicha kuzatuv)
+
+Bir martalik snapshot o'rniga **uzluksiz kuzatuv**:
+- **Watch** bo'limida nishonni (domain/username/email/...) interval bilan kuzatuvga qo'yasiz
+- ARQ worker har sikl mavjud public-manba tekshiruvini qayta chaqiradi va natijani oldingisi bilan **solishtiradi**; o'zgarish (yangi profil/subdomain, yo'qolgan narsa) **change event** sifatida yoziladi
+- Har watch'da "Run now", pauza/davom, tarix (o'zgarishlar jurnali), o'chirish
+- Yangi manba yo'q, saqlangan parol yo'q — faqat public sirtni jadval bo'yicha yangilaydi
+
+Kuzatuv tezligi `WATCH_POLL_MINUTES` (default 5 daqiqa) bilan sozlanadi.
+
 ## AI tahlil (lokal Qwen)
 
 Har qanday natijada **"AI Summary"** tugmasi bor. Bosilganda brauzer

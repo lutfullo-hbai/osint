@@ -53,7 +53,11 @@ services:
       dockerfile: Dockerfile
     container_name: osint-worker
     command: ["arq", "worker.WorkerSettings"]
+    volumes:
+      - osint-data:/app/data
     environment:
+      - CASES_DB_PATH=/app/data/cases.db
+      - WATCH_POLL_MINUTES=${WATCH_POLL_MINUTES:-5}
       - HIBP_API_KEY=${HIBP_API_KEY:-}
       - OPENSANCTIONS_API_KEY=${OPENSANCTIONS_API_KEY:-}
       - OPENCORPORATES_API_KEY=${OPENCORPORATES_API_KEY:-}

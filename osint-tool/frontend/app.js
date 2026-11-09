@@ -228,6 +228,176 @@ function activateTab(name) {
   if (name === "cases") {
     loadCases();
   }
+  if (name === "watch") {
+    loadWatches();
+  }
+}
+
+// ---- Watch (scheduled monitoring) ----
+
+async function watchApi(path, options = {}) {
+  return requestJson(`${API_BASE}/api/watches${path}`, {
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    ...options,
+  });
+}
+
+function watchError(message) {
+  const box = document.querySelector("#panel-watch .error-box");
+  if (!box) return;
+  box.textContent = message ? `[ERROR] ${message}` : "";
+  box.classList.toggle("hidden", !message);
+}
+
+async function handleCreateWatch(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const name = form.name.value.trim();
+  const category = document.getElementById("watch-category").value;
+  const query = form.query.value.trim();
+  const interval = parseInt(document.getElementById("watch-interval").value, 10);
+  watchError("");
+  if (!name || !query) {
+    watchError("Please fill in a name and a target.");
+    return;
+  }
+  try {
+    const data = await watchApi("", {
+      method: "POST",
+      body: JSON.stringify({ name, category, query, interval_minutes: interval }),
+    });
+    if (!data || data.status !== "success") {
+      watchError((data && data.message) || "Could not create watch.");
+      return;
+    }
+    form.query.value = "";
+    form.name.value = "";
+    loadWatches();
+  } catch (err) {
+    watchError(err.message || "Could not reach the backend.");
+  }
+}
+
+async function loadWatches() {
+  const list = document.getElementById("watch-list");
+  if (!list) return;
+  list.innerHTML = '<div class="empty-state">Loading watches...</div>';
+  try {
+    const data = await watchApi("");
+    const watches = (data && data.watches) || [];
+    if (!watches.length) {
+      list.innerHTML =
+        '<div class="empty-state">No watches yet. Add one above to monitor a public target over time.</div>';
+      return;
+    }
+    list.innerHTML = "";
+    watches.forEach((w) => list.appendChild(buildWatchCard(w)));
+  } catch (err) {
+    list.innerHTML = `<div class="empty-state">Could not load watches: ${escapeHtml(err.message || "")}</div>`;
+  }
+}
+
+function buildWatchCard(w) {
+  const card = document.createElement("div");
+  card.className = "card watch-card";
+
+  const head = document.createElement("div");
+  head.className = "card-head";
+  const title = document.createElement("h3");
+  title.className = "card-title";
+  title.textContent = w.name;
+  head.appendChild(title);
+  const badge = document.createElement("span");
+  const st = (w.last_status || "pending").split(":")[0].trim();
+  badge.className = `badge watch-${st.replace(/\s+/g, "-")}`;
+  badge.textContent = w.active ? st : "paused";
+  head.appendChild(badge);
+  card.appendChild(head);
+
+  const meta = document.createElement("div");
+  meta.className = "card-meta";
+  const everyMin = w.interval_minutes;
+  const every = everyMin % 1440 === 0 ? `${everyMin / 1440}d`
+    : everyMin % 60 === 0 ? `${everyMin / 60}h` : `${everyMin}m`;
+  meta.innerHTML =
+    `<span class="tag">${escapeHtml(w.category)}</span> ${escapeHtml(w.query)}` +
+    `<br />every ${every} · ` +
+    (w.last_checked_at ? `last checked ${escapeHtml(w.last_checked_at.replace("T", " "))}` : "not checked yet") +
+    ` · ${w.event_count || 0} change${w.event_count === 1 ? "" : "s"}`;
+  card.appendChild(meta);
+
+  if (w.last_event_at) {
+    const le = document.createElement("div");
+    le.className = "card-meta";
+    le.textContent = `last change: ${w.last_event_at.replace("T", " ")}`;
+    card.appendChild(le);
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "chip-row";
+  actions.appendChild(buildActionButton("Run now", async () => {
+    watchError("");
+    try {
+      await watchApi(`/${w.id}/run`, { method: "POST" });
+      setTimeout(loadWatches, 1200);
+    } catch (err) {
+      watchError(err.message || "Run failed.");
+    }
+  }));
+  actions.appendChild(buildActionButton(w.active ? "Pause" : "Resume", async () => {
+    try {
+      await watchApi(`/${w.id}`, { method: "PATCH", body: JSON.stringify({ active: !w.active }) });
+      loadWatches();
+    } catch (err) {
+      watchError(err.message || "Toggle failed.");
+    }
+  }));
+  actions.appendChild(buildActionButton("History", () => openWatch(w.id)));
+  const del = buildActionButton("Delete", async () => {
+    try {
+      await watchApi(`/${w.id}`, { method: "DELETE" });
+      loadWatches();
+    } catch (err) {
+      watchError(err.message || "Delete failed.");
+    }
+  });
+  del.classList.add("chip-danger");
+  actions.appendChild(del);
+  card.appendChild(actions);
+
+  const events = document.createElement("div");
+  events.className = "watch-events hidden";
+  events.id = `watch-events-${w.id}`;
+  card.appendChild(events);
+  return card;
+}
+
+async function openWatch(watchId) {
+  const container = document.getElementById(`watch-events-${watchId}`);
+  if (!container) return;
+  if (!container.classList.contains("hidden")) {
+    container.classList.add("hidden");
+    return;
+  }
+  container.classList.remove("hidden");
+  container.innerHTML = "Loading history...";
+  try {
+    const data = await watchApi(`/${watchId}`);
+    const events = (data.watch && data.watch.events) || [];
+    if (!events.length) {
+      container.innerHTML = '<div class="empty-state">No changes recorded yet.</div>';
+      return;
+    }
+    container.innerHTML = "";
+    events.forEach((e) => {
+      const row = document.createElement("div");
+      row.className = "watch-event";
+      row.innerHTML = `<span class="watch-event-time">${escapeHtml(e.created_at.replace("T", " "))}</span> ${escapeHtml(e.summary)}`;
+      container.appendChild(row);
+    });
+  } catch (err) {
+    container.innerHTML = `<div class="empty-state">Could not load history: ${escapeHtml(err.message || "")}</div>`;
+  }
 }
 
 function setLoading(panel, isLoading) {
@@ -1124,11 +1294,14 @@ document.querySelectorAll(".tab").forEach((btn) => {
   btn.addEventListener("click", () => activateTab(btn.dataset.tab));
 });
 
-document.querySelectorAll(".search-form:not(#deep-scan-form)").forEach((form) => {
+document.querySelectorAll(
+  ".search-form:not(#deep-scan-form):not(#watch-form)"
+).forEach((form) => {
   form.addEventListener("submit", handleSubmit);
 });
 
 document.getElementById("deep-scan-form").addEventListener("submit", handleDeepScan);
+document.getElementById("watch-form").addEventListener("submit", handleCreateWatch);
 
 let catalogItems = [];
 let catalogLoaded = false;
