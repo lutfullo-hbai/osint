@@ -63,6 +63,45 @@ def test_short_handles_do_not_link():
     assert out["cluster_count"] == 2
 
 
+def test_stoplist_handle_does_not_link():
+    # "hello" is a common word -> must not glue two unrelated nodes
+    nodes = [
+        {"key": "username:hello", "type": "username", "query": "hello", "results": []},
+        {"key": "email:hello", "type": "email", "query": "hello@other.com", "results": []},
+    ]
+    out = correlate(nodes)
+    assert out["cluster_count"] == 2  # not merged despite shared "hello"
+
+
+def test_over_common_handle_does_not_link():
+    # a handle seen on >= GENERIC_PLATFORM_THRESHOLD platforms is generic
+    many = [
+        {"platform": f"Site{i}", "url": "https://github.com/widget", "info": ""}
+        for i in range(20)
+    ]
+    nodes = [
+        {"key": "username:widget", "type": "username", "query": "widget",
+         "results": many},
+        {"key": "email:widget", "type": "email", "query": "widget@mail.com",
+         "results": []},
+    ]
+    out = correlate(nodes)
+    # "widget" appears on 20 platforms -> treated as generic -> no link
+    assert out["cluster_count"] == 2
+
+
+def test_specific_handle_still_links():
+    # a rare handle on few platforms must still link (no regression)
+    nodes = [
+        {"key": "username:zephyrqx", "type": "username", "query": "zephyrqx",
+         "results": [{"platform": "GitHub", "url": "https://github.com/zephyrqx"}]},
+        {"key": "email:zephyrqx", "type": "email", "query": "zephyrqx@mail.com",
+         "results": []},
+    ]
+    out = correlate(nodes)
+    assert out["cluster_count"] == 1
+
+
 def test_contradiction_flagged_on_conflicting_locations():
     nodes = [
         {"key": "username:sam", "type": "username", "query": "samsmith", "results": [
