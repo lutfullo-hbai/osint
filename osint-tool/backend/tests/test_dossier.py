@@ -1,8 +1,25 @@
+import os
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 import main
+from services import dossier as dossier_mod
 from services.dossier import build_dossier
+
+
+def test_safe_preserves_unicode():
+    # the Unicode-font fix: Cyrillic / Uzbek / CJK must pass through unchanged,
+    # no more lossy latin-1 "?" replacement
+    text = "Тест oʻzbek gʻalati 测试"
+    assert dossier_mod._safe(text) == text
+    # control chars are stripped, newlines kept
+    assert dossier_mod._safe("a\x00b\nc") == "ab\nc"
+
+
+def test_bundled_fonts_exist():
+    for fname in dossier_mod._FONT_FILES.values():
+        assert os.path.exists(os.path.join(dossier_mod._ASSETS, fname)), fname
 
 
 def _is_pdf(blob: bytes) -> bool:
