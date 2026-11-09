@@ -17,6 +17,7 @@ from routers import (
     company,
     config,
     correlate,
+    dossier,
     deep_scan,
     domain,
     email,
@@ -140,6 +141,7 @@ app.include_router(config.router)
 app.include_router(cases.router)
 app.include_router(deep_scan.router)
 app.include_router(correlate.router)
+app.include_router(dossier.router)
 app.include_router(jobs.router)
 
 
