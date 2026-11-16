@@ -857,3 +857,37 @@ async def test_cors_allows_patch_and_delete_from_frontend(method):
         )
     assert response.status_code == 200
     assert method in response.headers.get("access-control-allow-methods", "")
+
+
+async def _phone_with(monkeypatch, mentions):
+    from tools.truecaller import TruecallerUnavailable
+
+    async def no_truecaller(_e164, _region):
+        raise TruecallerUnavailable("Could not reach Truecaller.")
+
+    async def search(_batches, max_results_per_batch):
+        return mentions
+
+    async def keep_all(items, _needles):
+        return items, 0
+
+    monkeypatch.setattr(svc, "scrape_truecaller", no_truecaller)
+    monkeypatch.setattr(svc, "search_public", search)
+    monkeypatch.setattr(svc, "filter_results_containing", keep_all)
+    return await svc._investigate_phone("+905069087385")
+
+
+async def test_phone_without_online_hits_says_so_and_links_are_unchecked(monkeypatch):
+    result = await _phone_with(monkeypatch, [])
+    assert result["found_online"] is False
+    assert "No online accounts" in result["message"]
+    # the app links are templates, never findings
+    assert result["links"] and all(link["checked"] is False for link in result["links"])
+    assert [r["platform"] for r in result["results"]] == ["Telecom info"]
+
+
+async def test_phone_with_public_mention_is_found_online(monkeypatch):
+    mention = {"platform": "OLX", "url": "https://olx.uz/x", "title": "+905069087385"}
+    result = await _phone_with(monkeypatch, [mention])
+    assert result["found_online"] is True
+    assert "message" not in result
