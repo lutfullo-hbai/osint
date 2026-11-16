@@ -30,14 +30,15 @@ async def dossier(request: Request, response: Response, payload: DossierRequest)
         if payload.case_id:
             case = await asyncio.to_thread(store.get_case, payload.case_id)
             nodes = nodes_from_findings(case.get("findings", []))
+            case_name = (case.get("case") or {}).get("name") or "case"
             data = {
-                "case_name": case.get("name"),
-                "query": case.get("name"),
+                "case_name": case_name,
+                "query": case_name,
                 "seed_type": "case",
                 "nodes": nodes,
                 "clusters": correlate(nodes)["clusters"],
             }
-            name = case.get("name", "case")
+            name = case_name
         elif payload.data is not None:
             data = payload.data
             name = data.get("query", "report")

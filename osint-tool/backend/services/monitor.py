@@ -66,7 +66,7 @@ async def check_watch(watch: dict) -> dict:
     """
     watch_id = watch["id"]
     try:
-        result = await investigate(watch["category"], watch["query"])
+        result = await investigate(watch["category"], watch["query"], fresh=True)
     except (InvestigationValidationError, ToolError) as exc:
         store.record_watch_check(watch_id, watch.get("last_hash"),
                                  f"error: {exc}", None)

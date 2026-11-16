@@ -840,3 +840,20 @@ async def test_brave_search_parses_results(monkeypatch):
     out = await ps._brave_search(['"bob" site:x.io'], 5)
     assert len(out) == 1 and out[0]["url"] == "https://x.io/a"
     assert out[0]["info"] == "desc"
+
+
+@pytest.mark.parametrize("method", ["PATCH", "DELETE"])
+async def test_cors_allows_patch_and_delete_from_frontend(method):
+    # the frontend pauses/deletes watches and deletes cases cross-origin
+    transport = ASGITransport(app=main.app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.options(
+            "/api/watches/x",
+            headers={
+                "Origin": "http://127.0.0.1:8080",
+                "Access-Control-Request-Method": method,
+                "Access-Control-Request-Headers": "content-type",
+            },
+        )
+    assert response.status_code == 200
+    assert method in response.headers.get("access-control-allow-methods", "")
