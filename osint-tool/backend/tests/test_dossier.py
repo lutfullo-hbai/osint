@@ -95,3 +95,19 @@ async def test_dossier_endpoint_requires_input():
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         resp = await client.post("/api/dossier", json={})
     assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_dossier_from_case_uses_case_name(monkeypatch):
+    from routers import dossier as dossier_router
+
+    def fake_get_case(case_id):
+        # store.get_case nests the case row under "case"
+        return {"case": {"id": case_id, "name": "Acme probe"}, "findings": []}
+
+    monkeypatch.setattr(dossier_router.store, "get_case", fake_get_case)
+    transport = ASGITransport(app=main.app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post("/api/dossier", json={"case_id": "abc"})
+    assert resp.status_code == 200
+    assert "osint-dossier-Acme_probe.pdf" in resp.headers["content-disposition"]

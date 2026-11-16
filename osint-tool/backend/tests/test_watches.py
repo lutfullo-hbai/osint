@@ -71,7 +71,7 @@ def test_record_check_logs_event_only_on_change(store_mod):
 async def test_check_watch_baseline_then_change(store_mod, monkeypatch):
     w = store_mod.create_watch("w", "username", "someone", 60)
 
-    async def fake_one(category, query):
+    async def fake_one(category, query, **_kw):
         return {"status": "success", "results": [
             {"platform": "GitHub", "url": "https://github.com/someone", "status": "found"},
         ]}
@@ -81,7 +81,7 @@ async def test_check_watch_baseline_then_change(store_mod, monkeypatch):
     assert first["status"] == "baseline"
     assert store_mod.get_watch(w["id"])["events"] == []  # no event on baseline
 
-    async def fake_two(category, query):
+    async def fake_two(category, query, **_kw):
         return {"status": "success", "results": [
             {"platform": "GitHub", "url": "https://github.com/someone", "status": "found"},
             {"platform": "GitLab", "url": "https://gitlab.com/someone", "status": "found"},
@@ -104,7 +104,7 @@ async def test_check_watch_baseline_then_change(store_mod, monkeypatch):
 async def test_check_watch_handles_investigator_error(store_mod, monkeypatch):
     w = store_mod.create_watch("w", "domain", "example.com", 60)
 
-    async def boom(category, query):
+    async def boom(category, query, **_kw):
         raise RuntimeError("upstream down")
     monkeypatch.setattr(monitor, "investigate", boom)
 

@@ -1,4 +1,5 @@
 import asyncio
+import contextvars
 import hashlib
 import ipaddress
 import re
@@ -155,11 +156,19 @@ def normalize_image_url(raw_url: str) -> str:
     return url
 
 
+# When set, cache reads are skipped (fresh upstream call) but the fresh result
+# is still written back. Watches need this: a cached snapshot would hide change.
+_skip_cache_read: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "skip_cache_read", default=False
+)
+
+
 async def _cached(key: str, producer, *args) -> dict:
-    cached = await get_cached_json(key)
-    if cached is not None:
-        cached["cached"] = True
-        return cached
+    if not _skip_cache_read.get():
+        cached = await get_cached_json(key)
+        if cached is not None:
+            cached["cached"] = True
+            return cached
 
     result = await producer(*args)
     if result.get("status") == "success":
@@ -1144,7 +1153,8 @@ HANDLERS = {
 CATEGORIES = tuple(sorted(HANDLERS))
 
 
-async def investigate(category: str, query: str) -> dict:
+async def investigate(category: str, query: str, fresh: bool = False) -> dict:
+    """Run one investigation. ``fresh=True`` bypasses cached results."""
     normalized_category = category.strip().lower()
     handler = HANDLERS.get(normalized_category)
     if handler is None:
@@ -1153,4 +1163,10 @@ async def investigate(category: str, query: str) -> dict:
             + ", ".join(CATEGORIES)
             + "."
         )
-    return await handler(query)
+    if not fresh:
+        return await handler(query)
+    token = _skip_cache_read.set(True)
+    try:
+        return await handler(query)
+    finally:
+        _skip_cache_read.reset(token)

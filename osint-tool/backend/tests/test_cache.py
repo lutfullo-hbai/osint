@@ -66,3 +66,32 @@ async def test_investigation_result_is_cached(monkeypatch):
     assert first["count"] == 1
     assert calls["count"] == 1
     assert second.get("cached") is True
+
+
+async def test_investigate_fresh_skips_cache_read_but_refreshes_it(monkeypatch):
+    from services import investigate as inv
+
+    monkeypatch.setattr(cache, "REDIS_URL", "")
+    cache.clear_memory_cache()
+    calls = []
+
+    async def producer(q):
+        calls.append(q)
+        return {"status": "success", "n": len(calls)}
+
+    async def handler(query):
+        return await inv._cached("osint:t:fresh", producer, query)
+
+    monkeypatch.setitem(inv.HANDLERS, "username", handler)
+
+    first = await inv.investigate("username", "x")
+    cached = await inv.investigate("username", "x")
+    assert cached["n"] == 1 and cached.get("cached") is True  # served from cache
+
+    fresh = await inv.investigate("username", "x", fresh=True)
+    assert fresh["n"] == 2 and not fresh.get("cached")  # upstream called again
+    assert len(calls) == 2
+    # the fresh result replaced the cached one, and the flag does not leak
+    again = await inv.investigate("username", "x")
+    assert again["n"] == 2 and again.get("cached") is True
+    assert first["n"] == 1
