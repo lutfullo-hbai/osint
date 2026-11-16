@@ -7,6 +7,7 @@ search-engine indexes and manual-check links. Do not work around those blocks.
 """
 import asyncio
 import html
+import os
 import re
 from urllib.parse import quote, urlparse
 
@@ -61,12 +62,30 @@ def _entry(platform: str, url: str, fields: list[tuple[str, object]], **extra) -
     }
 
 
+GITHUB_API = "https://api.github.com/"
+
+
+def _github_headers() -> dict:
+    # Sent ONLY to api.github.com. A free token lifts the limit 60 -> 5000/h.
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
 async def fetch_json(client: httpx.AsyncClient, url: str, missing=(404,), **kwargs):
+    if url.startswith(GITHUB_API):
+        kwargs["headers"] = {**kwargs.get("headers", {}), **_github_headers()}
     response = await client.get(url, **kwargs)
     if response.status_code in missing:
         return None
     if response.status_code == 429:
         raise ToolError("rate limit reached.")
+    if (
+        url.startswith(GITHUB_API)
+        and response.status_code == 403
+        and response.headers.get("x-ratelimit-remaining") == "0"
+    ):
+        hint = "" if _github_headers() else " Set GITHUB_TOKEN to raise it."
+        raise ToolError("GitHub API rate limit reached." + hint)
     if response.status_code != 200:
         raise ToolError(f"HTTP {response.status_code}.")
     try:
@@ -397,22 +416,25 @@ def extract_pivots(entries: list[dict]) -> list[dict]:
     pivots = []
     seen = set()
 
-    def add(kind: str, value: str):
+    def add(kind: str, value: str, via: str):
         if (kind, value.lower()) not in seen:
             seen.add((kind, value.lower()))
-            pivots.append({"type": kind, "value": value})
+            pivots.append({"type": kind, "value": value, "via": via})
 
     for entry in entries:
+        # "profile_link": the profile itself states it; "name_match": an
+        # account found only because its display name equals the searched name
+        via = entry.pop("pivot_via", "profile_link")
         website = entry.pop("website", "")
         if website:
             host = urlparse(website if "//" in website else f"//{website}").hostname
             try:
-                add("domain", normalize_domain(host or ""))
+                add("domain", normalize_domain(host or ""), via)
             except DomainValidationError:
                 pass
         linked = entry.pop("linked_username", "")
         if linked:
-            add("username", linked)
+            add("username", linked, via)
     return pivots
 
 
@@ -483,6 +505,7 @@ async def github_name_search(client, name: str) -> list[dict]:
             "title": item.get("login", ""),
             "info": "Account whose display name matches.",
             "linked_username": item.get("login", ""),
+            "pivot_via": "name_match",
         }
         for item in (data or {}).get("items") or []
     ]

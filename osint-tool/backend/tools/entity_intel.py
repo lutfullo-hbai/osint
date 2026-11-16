@@ -152,7 +152,8 @@ async def _entity_detail(client, qid: str, label: str, description: str) -> tupl
             continue
         social_notes.append(f"{name}: {handle}")
         if pivot_type == "username":
-            pivots.append({"type": "username", "value": handle})
+            # a curated knowledge-base statement: strong identity evidence
+            pivots.append({"type": "username", "value": handle, "via": "knowledge_base"})
     if website:
         fields.append(f"Website: {website}")
     if social_notes:

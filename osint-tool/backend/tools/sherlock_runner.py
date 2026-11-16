@@ -50,8 +50,10 @@ async def run_sherlock(username: str) -> dict:
     execution = await run_command(_build_command(username), timeout=SHERLOCK_TIMEOUT_SECONDS)
     results = parse_found(execution["stdout"]) or parse_found(execution["stderr"])
     if execution["returncode"] != 0 and not results:
+        # stderr is sometimes empty on failure; the stdout tail then says why
+        detail = execution["stderr"].strip() or strip_ansi(execution["stdout"]).strip()[-300:]
         raise ToolError(
             f"Sherlock exited with code {execution['returncode']}: "
-            f"{shorten(execution['stderr'])}"
+            f"{shorten(detail) or 'no output'}"
         )
     return {"tool": "sherlock", "results": results}

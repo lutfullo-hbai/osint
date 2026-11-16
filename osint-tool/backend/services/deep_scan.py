@@ -28,6 +28,35 @@ from services.investigate import (
 MAX_DEPTH = 2
 MAX_NODES = 14
 MAX_PIVOTS_PER_NODE = 6
+# Display-name matches are namesake candidates: follow only a few so they
+# cannot crowd the node budget out.
+MAX_NAME_MATCH_PIVOTS = 3
+
+# Pivot provenance ("via") -> follow order. Lower is followed first.
+# "tagged" handles are people MENTIONED in a post, not the target: never
+# followed automatically (they are still shown and clickable in the UI).
+_VIA_PRIORITY = {
+    "knowledge_base": 0,
+    "profile_link": 1,
+    None: 2,
+    "email_localpart": 3,
+    "name_match": 4,
+}
+NOT_FOLLOWED_VIA = {"tagged"}
+
+
+def _followable_pivots(pivots: list[dict]) -> list[dict]:
+    """Strongest pivots first; drop mentions; cap namesake candidates."""
+    keep = [p for p in pivots if p.get("via") not in NOT_FOLLOWED_VIA]
+    keep.sort(key=lambda p: _VIA_PRIORITY.get(p.get("via"), 2))
+    out, name_matches = [], 0
+    for pivot in keep:
+        if pivot.get("via") == "name_match":
+            if name_matches >= MAX_NAME_MATCH_PIVOTS:
+                continue
+            name_matches += 1
+        out.append(pivot)
+    return out[:MAX_PIVOTS_PER_NODE]
 
 # Pivot type -> investigator. "ip" shares the domain investigator, which
 # routes IPs internally. "image" is intentionally excluded: it needs a URL
@@ -85,9 +114,9 @@ async def run_deep_scan(seed_query: str, seed_type: str | None = None) -> dict:
     warnings: list[str] = []
     truncated = False
 
-    # queue holds (depth, ptype, value, parent_key_or_None)
-    queue: list[tuple[int, str, str, str | None]] = [
-        (0, seed_type, seed_query, None)
+    # queue holds (depth, ptype, value, parent_key_or_None, via_or_None)
+    queue: list[tuple[int, str, str, str | None, str | None]] = [
+        (0, seed_type, seed_query, None, None)
     ]
     seen.add(_node_key(seed_type, seed_query))
 
@@ -100,11 +129,11 @@ async def run_deep_scan(seed_query: str, seed_type: str | None = None) -> dict:
         level = queue
         queue = []
         tasks = [
-            _HANDLERS[ptype](value) for (_d, ptype, value, _p) in level
+            _HANDLERS[ptype](value) for (_d, ptype, value, _p, _v) in level
         ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        for (depth, ptype, value, parent_key), result in zip(level, results):
+        for (depth, ptype, value, parent_key, via), result in zip(level, results):
             node_key = _node_key(ptype, value)
 
             if isinstance(result, InvestigationValidationError):
@@ -131,6 +160,10 @@ async def run_deep_scan(seed_query: str, seed_type: str | None = None) -> dict:
                 "results": result.get("results", []),
                 "pivots": result.get("pivots", []),
             }
+            if parent_key is not None:
+                # how this node was reached — correlation weighs it as evidence
+                node["parent"] = parent_key
+                node["via"] = via
             if result.get("message"):
                 node["message"] = result["message"]
             nodes.append(node)
@@ -144,7 +177,7 @@ async def run_deep_scan(seed_query: str, seed_type: str | None = None) -> dict:
 
             # enqueue children
             if depth + 1 <= MAX_DEPTH:
-                for pivot in result.get("pivots", [])[:MAX_PIVOTS_PER_NODE]:
+                for pivot in _followable_pivots(result.get("pivots", [])):
                     ctype = pivot.get("type")
                     cvalue = pivot.get("value")
                     if not ctype or not cvalue or ctype not in _HANDLERS:
@@ -154,7 +187,9 @@ async def run_deep_scan(seed_query: str, seed_type: str | None = None) -> dict:
                         edges.append({"from": node_key, "to": ckey})
                         continue
                     seen.add(ckey)
-                    queue.append((depth + 1, ctype, cvalue, node_key))
+                    queue.append(
+                        (depth + 1, ctype, cvalue, node_key, pivot.get("via"))
+                    )
 
         if len(nodes) >= MAX_NODES:
             truncated = True

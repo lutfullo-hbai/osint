@@ -427,7 +427,9 @@ async def _investigate_email(email: str) -> dict:
     # The local part is often reused as a username elsewhere.
     local_part = email.split("@", 1)[0]
     if local_part and set(local_part) <= ALLOWED_USERNAME_CHARS and len(local_part) >= 3:
-        email_pivots.append({"type": "username", "value": local_part})
+        email_pivots.append(
+            {"type": "username", "value": local_part, "via": "email_localpart"}
+        )
     # Search engines ignore quotes, so keep only pages that really show the address.
     results.extend(
         item

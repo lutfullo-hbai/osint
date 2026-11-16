@@ -132,7 +132,7 @@ async def test_email_survives_holehe_failure(monkeypatch):
     assert result["warnings"] == ["Holehe: holehe crashed"]
     assert result["pivots"] == [
         {"type": "domain", "value": "example.com"},
-        {"type": "username", "value": "user"},
+        {"type": "username", "value": "user", "via": "email_localpart"},
     ]
 
 
@@ -189,8 +189,8 @@ def test_github_parser_exposes_pivots_only_through_extract():
     )
     assert "Company" not in entry["info"]
     assert pp.extract_pivots([entry]) == [
-        {"type": "domain", "value": "bob.dev"},
-        {"type": "username", "value": "bobby"},
+        {"type": "domain", "value": "bob.dev", "via": "profile_link"},
+        {"type": "username", "value": "bobby", "via": "profile_link"},
     ]
     assert "website" not in entry and "linked_username" not in entry
 
@@ -337,8 +337,8 @@ async def test_social_presence_keeps_posts_and_turns_tags_into_pivots(monkeypatc
     assert outcome["posts"][0]["platform"] == "Instagram"
     assert outcome["results"] == []
     assert outcome["pivots"] == [
-        {"type": "username", "value": "axror.xs"},
-        {"type": "username", "value": "alishercr"},
+        {"type": "username", "value": "axror.xs", "via": "tagged"},
+        {"type": "username", "value": "alishercr", "via": "tagged"},
     ]
 
 
@@ -446,8 +446,8 @@ def test_parse_gravatar_profile_extracts_fields_and_pivots():
     assert "Name: Beau Lebens" in result["info"]
     assert "Linked accounts" in result["info"]
     assert pivots == [
-        {"type": "username", "value": "beaulebens"},
-        {"type": "username", "value": "beaulebens"},
+        {"type": "username", "value": "beaulebens", "via": "profile_link"},
+        {"type": "username", "value": "beaulebens", "via": "profile_link"},
     ]
 
 
@@ -482,7 +482,7 @@ async def test_email_adds_local_part_and_gravatar_pivots(monkeypatch):
 
     assert {"type": "domain", "value": "example.com"} in result["pivots"]
     assert {"type": "username", "value": "beaulebens"} in result["pivots"]
-    assert {"type": "username", "value": "john.doe"} in result["pivots"]
+    assert {"type": "username", "value": "john.doe", "via": "email_localpart"} in result["pivots"]
 
 
 async def test_chesscom_and_npm_and_gravatar_username_sources(monkeypatch):
@@ -506,7 +506,9 @@ async def test_chesscom_and_npm_and_gravatar_username_sources(monkeypatch):
     assert chess["platform"] == "Chess.com" and "Followers: 3" in chess["info"]
     assert "leftpad" in npm["info"]
     assert grav["linked_username"] == "xdev"
-    assert pp.extract_pivots([grav]) == [{"type": "username", "value": "xdev"}]
+    assert pp.extract_pivots([grav]) == [
+        {"type": "username", "value": "xdev", "via": "profile_link"}
+    ]
 
 
 def test_epoch_to_date_formats_and_tolerates_junk():
@@ -891,3 +893,40 @@ async def test_phone_with_public_mention_is_found_online(monkeypatch):
     result = await _phone_with(monkeypatch, [mention])
     assert result["found_online"] is True
     assert "message" not in result
+
+
+
+async def test_github_token_sent_only_to_github_api(monkeypatch):
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_test")
+    seen = {}
+
+    class FakeClient:
+        async def get(self, url, **kwargs):
+            seen[url] = (kwargs.get("headers") or {}).get("Authorization")
+
+            class R:
+                status_code = 200
+                headers = {}
+
+                def json(self):
+                    return {}
+            return R()
+
+    await pp.fetch_json(FakeClient(), "https://api.github.com/users/x")
+    await pp.fetch_json(FakeClient(), "https://gitlab.com/api/v4/users?username=x")
+    assert seen["https://api.github.com/users/x"] == "Bearer ghp_test"
+    assert seen["https://gitlab.com/api/v4/users?username=x"] is None
+
+
+async def test_github_rate_limit_gives_clear_hint(monkeypatch):
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+
+    class FakeClient:
+        async def get(self, url, **kwargs):
+            class R:
+                status_code = 403
+                headers = {"x-ratelimit-remaining": "0"}
+            return R()
+
+    with pytest.raises(ToolError, match="GITHUB_TOKEN"):
+        await pp.fetch_json(FakeClient(), "https://api.github.com/users/x")

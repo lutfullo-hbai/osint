@@ -1097,8 +1097,9 @@ function buildDeepGraph(data) {
 }
 
 function buildClusters(data) {
+  // multi-node identities, plus single nodes that have namesake candidates
   const clusters = (data.clusters || []).filter(
-    (c) => (c.members || []).length > 1
+    (c) => (c.members || []).length > 1 || (c.candidates || []).length
   );
   if (!clusters.length) return null;
 
@@ -1161,6 +1162,23 @@ function buildClusters(data) {
       plat.className = "card-meta";
       plat.textContent = "seen on: " + c.platforms.join(", ");
       card.appendChild(plat);
+    }
+
+    if (c.candidates && c.candidates.length) {
+      // NOT merged: same display name only. Verify before treating as this person.
+      const cand = document.createElement("div");
+      cand.className = "cluster-candidates";
+      const label = document.createElement("div");
+      label.textContent =
+        `Unconfirmed candidates (${c.candidates.length}) — may be different people:`;
+      cand.appendChild(label);
+      c.candidates.forEach((x) => {
+        const row = document.createElement("div");
+        row.className = "card-meta";
+        row.textContent = `@${x.query} — ${x.reason}`;
+        cand.appendChild(row);
+      });
+      card.appendChild(cand);
     }
 
     wrap.appendChild(card);

@@ -909,3 +909,10 @@ a.chip { text-decoration: none; }
   padding: 8px 10px;
   opacity: 0.85;
 }
+
+.cluster-candidates {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px dashed var(--muted);
+  border-radius: 10px;
+}
