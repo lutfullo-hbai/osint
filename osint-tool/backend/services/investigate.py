@@ -518,17 +518,32 @@ async def _investigate_phone(raw_query: str) -> dict:
     except ToolError as exc:
         warnings.append(f"Public mentions search failed: {exc}")
 
+    # Only the numbering-plan entry is not evidence of any online presence.
+    found_online = any(r.get("platform") != "Telecom info" for r in results)
     response = {
         "status": "success",
         "query": raw_query,
         "results": results,
         "count": len(results),
-        "links": manual_check_links(e164),
+        "found_online": found_online,
+        # Manual-check links are URL templates built from the number. The tool
+        # did NOT open or verify them, so they are never findings.
+        "links": [
+            {**link, "checked": False} for link in manual_check_links(e164)
+        ],
         "notice": (
             "Phone metadata is from the numbering plan, not a live lookup. "
-            "Owner identity needs independent confirmation."
+            "The app links were NOT checked by the tool: they only open each "
+            "service so you can look yourself. Owner identity needs "
+            "independent confirmation."
         ),
     }
+    if not found_online:
+        response["message"] = (
+            "No online accounts or public mentions were found for this "
+            "number. Only numbering-plan data (country, carrier, line type) "
+            "is known."
+        )
     if warnings:
         response["warnings"] = warnings
     return response

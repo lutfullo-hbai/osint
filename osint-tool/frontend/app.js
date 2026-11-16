@@ -743,9 +743,10 @@ function buildToolbar(data) {
   }
   if (Array.isArray(data.links) && data.links.length) {
     const links = document.createElement("div");
-    links.className = "chip-row";
+    links.className = "chip-row manual-links";
     const label = document.createElement("span");
-    label.textContent = "open externally (unverified):";
+    label.textContent =
+      "NOT checked by the tool. These only open each service so you can look yourself:";
     links.appendChild(label);
     data.links.forEach((item) => {
       const link = document.createElement("a");
@@ -753,7 +754,8 @@ function buildToolbar(data) {
       link.href = item.url;
       link.target = "_blank";
       link.rel = "noopener noreferrer";
-      link.textContent = item.label;
+      link.textContent = `${item.label} ↗`;
+      link.title = "Opens the service. Nothing was verified.";
       links.appendChild(link);
     });
     toolbar.appendChild(links);
@@ -821,6 +823,14 @@ function renderResults(panel, data) {
       "No public traces found. The target may not exist on scanned platforms.";
     panel.results.appendChild(empty);
     return;
+  }
+
+  if (data.message) {
+    // e.g. phone: only numbering-plan info, nothing found online
+    const msg = document.createElement("div");
+    msg.className = "empty-state";
+    msg.textContent = data.message;
+    panel.results.appendChild(msg);
   }
 
   data.results.forEach((item, index) => {
