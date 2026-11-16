@@ -35,7 +35,9 @@ from tools.email_domain import (
 )
 from tools.email_intel import lookup_breaches, lookup_emailrep
 from tools.holehe_runner import run_holehe
+from tools.domain_emails import find_domain_emails
 from tools.hub_domains import is_hub_domain
+from tools.profile_history import annotate_first_archived
 from services.names import username_variants
 from tools.image_intel import analyze_image, fetch_image_bytes
 from tools.ip_intel import (
@@ -398,6 +400,9 @@ async def _investigate_username(username: str) -> dict:
         posts = outcomes["Web search"]["posts"]
         add_pivots(outcomes["Web search"]["pivots"])
 
+    # how old is each strong hit? (earliest Wayback snapshot)
+    await annotate_first_archived(results)
+
     seen_platforms = {item["platform"] for item in results}
     response = {
         "status": "success",
@@ -624,6 +629,7 @@ async def _investigate_domain(domain: str) -> dict:
                 "Archived URLs": wayback_cdx(client, domain),
                 "Favicon": favicon_hash(client, domain),
                 "Disclosure": disclosure_files(client, domain),
+                "Published emails": find_domain_emails(domain),
             }
         )
 
@@ -645,6 +651,9 @@ async def _investigate_domain(domain: str) -> dict:
             disclosure_results, disclosure_warnings = outcomes["Disclosure"]
             results.extend(disclosure_results)
             warnings.extend(disclosure_warnings)
+        # addresses the organisation itself published: shown with their page,
+        # never auto-followed (they are other people's contacts)
+        results.extend(outcomes.get("Published emails") or [])
 
         subdomains: list[str] = []
         if "Subdomains" in outcomes:

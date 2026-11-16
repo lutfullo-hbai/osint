@@ -28,6 +28,7 @@ from routers import (
     jobs,
     name,
     phone,
+    sources,
     username,
 )
 import store
@@ -145,6 +146,7 @@ app.include_router(correlate.router)
 app.include_router(dossier.router)
 app.include_router(watches.router)
 app.include_router(jobs.router)
+app.include_router(sources.router)
 
 
 @app.get("/")

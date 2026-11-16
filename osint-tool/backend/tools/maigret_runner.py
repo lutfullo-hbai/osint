@@ -3,6 +3,7 @@ import json
 import os
 import tempfile
 
+from tools.maigret_db import ensure_db
 from tools.base import ToolError, positional_arg, run_command, shorten, strip_ansi
 
 MAIGRET_TIMEOUT_SECONDS = 900
@@ -139,6 +140,7 @@ async def run_maigret(username: str) -> dict:
         "10",
         "-fo",
         report_dir,
+        *(["--db", db_path] if (db_path := ensure_db()) else []),
         "--",
         username,
     ]

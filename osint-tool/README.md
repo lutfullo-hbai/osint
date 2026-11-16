@@ -107,6 +107,20 @@ IP bo'yicha, `slowapi` orqali (env bilan sozlanadi):
 
 Limitdan oshsa `429` va `X-RateLimit-*` / `Retry-After` sarlavhalari qaytadi.
 
+### Veb-qidiruv va passiv manbalar (kalitsiz)
+- **SearXNG** (`searxng` konteyneri, faqat ichki tarmoqda): bitta so'rov Google, Bing,
+  Brave, Startpage va boshqalarga tarqaladi. Tartib: Brave API (kalit bo'lsa) → SearXNG →
+  DuckDuckGo. Bittasi bloklasa keyingisi ishlaydi. `.env`da `SEARXNG_SECRET` o'rnating.
+- **Subfinder** (image ichida): passiv subdomain qidiruvi, crt.sh/OTX/HackerTarget bilan birga.
+- **Domen email'lari**: tashkilot ochiq e'lon qilgan manzillar, har biri topilgan sahifasi bilan
+  (taxmin qilinmaydi; gmail.com kabi umumiy domenlarda o'chiq).
+- **Maigret bazasi**: `/app/data/maigret_db.json` — o'zbek saytlari skanerga kiritilgan, har
+  dushanba 04:30 UTC `--self-check --auto-disable` ishlamay qolgan saytlarni o'chiradi.
+  Qo'shimcha sayt ta'riflari: `backend/assets/maigret_extra_sites.json`.
+- **Wayback**: kuchli topilgan profillarning birinchi arxivlangan sanasi.
+- **Manbalar holati**: `GET /api/sources/health` va sarlavhadagi `[SOURCES ...]` belgisi
+  (ustiga olib borilsa tafsilotlar).
+
 ### Kalitli (ixtiyoriy) manbalar
 Kalit `.env`da bo'lsa ishlaydi, bo'lmasa o'sha manba o'tkazib yuboriladi:
 `BRAVE_API_KEY` (Google sifatidagi qidiruv, DuckDuckGo o'rniga), `HIBP_API_KEY`

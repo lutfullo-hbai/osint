@@ -15,6 +15,8 @@ DEFAULT_MAX_RESULTS = 15
 DELAY_BETWEEN_BATCHES_SECONDS = 2.5
 BRAVE_ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
 BRAVE_DELAY_SECONDS = 1.1
+SEARXNG_TIMEOUT_SECONDS = 20
+SEARXNG_DELAY_SECONDS = 0.3
 
 VERIFY_TIMEOUT_SECONDS = 12
 MAX_CONCURRENT_FETCHES = 6
@@ -184,33 +186,111 @@ async def _brave_search(
     return results
 
 
+def parse_searxng(data: dict, limit: int) -> list[dict]:
+    """SearXNG JSON -> our result entries."""
+    out = []
+    for item in (data.get("results") or [])[:limit]:
+        url = (item.get("url") or "").strip()
+        if not url.startswith("http"):
+            continue
+        out.append({
+            "platform": platform_from_url(url),
+            "source": "web_search",
+            "url": url,
+            "title": (item.get("title") or "").strip(),
+            "info": (item.get("content") or "").strip()[:300],
+            "status": "found",
+            "engines": item.get("engines") or ([item["engine"]] if item.get("engine") else []),
+        })
+    return out
+
+
+async def _searxng_search(query_batches: list[str], max_results_per_batch: int) -> list[dict]:
+    """Our own SearXNG: one query fans out to Google, Bing, Brave, Startpage...
+
+    The URL is operator configuration (the compose-internal service), so it is
+    called directly rather than through the public-URL SSRF guard.
+    """
+    base = os.environ.get("SEARXNG_URL", "").strip().rstrip("/")
+    results, seen, failed = [], set(), 0
+    async with httpx.AsyncClient(timeout=SEARXNG_TIMEOUT_SECONDS) as client:
+        for index, batch in enumerate(query_batches):
+            if index > 0:
+                await asyncio.sleep(SEARXNG_DELAY_SECONDS)
+            try:
+                response = await client.get(
+                    f"{base}/search",
+                    params={"q": batch, "format": "json", "safesearch": 0},
+                )
+                if response.status_code != 200:
+                    failed += 1
+                    continue
+                items = parse_searxng(response.json(), max_results_per_batch)
+            except (httpx.HTTPError, ValueError):
+                failed += 1
+                continue
+            for item in items:
+                key = item["url"].split("#")[0].lower().rstrip("/")
+                if key not in seen:
+                    seen.add(key)
+                    results.append(item)
+    if not results and failed == len(query_batches):
+        raise ToolError("SearXNG did not respond.")
+    return results
+
+
+def _providers(max_results_per_batch: int) -> list[tuple[str, object]]:
+    """Search backends in order of preference; each later one is a fallback."""
+    providers = []
+    if os.environ.get("BRAVE_API_KEY", "").strip():
+        providers.append(("Brave Search", lambda b: _brave_search(b, max_results_per_batch)))
+    if os.environ.get("SEARXNG_URL", "").strip():
+        providers.append(("SearXNG", lambda b: _searxng_search(b, max_results_per_batch)))
+    providers.append(("DuckDuckGo", lambda b: asyncio.to_thread(_search_sync, b, max_results_per_batch)))
+    return providers
+
+
 async def search_public(
     query_batches: list[str],
     timeout: int = SEARCH_TIMEOUT_SECONDS,
     max_results_per_batch: int = DEFAULT_MAX_RESULTS,
 ) -> list[dict]:
-    try:
-        if os.environ.get("BRAVE_API_KEY", "").strip():
-            return await asyncio.wait_for(
-                _brave_search(list(query_batches), max_results_per_batch),
-                timeout=timeout,
-            )
-        return await asyncio.wait_for(
-            asyncio.to_thread(
-                _search_sync, list(query_batches), max_results_per_batch
-            ),
-            timeout=timeout,
-        )
-    except asyncio.TimeoutError:
+    """Run the batches on the first search backend that answers.
+
+    A backend that fails or returns nothing hands over to the next one, so a
+    single engine rate-limiting this IP no longer empties every name search.
+    """
+    batches = list(query_batches)
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    errors = []
+    for label, run in _providers(max_results_per_batch):
+        remaining = deadline - loop.time()
+        if remaining <= 1:
+            break
+        try:
+            results = await asyncio.wait_for(run(batches), timeout=remaining)
+        except asyncio.TimeoutError:
+            errors.append(f"{label} timed out")
+            continue
+        except ImportError:
+            errors.append(f"{label}: package not installed")
+            continue
+        except ToolError as exc:
+            errors.append(f"{label}: {exc}")
+            continue
+        except Exception as exc:  # noqa: BLE001 - one backend must not sink search
+            errors.append(f"{label} failed unexpectedly: {type(exc).__name__}")
+            continue
+        if results:
+            return results
+        errors.append(f"{label}: no results")
+    if errors and all(not e.endswith("no results") for e in errors):
         raise ToolError(
-            f"Public search timed out after {timeout} seconds"
-        ) from None
-    except ToolError:
-        raise
-    except ImportError:
-        raise ToolError("'ddgs' package is not installed on the server") from None
-    except Exception as exc:
-        raise ToolError(f"Public search failed unexpectedly: {exc}") from exc
+            "Search engine did not respond (" + "; ".join(errors) + "). It may be "
+            "rate-limiting this IP - try again in a minute."
+        )
+    return []
 
 
 def _digit_pattern(digits: str) -> re.Pattern:

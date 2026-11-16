@@ -1,0 +1,27 @@
+# SearXNG for NEXUS OSINT: a private metasearch backend reachable only on the
+# compose network. Results come as JSON to the backend; no public UI is exposed.
+use_default_settings: true
+
+general:
+  instance_name: "nexus-osint-search"
+  enable_metrics: false
+
+server:
+  # overridden by the SEARXNG_SECRET environment variable at runtime
+  secret_key: "change-me-via-SEARXNG_SECRET"
+  limiter: false          # only our backend talks to it, over the internal network
+  public_instance: false
+  image_proxy: false
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  formats:
+    - html
+    - json
+
+outgoing:
+  request_timeout: 6.0
+  max_request_timeout: 12.0
+  pool_connections: 50
+  pool_maxsize: 10
