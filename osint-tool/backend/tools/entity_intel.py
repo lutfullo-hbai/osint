@@ -5,6 +5,8 @@ request carries a descriptive User-Agent with a contact URL, per their robot
 policy. Only notable people have entries; unknown names simply return nothing.
 """
 import asyncio
+import re
+import unicodedata
 
 import httpx
 
@@ -18,6 +20,8 @@ WIKIMEDIA_HEADERS = {
 }
 TIMEOUT = httpx.Timeout(15.0)
 MAX_CANDIDATES = 2
+INSTANCE_OF_PROPERTY = "P31"
+HUMAN_QID = "Q5"
 
 # Wikidata property -> (label, pivot type). A handle on one of these becomes a
 # pivot the investigator can click to search that platform next.
@@ -119,11 +123,20 @@ async def _wikipedia_summary(client, title: str) -> dict | None:
     }
 
 
-async def _entity_detail(client, qid: str, label: str, description: str) -> tuple[dict, list[dict]]:
+def _norm_label(value: str) -> str:
+    """Casefold, strip accents and apostrophe variants, collapse spaces."""
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = re.sub(r"[\'\u2018\u2019\u02bb\u02bc`]", "", text)
+    return re.sub(r"\s+", " ", text).strip().casefold()
+
+
+async def _entity_detail(client, qid: str, label: str, description: str) -> tuple[dict, list[dict], bool]:
     data = await _get_json(
         client, f"https://www.wikidata.org/wiki/Special:EntityData/{qid}.json"
     )
     claims = (data.get("entities") or {}).get(qid, {}).get("claims") or {}
+    is_human = HUMAN_QID in _claim_ids(claims, INSTANCE_OF_PROPERTY)
 
     occupation_ids = _claim_ids(claims, OCCUPATION_PROPERTY)
     country_ids = _claim_ids(claims, CITIZENSHIP_PROPERTY)
@@ -152,8 +165,8 @@ async def _entity_detail(client, qid: str, label: str, description: str) -> tupl
             continue
         social_notes.append(f"{name}: {handle}")
         if pivot_type == "username":
-            # a curated knowledge-base statement: strong identity evidence
-            pivots.append({"type": "username", "value": handle, "via": "knowledge_base"})
+            # the caller decides how much this is worth (see run_person_entity)
+            pivots.append({"type": "username", "value": handle})
     if website:
         fields.append(f"Website: {website}")
     if social_notes:
@@ -166,7 +179,32 @@ async def _entity_detail(client, qid: str, label: str, description: str) -> tupl
         "title": label,
         "info": "; ".join(fields) or "Entity found.",
     }
-    return entry, pivots
+    return entry, pivots, is_human
+
+
+def _grade_pivots(name: str, details: list[tuple[dict, list[dict], bool]]) -> list[dict]:
+    """Decide how strongly each entity's accounts identify the searched person.
+
+    A Wikidata search returns every item that shares the name. Only a human
+    whose label equals the query AND who is the ONLY such human is treated as
+    "the" person: their accounts are knowledge-base evidence. When two humans
+    share the name (Michael Jordan the player and the professor) nobody knows
+    which one is meant, so every account is a namesake candidate. Non-human
+    items (a film, a band) contribute nothing.
+    """
+    wanted = _norm_label(name)
+    matching = [
+        d for d in details if d[2] and _norm_label(d[0].get("title")) == wanted
+    ]
+    unique = matching[0] if len(matching) == 1 else None
+    graded = []
+    for detail in details:
+        entry, pivots, is_human = detail
+        if not is_human:
+            continue
+        via = "knowledge_base" if detail is unique else "name_match"
+        graded.extend({**p, "via": via} for p in pivots)
+    return graded
 
 
 async def run_person_entity(name: str) -> dict:
@@ -207,13 +245,10 @@ async def run_person_entity(name: str) -> dict:
         )
 
     results = []
-    pivots = []
     *detail_outcomes, summary_outcome = outcomes
-    for outcome in detail_outcomes:
-        if isinstance(outcome, tuple):
-            entry, entry_pivots = outcome
-            results.append(entry)
-            pivots.extend(entry_pivots)
+    details = [o for o in detail_outcomes if isinstance(o, tuple)]
+    results.extend(entry for entry, _p, _h in details)
+    pivots = _grade_pivots(name, details)
     if isinstance(summary_outcome, dict):
         results.insert(0, summary_outcome)
 

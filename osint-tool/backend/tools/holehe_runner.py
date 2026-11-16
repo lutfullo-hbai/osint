@@ -1,6 +1,6 @@
 import re
 
-from tools.base import ToolError, run_command, shorten, strip_ansi
+from tools.base import ToolError, positional_arg, run_command, shorten, strip_ansi
 
 HOLEHE_TIMEOUT_SECONDS = 300
 
@@ -35,9 +35,10 @@ def parse_found(stdout: str) -> list[dict]:
 async def run_holehe(email: str) -> dict:
     command = [
         "holehe",
-        email,
         "--only-used",
         "--no-color",
+        "--",
+        positional_arg(email),
     ]
     execution = await run_command(command, timeout=HOLEHE_TIMEOUT_SECONDS)
     results = parse_found(execution["stdout"])

@@ -1,4 +1,5 @@
 import re
+import time
 
 import httpx
 
@@ -114,16 +115,32 @@ def _extract_from_html(html: str) -> dict:
     }
 
 
+# When Truecaller cannot be reached at all (blocked network), every phone
+# lookup would wait for the timeout. After one connection failure, skip it
+# for a while and say so instead.
+TRUECALLER_TIMEOUT = httpx.Timeout(15.0, connect=5.0)
+UNREACHABLE_COOLDOWN_SECONDS = 600
+_unreachable_until = 0.0
+
+
 async def scrape_truecaller(number: str, region: str) -> dict:
+    global _unreachable_until
     url = SEARCH_URL_TEMPLATE.format(region=region, number=number.lstrip("+"))
+    if time.monotonic() < _unreachable_until:
+        raise TruecallerUnavailable(
+            "Truecaller skipped: it was unreachable from this network a few "
+            "minutes ago."
+        )
     try:
         async with httpx.AsyncClient(
             headers=BROWSER_HEADERS,
             follow_redirects=True,
-            timeout=httpx.Timeout(30.0),
+            timeout=TRUECALLER_TIMEOUT,
         ) as client:
             response = await client.get(url)
     except httpx.HTTPError as exc:
+        if isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout)):
+            _unreachable_until = time.monotonic() + UNREACHABLE_COOLDOWN_SECONDS
         raise TruecallerUnavailable(
             f"Could not reach Truecaller ({type(exc).__name__}: {exc or 'connection failed'}). "
             "Check network connectivity."

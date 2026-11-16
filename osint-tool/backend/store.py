@@ -158,6 +158,9 @@ MIN_INTERVAL = 5
 MAX_INTERVAL = 7 * 24 * 60  # a week
 
 
+MAX_WATCHES = int(os.environ.get("MAX_WATCHES", "100"))
+
+
 def create_watch(name: str, category: str, query: str,
                  interval_minutes: int) -> dict:
     name = " ".join((name or "").split())
@@ -178,6 +181,11 @@ def create_watch(name: str, category: str, query: str,
     watch_id = uuid.uuid4().hex
     now = _now()
     with _connect() as conn:
+        (count,) = conn.execute("SELECT COUNT(*) FROM watches").fetchone()
+        if count >= MAX_WATCHES:
+            raise CaseError(
+                f"At most {MAX_WATCHES} watches; delete one before adding another."
+            )
         conn.execute(
             "INSERT INTO watches (id, name, category, query, interval_minutes, "
             "active, last_hash, last_status, last_checked_at, created_at) "
@@ -271,18 +279,36 @@ def due_watches() -> list[dict]:
     return due
 
 
+_ANY = object()
+
+
 def record_watch_check(watch_id: str, new_hash: str, status: str,
-                       change_summary: str | None) -> None:
-    """Persist the outcome of one check; log an event only on a real change."""
+                       change_summary: str | None, expected_hash=_ANY) -> bool:
+    """Persist the outcome of one check; log an event only on a real change.
+
+    With expected_hash, the update applies only if the stored baseline is still
+    that value (compare-and-set): two overlapping checks of one watch cannot
+    both log the same change. Returns whether the update applied.
+    """
     now = _now()
     with _connect() as conn:
-        conn.execute(
-            "UPDATE watches SET last_hash=?, last_status=?, last_checked_at=? "
-            "WHERE id=?", (new_hash, status, now, watch_id),
-        )
+        if expected_hash is _ANY:
+            cur = conn.execute(
+                "UPDATE watches SET last_hash=?, last_status=?, last_checked_at=? "
+                "WHERE id=?", (new_hash, status, now, watch_id),
+            )
+        else:
+            cur = conn.execute(
+                "UPDATE watches SET last_hash=?, last_status=?, last_checked_at=? "
+                "WHERE id=? AND last_hash IS ?",
+                (new_hash, status, now, watch_id, expected_hash),
+            )
+        if cur.rowcount != 1:
+            return False
         if change_summary:
             conn.execute(
                 "INSERT INTO watch_events (id, watch_id, summary, created_at) "
                 "VALUES (?,?,?,?)",
                 (uuid.uuid4().hex, watch_id, change_summary, now),
             )
+    return True

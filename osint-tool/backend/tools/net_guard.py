@@ -40,7 +40,8 @@ def _resolve_sync(host: str, port: int) -> set[str]:
     return {info[4][0] for info in infos}
 
 
-async def ensure_safe_url(url: str) -> str:
+async def _check_url(url: str):
+    """Validate a URL and return (parsed, host, addresses it resolves to)."""
     parsed = urlparse(url)
     if parsed.scheme.lower() not in ALLOWED_SCHEMES:
         raise UnsafeURLError("Only http and https URLs are allowed.")
@@ -66,20 +67,48 @@ async def ensure_safe_url(url: str) -> str:
             raise UnsafeURLError(
                 "URL resolves to a private, loopback or reserved address."
             )
+    return parsed, host, sorted(addresses)
+
+
+async def ensure_safe_url(url: str) -> str:
+    await _check_url(url)
     return url
+
+
+def _pinned(parsed, address: str) -> str:
+    """The same URL with the host swapped for an already-validated IP."""
+    netloc = f"[{address}]" if ":" in address else address
+    if parsed.port is not None:
+        netloc += f":{parsed.port}"
+    return parsed._replace(netloc=netloc).geturl()
 
 
 async def safe_get(
     client: httpx.AsyncClient, url: str, max_redirects: int = MAX_REDIRECTS
 ) -> httpx.Response:
+    """GET a user-supplied URL without letting it reach a private address.
+
+    The host is resolved and checked once, then the connection goes to that
+    exact IP (Host header and TLS SNI keep the real name, so the certificate is
+    still verified for it). Resolving again at connect time would let a DNS
+    record flip to 127.0.0.1 between the check and the request (rebinding).
+    """
     current = url
     for _ in range(max_redirects + 1):
-        await ensure_safe_url(current)
-        response = await client.get(current, follow_redirects=False)
+        parsed, host, addresses = await _check_url(current)
+        extensions = {"sni_hostname": host} if parsed.scheme.lower() == "https" else {}
+        response = await client.get(
+            _pinned(parsed, addresses[0]),
+            headers={"Host": parsed.netloc.rsplit("@", 1)[-1]},
+            extensions=extensions,
+            follow_redirects=False,
+        )
+        # report the URL the caller asked for, not the pinned IP form
+        response.request = httpx.Request(response.request.method, current)
         if not response.is_redirect:
             return response
         location = response.headers.get("location")
         if not location:
             return response
-        current = urljoin(str(response.url), location)
+        current = urljoin(current, location)
     raise UnsafeURLError("Too many redirects.")

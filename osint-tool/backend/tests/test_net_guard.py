@@ -51,7 +51,8 @@ async def test_safe_get_follows_public_redirect(monkeypatch):
     monkeypatch.setattr("tools.net_guard._resolve_sync", _fake_resolver)
 
     def handler(request: httpx.Request) -> httpx.Response:
-        if request.url.host == "example.com":
+        # the connection goes to the pinned IP; the Host header names the site
+        if request.headers["host"] == "example.com":
             return httpx.Response(302, headers={"location": "https://example.org/ok"})
         return httpx.Response(200, text="ok")
 

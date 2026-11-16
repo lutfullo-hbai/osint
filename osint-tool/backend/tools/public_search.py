@@ -118,6 +118,7 @@ def _search_sync(
                 results.append(
                     {
                         "platform": platform_from_url(url),
+                        "source": "web_search",
                         "url": url,
                         "title": (item.get("title") or "").strip(),
                         "info": (item.get("body") or "").strip()[:300],
@@ -172,6 +173,7 @@ async def _brave_search(
                 seen.add(key)
                 results.append({
                     "platform": platform_from_url(url),
+                    "source": "web_search",
                     "url": url,
                     "title": (item.get("title") or "").strip(),
                     "info": (item.get("description") or "").strip()[:300],
