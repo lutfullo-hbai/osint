@@ -230,7 +230,8 @@ def build_dossier(data: dict) -> bytes:
 
     nodes = report["nodes"]
     clusters = report["clusters"]
-    multi = [c for c in clusters if len(c.get("members", [])) > 1]
+    multi = [c for c in clusters
+             if len(c.get("members", [])) > 1 or c.get("candidates")]
     total_findings = sum(len(n.get("results", [])) for n in nodes)
 
     _kv(pdf, "Seed", report["seed"])
@@ -262,6 +263,12 @@ def build_dossier(data: dict) -> bytes:
                         (f"  (+{len(vals) - 12} more)" if len(vals) > 12 else ""))
             if c.get("signals"):
                 _kv(pdf, "why linked", "; ".join(c["signals"]))
+            cands = c.get("candidates") or []
+            if cands:
+                # same display name only — NOT merged, may be different people
+                _kv(pdf, "unconfirmed candidates",
+                    ", ".join("@" + str(x.get("query")) for x in cands[:12]) +
+                    " (display-name match only; verify before use)")
             for x in c.get("contradictions", []):
                 pdf.set_text_color(*_AMBER)
                 pdf.set_font(FONT, "I", 9)

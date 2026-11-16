@@ -111,7 +111,8 @@ Limitdan oshsa `429` va `X-RateLimit-*` / `Retry-After` sarlavhalari qaytadi.
 Kalit `.env`da bo'lsa ishlaydi, bo'lmasa o'sha manba o'tkazib yuboriladi:
 `BRAVE_API_KEY` (Google sifatidagi qidiruv, DuckDuckGo o'rniga), `HIBP_API_KEY`
 (bo'lmasa breach tekshiruvi bepul XposedOrNot orqali ishlaydi),
-`OPENSANCTIONS_API_KEY`, `OPENCORPORATES_API_KEY`, `SECURITYTRAILS_API_KEY`
+`OPENSANCTIONS_API_KEY`, `OPENCORPORATES_API_KEY`, `SECURITYTRAILS_API_KEY`,
+`GITHUB_TOKEN` (bepul; GitHub limiti soatiga 60 → 5000)
 (subdomenlar/DNS tarixi), `HUNTER_API_KEY` (exposure email'lari). To'liq ro'yxat —
 `.env.example`.
 

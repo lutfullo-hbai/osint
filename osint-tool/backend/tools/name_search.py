@@ -217,7 +217,11 @@ async def run_username_web(username: str) -> dict:
             profile_seen.add(key)
             profiles.append(item)
 
-    pivots = [{"type": "username", "value": h} for h in tagged[:MAX_TAGGED_HANDLES]]
+    # a tagged @handle is someone MENTIONED in a post, not the target itself
+    pivots = [
+        {"type": "username", "value": h, "via": "tagged"}
+        for h in tagged[:MAX_TAGGED_HANDLES]
+    ]
     return {
         "tool": "username-web",
         "results": profiles,

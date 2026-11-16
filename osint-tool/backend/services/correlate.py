@@ -16,6 +16,7 @@ from collections import defaultdict
 MIN_HANDLE_LEN = 4
 
 # Link weights — how strongly a shared signal argues "same entity".
+W_KB = 5             # a curated knowledge base (Wikidata) lists the account
 W_EMAIL = 3          # the same email address on two nodes
 W_LINKED = 3         # a profile explicitly links out to another node's handle
 W_AVATAR = 3         # the same perceptual avatar hash
@@ -36,6 +37,9 @@ STOPLIST_HANDLES = {
     "private", "social", "socials", "me", "null", "none", "name", "username",
     "password", "anonymous", "unknown", "nobody", "everyone", "staff", "sales",
     "office", "online", "world", "global", "main", "web", "app", "site",
+    # URL path words a profile-URL pattern can mistake for a handle
+    "popular", "explore", "trending", "hashtag", "search", "share", "watch",
+    "status", "intent", "discover", "about", "people", "profile", "settings",
 }
 GENERIC_PLATFORM_THRESHOLD = 18  # a handle seen on >= this many platforms is generic
 
@@ -77,6 +81,9 @@ def _extract(node: dict) -> dict:
         "avatars": set(),
         "locations": set(),
         "platforms": set(),
+        # handles a NAME search surfaced (display-name matches): namesake
+        # candidates, never identity evidence on their own
+        "candidate_handles": set(),
         # handle -> platforms it was seen on, to spot generic (over-common) ones
         "handle_platforms": defaultdict(set),
     }
@@ -103,7 +110,10 @@ def _extract(node: dict) -> dict:
         m = _HANDLE_URL_RE.match(url)
         if m and len(norm_handle(m.group(1))) >= MIN_HANDLE_LEN:
             h = norm_handle(m.group(1))
-            ids["usernames"].add(h)
+            # a name search returns everyone who shares the name, so a handle
+            # in its results is a candidate, not the searched person's handle
+            bucket = "candidate_handles" if ntype == "name" else "usernames"
+            ids[bucket].add(h)
             if platform:
                 ids["handle_platforms"][h].add(platform)
 
@@ -174,14 +184,24 @@ class _Union:
             self.parent[rb] = ra
 
 
-def _confidence(score: int, members: int) -> str:
+def _confidence(strength: int, members: int) -> str:
     if members < 2:
         return "single"
-    if score >= 5:
+    if strength >= 5:
         return "high"
-    if score >= 3:
+    if strength >= 3:
         return "medium"
     return "low"
+
+
+def _node_ref(ptype: str, value: str) -> tuple[str, str]:
+    if ptype == "username":
+        return ("username", norm_handle(value))
+    if ptype == "email":
+        return ("email", norm_email(value))
+    if ptype in ("domain", "ip"):
+        return ("host", str(value).strip().lower())
+    return (str(ptype), norm_name(value))
 
 
 def correlate(nodes: list[dict]) -> dict:
@@ -189,13 +209,33 @@ def correlate(nodes: list[dict]) -> dict:
 
     Returns {"clusters": [...], "cluster_count": n}. Each cluster lists its
     member node keys, the identifiers that tie them, a confidence level, the
-    human-readable signals behind it, and any contradictions (e.g. two
-    different stated locations).
+    human-readable signals behind it, any contradictions (e.g. two different
+    stated locations) and namesake candidates that were NOT merged.
+
+    Evidence rules:
+    - a pivot is not evidence of itself: when node B was reached from node A,
+      the handle that was followed does not also count as a "shared handle";
+    - how a pivot was found decides its weight ("via"): a knowledge-base
+      listing or a profile linking out is evidence; a display-name match is
+      only a candidate; a tagged @mention is nothing;
+    - confidence is set by the cluster's WEAKEST member, so many weak links
+      can never add up to "high".
     """
     nodes = [n for n in nodes if isinstance(n, dict)]
     n = len(nodes)
     extracted = [_extract(node) for node in nodes]
+    refs = [_node_ref(node.get("type"), node.get("query", "")) for node in nodes]
     uf = _Union(n)
+
+    # node -> {ref of a pivot it produced: via}
+    pivot_via: list[dict] = []
+    for node in nodes:
+        vias = {}
+        for pivot in node.get("pivots") or []:
+            if isinstance(pivot, dict) and pivot.get("type") and pivot.get("value"):
+                ref = _node_ref(pivot["type"], pivot["value"])
+                vias.setdefault(ref, pivot.get("via"))
+        pivot_via.append(vias)
 
     # global handle frequency across all nodes -> spot over-common handles
     handle_freq: dict[str, set] = defaultdict(set)
@@ -212,6 +252,8 @@ def correlate(nodes: list[dict]) -> dict:
     # pairwise link scoring
     pair_score: dict[tuple[int, int], int] = defaultdict(int)
     pair_signals: dict[tuple[int, int], list[str]] = defaultdict(list)
+    # hub index -> [(candidate index, reason)] — shown, never merged
+    candidates: dict[int, list[tuple[int, str]]] = defaultdict(list)
 
     def link(i: int, j: int, weight: int, reason: str) -> None:
         key = (i, j) if i < j else (j, i)
@@ -219,15 +261,38 @@ def correlate(nodes: list[dict]) -> dict:
         pair_signals[key].append(reason)
         uf.union(i, j)
 
+    def candidate(hub: int, other: int, reason: str) -> None:
+        if all(c != other for c, _ in candidates[hub]):
+            candidates[hub].append((other, reason))
+
     for i in range(n):
         for j in range(i + 1, n):
             ei, ej = extracted[i], extracted[j]
+
+            # how one node led to the other, if it did
+            via, parent, child = None, None, None
+            if refs[j] in pivot_via[i]:
+                via, parent, child = pivot_via[i][refs[j]], i, j
+            elif refs[i] in pivot_via[j]:
+                via, parent, child = pivot_via[j][refs[i]], j, i
+            # the followed handle itself is not independent evidence
+            followed = {refs[child][1]} if child is not None and refs[child][0] == "username" else set()
+
+            if via == "knowledge_base":
+                link(i, j, W_KB, f"listed on a knowledge base: @{refs[child][1]}")
+            elif via == "profile_link":
+                link(i, j, W_LINKED, f"profile links to {refs[child][1]}")
+            elif via == "name_match":
+                candidate(parent, child,
+                          "display name matches — may be a different person")
+
             shared_email = ei["emails"] & ej["emails"]
             if shared_email:
                 link(i, j, W_EMAIL, f"shared email {sorted(shared_email)[0]}")
-            # only link on SPECIFIC handles; generic/common ones collide
+            # only link on SPECIFIC, independently observed handles
             shared_handle = {
-                h for h in (ei["usernames"] & ej["usernames"]) if not is_generic(h)
+                h for h in (ei["usernames"] & ej["usernames"])
+                if not is_generic(h) and h not in followed
             }
             if shared_handle:
                 link(i, j, W_HANDLE, f"shared handle @{sorted(shared_handle)[0]}")
@@ -242,7 +307,28 @@ def correlate(nodes: list[dict]) -> dict:
                 link(i, j, W_LOCALPART, "email name reused as handle")
             shared_name = ei["names"] & ej["names"]
             if shared_name:
-                link(i, j, W_NAME, f"shared name '{sorted(shared_name)[0]}'")
+                pair = (i, j)
+                if pair_score.get(pair, 0) > 0:
+                    # a name agreeing with other evidence corroborates it
+                    link(i, j, W_NAME, f"shared name '{sorted(shared_name)[0]}'")
+                else:
+                    # a name ALONE is what namesakes share: a candidate of the
+                    # searched name, nothing between two unrelated accounts
+                    for hub, other in ((i, j), (j, i)):
+                        if nodes[hub].get("type") == "name":
+                            candidate(hub, other,
+                                      f"same name '{sorted(shared_name)[0]}' only — may be a different person")
+
+            # a name search surfaced this handle: namesake candidate only
+            for hub, other in ((i, j), (j, i)):
+                hit = {
+                    h for h in extracted[hub]["candidate_handles"]
+                    & extracted[other]["usernames"]
+                    if not is_generic(h)
+                }
+                if hit and via != "name_match":
+                    candidate(hub, other,
+                              f"@{sorted(hit)[0]} found by name search — may be a different person")
 
     # build clusters from union-find roots
     groups: dict[int, list[int]] = defaultdict(list)
@@ -269,10 +355,26 @@ def correlate(nodes: list[dict]) -> dict:
 
         score = 0
         signals: list[str] = []
+        strongest = defaultdict(int)  # member -> its strongest tie in the cluster
         for (a, b), s in pair_score.items():
             if a in member_set and b in member_set:
                 score += s
                 signals.extend(pair_signals[(a, b)])
+                strongest[a] = max(strongest[a], s)
+                strongest[b] = max(strongest[b], s)
+        weakest = min((strongest[m] for m in members), default=0)
+
+        cands = []
+        cand_seen = set()
+        for idx in members:
+            for other, reason in candidates.get(idx, []):
+                if other not in member_set and other not in cand_seen:
+                    cand_seen.add(other)
+                    cands.append({
+                        "key": nodes[other].get("key"),
+                        "query": nodes[other].get("query"),
+                        "reason": reason,
+                    })
 
         contradictions = []
         if len({loc.lower() for loc in locations}) > 1:
@@ -300,7 +402,8 @@ def correlate(nodes: list[dict]) -> dict:
             },
             "platforms": sorted(platforms),
             "score": score,
-            "confidence": _confidence(score, len(members)),
+            "confidence": _confidence(weakest, len(members)),
+            "candidates": cands,
             "signals": sorted(set(signals)),
             "contradictions": contradictions,
         })

@@ -215,7 +215,8 @@ def parse_gravatar_profile(entry: dict, image_url: str) -> tuple[dict, list[dict
         url = account.get("url") or ""
         account_notes.append(f"{account.get('name') or shortname}: {url or username}")
         if shortname in GRAVATAR_PIVOT_SERVICES and username:
-            pivots.append({"type": "username", "value": username})
+            # the owner listed this account on their own Gravatar profile
+            pivots.append({"type": "username", "value": username, "via": "profile_link"})
     if account_notes:
         fields.append("Linked accounts: " + "; ".join(account_notes[:8]))
 

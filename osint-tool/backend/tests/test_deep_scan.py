@@ -158,3 +158,34 @@ async def test_truncation_never_leaves_dangling_edges(monkeypatch):
     assert data["truncated"] is True
     assert data["node_count"] <= 8
     _assert_edges_reference_real_nodes(data)
+
+
+def test_followable_pivots_drop_tagged_cap_namesakes_and_rank():
+    pivots = (
+        [{"type": "username", "value": f"tag{i}", "via": "tagged"} for i in range(3)]
+        + [{"type": "username", "value": f"nm{i}", "via": "name_match"} for i in range(5)]
+        + [{"type": "username", "value": "kb", "via": "knowledge_base"},
+           {"type": "domain", "value": "x.com"}]
+    )
+    out = deep_scan._followable_pivots(pivots)
+    values = [p["value"] for p in out]
+    assert values[0] == "kb"                      # strongest first
+    assert not any(v.startswith("tag") for v in values)  # mentions never followed
+    assert sum(v.startswith("nm") for v in values) == deep_scan.MAX_NAME_MATCH_PIVOTS
+    assert len(out) <= deep_scan.MAX_PIVOTS_PER_NODE
+
+
+@pytest.mark.asyncio
+async def test_child_nodes_record_how_they_were_reached(monkeypatch):
+    monkeypatch.setitem(
+        deep_scan._HANDLERS, "name",
+        _fake("name", [], [{"type": "username", "value": "kbhandle", "via": "knowledge_base"},
+                           {"type": "username", "value": "friend", "via": "tagged"}]),
+    )
+    monkeypatch.setitem(deep_scan._HANDLERS, "username", _fake("username", []))
+    data = await deep_scan.run_deep_scan("Jane Roe", "name")
+    child = next(n for n in data["nodes"] if n["query"] == "kbhandle")
+    assert child["via"] == "knowledge_base" and child["parent"] == "name:jane roe"
+    assert all(n["query"] != "friend" for n in data["nodes"])
+    # the knowledge-base account is merged with the seed at high confidence
+    assert any(c["confidence"] == "high" for c in data["clusters"])
