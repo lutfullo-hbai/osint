@@ -932,7 +932,7 @@ async def _investigate_footprint(query: str, mode: str, email: str, username: st
 
     if "Registrations" in outcomes:
         registrations = outcomes["Registrations"]["results"]
-        platform_hits += len(registrations)
+        platform_hits += len(outcomes["Registrations"].get("used", []))
         results.extend(registrations)
     if "Breaches" in outcomes:
         entry, warning = outcomes["Breaches"]

@@ -916,3 +916,9 @@ a.chip { text-decoration: none; }
   border: 1px dashed var(--muted);
   border-radius: 10px;
 }
+
+.badge.unconfirmed {
+  background: transparent;
+  border: 1px dashed var(--muted);
+  color: var(--muted);
+}
