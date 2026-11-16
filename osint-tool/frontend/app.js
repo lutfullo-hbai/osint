@@ -440,6 +440,12 @@ function buildCard(item) {
   const badge = document.createElement("span");
   badge.className = `badge ${status}`;
   badge.textContent = status;
+  if (item.signal === "registration") {
+    // a sign-up form said "taken": a lead, not a confirmed account
+    badge.className = "badge unconfirmed";
+    badge.textContent = "signal · unconfirmed";
+    badge.title = "The site's sign-up check reports this address as taken. No profile was seen.";
+  }
   head.appendChild(badge);
   card.appendChild(head);
 

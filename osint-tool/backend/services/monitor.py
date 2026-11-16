@@ -54,7 +54,7 @@ def signature_items(result: dict) -> list[str]:
     """
     items = []
     for item in (result.get("posts") or []) + (result.get("results") or []):
-        if not isinstance(item, dict) or item.get("source") == "web_search" or (
+        if not isinstance(item, dict) or item.get("source") in ("web_search", "run_summary") or (
             item.get("sources") == ["search-index"]
         ):
             continue

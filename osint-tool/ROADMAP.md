@@ -100,18 +100,24 @@ Har bir band uchun regressiya testi (Michael Jordan namesake, netflix/budget.me 
       0–100 ishonch bahosi. Uchinchi username dvigateli sifatida faqat Maigret o'zbek ta'riflari
       yetarli bo'lmasa; AGPL — alohida konteyner, kodini o'zimizga aralashtirmaymiz
 
-## Faza 4 — Holehe kengaytmasi — L
+## Faza 4 — Holehe kengaytmasi (poydevor ✅, yangi modullar test akkaunt kutmoqda)
 Maqsad: email bo'yicha "ro'yxatdan o'tganlik signali"ni ishonchli va kengroq qilish.
 
 Poydevor:
-- [ ] 4.1 (eski 1.8) Holehe'ni subprocess o'rniga Python ichidan chaqirish (modullar
+- [x] 4.1 (eski 1.8) Holehe'ni subprocess o'rniga Python ichidan chaqirish (modullar
       `async def site(email, client, out)` shaklida). Natija uch holatli: `used` / `not_used` /
       `unknown` (rate-limit, captcha, xato) + sabab
-- [ ] 4.2 (eski 1.7) Modul salomatligi: har bir modulning oxirgi 20 natijasi saqlanadi; doim
+- [x] 4.2 (eski 1.7) Modul salomatligi: har bir modulning oxirgi 20 natijasi saqlanadi; doim
       `unknown` qaytaradigan modul avtomatik o'chiriladi va panelda ko'rsatiladi
-- [ ] 4.3 Ma'lum test email'lari (o'zimizniki: ro'yxatdan o'tgan va o'tmagan) bilan kunlik
+- [x] 4.0 Xavfsizlik siyosati: Holehe'ning 121 modulidan 4 tasi parol tiklash oqimini, 13 tasi
+      login formani ishlatadi — ular egasiga xat/ogohlantirish yuborishi mumkin. Parol tiklash —
+      hech qachon; login — faqat `HOLEHE_ALLOW_LOGIN=1`; kattalar saytlari (maxsus toifadagi
+      ma'lumot) — faqat `HOLEHE_INCLUDE_ADULT=1`. Standart: 100 modul
+- [~] 4.3 Ma'lum test email'lari (o'zimizniki: ro'yxatdan o'tgan va o'tmagan) bilan kunlik
       kanareyka tekshiruvi — modul jimgina buzilganini ushlaydi
-- [ ] 4.4 Har bir domenga rate-limit va global semafor; 429/captcha'da backoff, `unknown`
+      Bajarildi: har kuni tasodifiy, hech kim ishlatmagan manzil bilan — "registered" degan modul
+      (soxta ijobiy) 7 kunga to'xtatiladi. Qoldi: haqiqiy test akkaunt bilan soxta salbiyni ushlash
+- [x] 4.4 Har bir domenga rate-limit va global semafor; 429/captcha'da backoff, `unknown`
 
 Yangi va tuzatiladigan modullar (eski 4.6):
 - [ ] 4.5 Buzilganlarini tuzatish: Instagram, Google, GitHub, Discord
@@ -126,7 +132,7 @@ Har bir modul uchun majburiy tekshiruv (merge'dan oldin):
 
 UI va sozlash:
 - [ ] 4.7 Kengaytirilgan modullar `HOLEHE_EXTENDED=1` bilan yoqiladi (standart: o'chiq)
-- [ ] 4.8 UI: "Ro'yxatdan o'tganlik signali — tasdiqlanmagan", `unknown` alohida ko'rsatiladi;
+- [x] 4.8 UI: "Ro'yxatdan o'tganlik signali — tasdiqlanmagan", `unknown` alohida ko'rsatiladi;
       korrelatsiyada faqat zaif signal (o'zi birlashtirmaydi)
 - ~~Ignorant (telefon → Instagram/Snapchat)~~ — qo'shilmaydi (telefon bo'yicha akkaunt tekshiruvi)
 

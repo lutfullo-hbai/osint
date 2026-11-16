@@ -8,7 +8,7 @@ import httpx
 from fastapi import APIRouter, Depends, Request, Response
 
 from security import general_limit, limiter, verify_api_key
-from tools import maigret_db, truecaller
+from tools import holehe_runner, maigret_db, truecaller
 
 router = APIRouter(tags=["sources"], dependencies=[Depends(verify_api_key)])
 
@@ -53,6 +53,19 @@ def _maigret() -> dict:
                                   f"updated {age_days:.0f} day(s) ago"}
 
 
+async def _holehe() -> dict:
+    try:
+        h = await holehe_runner.health_summary()
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "detail": type(exc).__name__}
+    active = h["allowed"] - len(h["paused"])
+    detail = (f"{active} sign-up checks active, {len(h['paused'])} paused, "
+              f"{h['excluded_by_policy']} excluded (password recovery / login / adult)")
+    if h["paused"]:
+        detail += "; paused: " + ", ".join(sorted(h["paused"])[:10])
+    return {"ok": active > 0, "detail": detail, "paused": h["paused"]}
+
+
 @router.get("/api/sources/health")
 @limiter.limit(general_limit)
 async def sources_health(request: Request, response: Response):
@@ -69,6 +82,7 @@ async def sources_health(request: Request, response: Response):
         "Maigret": await asyncio.to_thread(_maigret),
         "Subfinder": {"ok": shutil.which("subfinder") is not None,
                       "detail": "installed" if shutil.which("subfinder") else "binary missing"},
+        "Holehe": await _holehe(),
         "Truecaller": {"ok": tc_until <= 0,
                        "detail": "available" if tc_until <= 0 else f"skipped for {int(tc_until // 60) + 1} min (unreachable)"},
     }

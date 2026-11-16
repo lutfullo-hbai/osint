@@ -6,6 +6,7 @@ from arq.connections import RedisSettings
 import store
 from services.investigate import InvestigationValidationError, investigate
 from services.monitor import check_one_watch, run_watch_cycle
+from tools.holehe_runner import run_canary
 from tools.maigret_db import ensure_db, run_self_check
 from tools.base import ToolError
 
@@ -33,6 +34,11 @@ async def maigret_self_check(ctx) -> dict:
         return {"status": "error", "message": str(exc)}
 
 
+async def holehe_canary(ctx) -> dict:
+    """Daily: pause Holehe modules that call a random address "registered"."""
+    return await run_canary()
+
+
 async def startup(ctx) -> None:
     store.init_db()
     ensure_db()
@@ -50,6 +56,7 @@ class WorkerSettings:
         # Monday 04:30 UTC: a long job, kept away from working hours
         cron(maigret_self_check, weekday=0, hour=4, minute=30, run_at_startup=False,
              timeout=2400),
+        cron(holehe_canary, hour=5, minute=15, run_at_startup=False, timeout=600),
     ]
     redis_settings = RedisSettings.from_dsn(
         os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
