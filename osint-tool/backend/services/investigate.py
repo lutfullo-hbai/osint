@@ -36,6 +36,7 @@ from tools.email_domain import (
 from tools.email_intel import lookup_breaches, lookup_emailrep
 from tools.holehe_runner import run_holehe
 from tools.hub_domains import is_hub_domain
+from services.names import username_variants
 from tools.image_intel import analyze_image, fetch_image_bytes
 from tools.ip_intel import (
     internetdb_lookup,
@@ -275,6 +276,10 @@ async def _investigate_name(name: str) -> dict:
         "count": len(results),
         "notice": NAME_NOTICE,
     }
+    # handles people commonly build from a name: leads to check, never results
+    ideas = username_variants(name, limit=6)
+    if ideas:
+        response["username_ideas"] = ideas
     if pivots:
         response["pivots"] = pivots
     if warnings:

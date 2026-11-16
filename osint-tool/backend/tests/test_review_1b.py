@@ -89,9 +89,10 @@ def test_localpart_counts_once():
                                     "via": "email_localpart"}]},
         {"key": "username:janedoe", "type": "username", "query": "janedoe", "results": []},
     ]
-    cluster = corr.correlate(nodes)["clusters"][0]
-    assert cluster["score"] == corr.W_LOCALPART
-    assert cluster["confidence"] == "low"
+    out = corr.correlate(nodes)
+    email = next(c for c in out["clusters"] if "email:janedoe@x.org" in c["members"])
+    reason = email["candidates"][0]["reason"]
+    assert reason.count("email name reused as handle") == 1 and "shared handle" not in reason
 
 
 def test_nodes_from_findings_keeps_pivots():

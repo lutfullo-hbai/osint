@@ -30,6 +30,7 @@ COPY backend/routers ./routers
 COPY backend/services ./services
 COPY backend/tools ./tools
 COPY backend/assets ./assets
+COPY backend/scripts ./scripts
 COPY backend/tests ./tests
 
 RUN useradd --create-home --shell /bin/bash osint \

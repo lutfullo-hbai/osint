@@ -1,0 +1,869 @@
+[
+ {
+  "id": "kb-listed",
+  "desc": "Wikidata lists the handle of the searched person",
+  "same": true,
+  "nodes": [
+   {
+    "key": "name:linus torvalds",
+    "type": "name",
+    "query": "Linus Torvalds",
+    "results": [],
+    "pivots": [
+     {
+      "type": "username",
+      "value": "torvalds",
+      "via": "knowledge_base"
+     }
+    ]
+   },
+   {
+    "key": "username:torvalds",
+    "type": "username",
+    "query": "torvalds",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/torvalds",
+      "info": "Name: Linus Torvalds"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "wikidata-namesakes",
+  "desc": "two different people share the name; account found by display name",
+  "same": false,
+  "nodes": [
+   {
+    "key": "name:michael jordan",
+    "type": "name",
+    "query": "Michael Jordan",
+    "results": [],
+    "pivots": [
+     {
+      "type": "username",
+      "value": "mjordan_art",
+      "via": "name_match"
+     }
+    ]
+   },
+   {
+    "key": "username:mjordan_art",
+    "type": "username",
+    "query": "mjordan_art",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/mjordan_art",
+      "info": "Name: Michael Jordan"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "cyrillic-same",
+  "desc": "Latin search, Cyrillic profile, same rare handle on both",
+  "same": true,
+  "nodes": [
+   {
+    "key": "username:abdubaniyev07",
+    "type": "username",
+    "query": "abdubaniyev07",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/abdubaniyev07",
+      "info": "Name: Lutfullo Abdubaniyev"
+     }
+    ]
+   },
+   {
+    "key": "email:abdubaniyev07@mail.com",
+    "type": "email",
+    "query": "abdubaniyev07@mail.com",
+    "results": [
+     {
+      "platform": "Gravatar profile",
+      "url": "https://gravatar.com/abdubaniyev07",
+      "info": "Name: Лутфулло Абдубаниев; Linked: tw:abdubaniyev07"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "common-name-namesakes",
+  "desc": "two GitHub users called Aziz Karimov",
+  "same": false,
+  "nodes": [
+   {
+    "key": "username:azizk",
+    "type": "username",
+    "query": "azizk",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/azizk",
+      "info": "Name: Aziz Karimov"
+     }
+    ]
+   },
+   {
+    "key": "username:karimov-dev",
+    "type": "username",
+    "query": "karimov-dev",
+    "results": [
+     {
+      "platform": "GitLab",
+      "url": "https://gitlab.com/karimov-dev",
+      "info": "Name: Aziz Karimov"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "stated-email",
+  "desc": "GitHub profile publishes the investigated email",
+  "same": true,
+  "nodes": [
+   {
+    "key": "email:zarina.dev@proton.me",
+    "type": "email",
+    "query": "zarina.dev@proton.me",
+    "results": []
+   },
+   {
+    "key": "username:zdeveloper",
+    "type": "username",
+    "query": "zdeveloper",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/zdeveloper",
+      "info": "Email: zarina.dev@proton.me"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "shared-email",
+  "desc": "two profiles show the same personal email",
+  "same": true,
+  "nodes": [
+   {
+    "key": "username:qwerty_lab",
+    "type": "username",
+    "query": "qwerty_lab",
+    "results": [
+     {
+      "platform": "GitLab",
+      "url": "https://gitlab.com/qwerty_lab",
+      "info": "Email: nodirbek.t@inbox.uz"
+     }
+    ]
+   },
+   {
+    "key": "username:nbtcode",
+    "type": "username",
+    "query": "nbtcode",
+    "results": [
+     {
+      "platform": "Keybase",
+      "url": "https://keybase.io/nbtcode",
+      "info": "Email: nodirbek.t@inbox.uz"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "role-email",
+  "desc": "two employees list the company info@ address",
+  "same": false,
+  "nodes": [
+   {
+    "key": "username:alexsmirnov",
+    "type": "username",
+    "query": "alexsmirnov",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/alexsmirnov",
+      "info": "Email: info@acme-soft.uz"
+     }
+    ]
+   },
+   {
+    "key": "username:dilnoza_m",
+    "type": "username",
+    "query": "dilnoza_m",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/dilnoza_m",
+      "info": "Email: info@acme-soft.uz"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "profile-link",
+  "desc": "Gravatar lists the Twitter handle",
+  "same": true,
+  "nodes": [
+   {
+    "key": "email:sardorbek@x.uz",
+    "type": "email",
+    "query": "sardorbek@x.uz",
+    "results": [],
+    "pivots": [
+     {
+      "type": "username",
+      "value": "sardor_codes",
+      "via": "profile_link"
+     }
+    ]
+   },
+   {
+    "key": "username:sardor_codes",
+    "type": "username",
+    "query": "sardor_codes",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/sardor_codes",
+      "info": ""
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "short-handle",
+  "desc": "handle 'ali' on two unrelated accounts",
+  "same": false,
+  "nodes": [
+   {
+    "key": "username:ali",
+    "type": "username",
+    "query": "ali",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/ali",
+      "info": ""
+     }
+    ]
+   },
+   {
+    "key": "email:ali@company.com",
+    "type": "email",
+    "query": "ali@company.com",
+    "results": [
+     {
+      "platform": "Gravatar",
+      "url": "https://gravatar.com/ali",
+      "info": ""
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "rare-handle-and-name",
+  "desc": "same rare handle and same name",
+  "same": true,
+  "nodes": [
+   {
+    "key": "username:qodirov1994",
+    "type": "username",
+    "query": "qodirov1994",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/qodirov1994",
+      "info": "Name: Javlon Qodirov"
+     }
+    ]
+   },
+   {
+    "key": "username:javlonq",
+    "type": "username",
+    "query": "javlonq",
+    "results": [
+     {
+      "platform": "GitLab",
+      "url": "https://gitlab.com/qodirov1994",
+      "info": "Name: Жавлон Кодиров"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "rare-handle-different-names",
+  "desc": "same handle, clearly different stated names",
+  "same": false,
+  "nodes": [
+   {
+    "key": "username:nightowl42",
+    "type": "username",
+    "query": "nightowl42",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/nightowl42",
+      "info": "Name: Peter Novak"
+     }
+    ]
+   },
+   {
+    "key": "username:owl42",
+    "type": "username",
+    "query": "owl42",
+    "results": [
+     {
+      "platform": "Reddit",
+      "url": "https://reddit.com/user/nightowl42",
+      "info": "Name: Gulnora Yusupova"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "birth-conflict",
+  "desc": "same name and handle but born 1969 vs 1995",
+  "same": false,
+  "nodes": [
+   {
+    "key": "name:rustam ergashev",
+    "type": "name",
+    "query": "Rustam Ergashev",
+    "results": [
+     {
+      "platform": "Wikidata",
+      "url": "https://www.wikidata.org/wiki/Q1",
+      "info": "Born: 1969-05-01"
+     }
+    ]
+   },
+   {
+    "key": "username:rergashev",
+    "type": "username",
+    "query": "rergashev",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/rergashev",
+      "info": "Name: Rustam Ergashev; Born: 1995"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "avatar-and-handle",
+  "desc": "same avatar hash and same handle",
+  "same": true,
+  "nodes": [
+   {
+    "key": "username:mirzo_dev",
+    "type": "username",
+    "query": "mirzo_dev",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/mirzo_dev",
+      "info": "dhash: 9f3a77c1e0b2d4f8"
+     }
+    ]
+   },
+   {
+    "key": "email:mirzo_dev@gmail.com",
+    "type": "email",
+    "query": "mirzo_dev@gmail.com",
+    "results": [
+     {
+      "platform": "Gravatar",
+      "url": "https://gravatar.com/mirzo_dev",
+      "info": "dhash: 9f3a77c1e0b2d4f8"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "localpart-and-name",
+  "desc": "email local-part reused as handle, same name",
+  "same": true,
+  "nodes": [
+   {
+    "key": "email:shohruh.tursunboev@gmail.com",
+    "type": "email",
+    "query": "shohruh.tursunboev@gmail.com",
+    "results": [
+     {
+      "platform": "Gravatar profile",
+      "url": "https://gravatar.com/x",
+      "info": "Name: Shohruh Tursunboev"
+     }
+    ]
+   },
+   {
+    "key": "username:shohruhtursunboev",
+    "type": "username",
+    "query": "shohruhtursunboev",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/shohruhtursunboev",
+      "info": "Name: Shoxrux Tursunboyev"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "generic-localpart",
+  "desc": "local-part 'john' equals a handle",
+  "same": false,
+  "nodes": [
+   {
+    "key": "email:john@corp.com",
+    "type": "email",
+    "query": "john@corp.com",
+    "results": []
+   },
+   {
+    "key": "username:john",
+    "type": "username",
+    "query": "john",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/john",
+      "info": ""
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "tagged",
+  "desc": "an @mention in someone's post",
+  "same": false,
+  "nodes": [
+   {
+    "key": "name:shavkat mirziyoyev",
+    "type": "name",
+    "query": "Shavkat Mirziyoyev",
+    "results": [],
+    "pivots": [
+     {
+      "type": "username",
+      "value": "tamim",
+      "via": "tagged"
+     }
+    ]
+   },
+   {
+    "key": "username:tamim",
+    "type": "username",
+    "query": "tamim",
+    "results": [
+     {
+      "platform": "X",
+      "url": "https://x.com/tamim",
+      "info": "Name: Tamim bin Hamad"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "reversed-name",
+  "desc": "family name first, same handle",
+  "same": true,
+  "nodes": [
+   {
+    "key": "username:abdubaniyev.l",
+    "type": "username",
+    "query": "abdubaniyev.l",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/abdubaniyev.l",
+      "info": "Name: Abdubaniyev Lutfullo"
+     }
+    ]
+   },
+   {
+    "key": "email:abdubaniyev.l@gmail.com",
+    "type": "email",
+    "query": "abdubaniyev.l@gmail.com",
+    "results": [
+     {
+      "platform": "Gravatar profile",
+      "url": "https://gravatar.com/q",
+      "info": "Name: Lutfullo Abdubaniyev"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "city-cross-script",
+  "desc": "same handle+name, city in Latin vs Cyrillic is not a conflict",
+  "same": true,
+  "nodes": [
+   {
+    "key": "username:bekzod_n",
+    "type": "username",
+    "query": "bekzod_n",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/bekzod_n",
+      "info": "Name: Bekzod Nurmatov; Location: Namangan"
+     }
+    ]
+   },
+   {
+    "key": "username:bnurmatov",
+    "type": "username",
+    "query": "bnurmatov",
+    "results": [
+     {
+      "platform": "GitLab",
+      "url": "https://gitlab.com/bekzod_n",
+      "info": "Name: Бекзод Нурматов; Location: Наманган, Uzbekistan"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "city-conflict-common-name",
+  "desc": "same common name, Tashkent vs London",
+  "same": false,
+  "nodes": [
+   {
+    "key": "username:annasmith",
+    "type": "username",
+    "query": "annasmith",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/annasmith",
+      "info": "Name: Anna Smith; Location: Tashkent"
+     }
+    ]
+   },
+   {
+    "key": "username:asmith",
+    "type": "username",
+    "query": "asmith",
+    "results": [
+     {
+      "platform": "GitLab",
+      "url": "https://gitlab.com/asmith",
+      "info": "Name: Anna Smith; Location: London, UK"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "kb-cyrillic",
+  "desc": "Wikidata handle, Cyrillic display name",
+  "same": true,
+  "nodes": [
+   {
+    "key": "name:shavkat mirziyoyev",
+    "type": "name",
+    "query": "Shavkat Mirziyoyev",
+    "results": [],
+    "pivots": [
+     {
+      "type": "username",
+      "value": "president_uz",
+      "via": "knowledge_base"
+     }
+    ]
+   },
+   {
+    "key": "username:president_uz",
+    "type": "username",
+    "query": "president_uz",
+    "results": [
+     {
+      "platform": "Telegram",
+      "url": "https://t.me/president_uz",
+      "info": "Name: Шавкат Мирзиёев"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "patronymic",
+  "desc": "with and without patronymic, same handle",
+  "same": true,
+  "nodes": [
+   {
+    "key": "username:smirziyoyev",
+    "type": "username",
+    "query": "smirziyoyev",
+    "results": [
+     {
+      "platform": "X",
+      "url": "https://x.com/smirziyoyev",
+      "info": "Name: Shavkat Miromonovich Mirziyoyev"
+     }
+    ]
+   },
+   {
+    "key": "username:mirziyoyev_sh",
+    "type": "username",
+    "query": "mirziyoyev_sh",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/smirziyoyev",
+      "info": "Name: Shavkat Mirziyoyev"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "russian-spelling",
+  "desc": "Xo'jayev vs Ходжаев and a rare handle",
+  "same": true,
+  "nodes": [
+   {
+    "key": "username:bxojayev",
+    "type": "username",
+    "query": "bxojayev",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/bxojayev",
+      "info": "Name: Bobur Xo'jayev"
+     }
+    ]
+   },
+   {
+    "key": "username:bobur.kh",
+    "type": "username",
+    "query": "bobur.kh",
+    "results": [
+     {
+      "platform": "VK",
+      "url": "https://vk.com/x",
+      "info": "Name: Бобур Ходжаев; Linked: gh:bxojayev"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "name-variant-guess",
+  "desc": "username guessed from the name, account shows the name",
+  "same": false,
+  "nodes": [
+   {
+    "key": "name:malika sobirova",
+    "type": "name",
+    "query": "Malika Sobirova",
+    "results": [],
+    "parent": null
+   },
+   {
+    "key": "username:malikasobirova",
+    "type": "username",
+    "query": "malikasobirova",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/malikasobirova",
+      "info": "Name: Malika Sobirova"
+     }
+    ],
+    "parent": "name:malika sobirova",
+    "via": "name_variant"
+   }
+  ]
+ },
+ {
+  "id": "lla-llo",
+  "desc": "Lutfullo vs Лутфулла and a shared rare handle",
+  "same": true,
+  "nodes": [
+   {
+    "key": "username:lutfullo_a",
+    "type": "username",
+    "query": "lutfullo_a",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/lutfullo_a",
+      "info": "Name: Lutfullo Abdubaniyev"
+     }
+    ]
+   },
+   {
+    "key": "username:lutfulla77",
+    "type": "username",
+    "query": "lutfulla77",
+    "results": [
+     {
+      "platform": "OK",
+      "url": "https://ok.ru/x",
+      "info": "Name: Лутфулла Абдубаниев; Linked: ok:lutfullo_a"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "search-hit-handle",
+  "desc": "a web-search page mentioning someone else's account",
+  "same": false,
+  "nodes": [
+   {
+    "key": "username:janedoe88",
+    "type": "username",
+    "query": "janedoe88",
+    "results": [
+     {
+      "platform": "X",
+      "url": "https://x.com/otherperson/status/1",
+      "source": "web_search",
+      "info": "@janedoe88 thanks"
+     }
+    ]
+   },
+   {
+    "key": "username:otherperson",
+    "type": "username",
+    "query": "otherperson",
+    "results": [
+     {
+      "platform": "X",
+      "url": "https://x.com/otherperson",
+      "info": ""
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "same-name-same-city",
+  "desc": "same rare name and city, nothing else",
+  "same": false,
+  "nodes": [
+   {
+    "key": "name:feruza qahhorova",
+    "type": "name",
+    "query": "Feruza Qahhorova",
+    "results": []
+   },
+   {
+    "key": "username:fqahhor",
+    "type": "username",
+    "query": "fqahhor",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/fqahhor",
+      "info": "Name: Feruza Qahhorova; Location: Andijan"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "search-index-hit",
+  "desc": "a merged username result that only a search engine found links to someone else's GitHub",
+  "same": false,
+  "nodes": [
+   {
+    "key": "username:linustorvalds",
+    "type": "username",
+    "query": "linustorvalds",
+    "results": [
+     {
+      "platform": "Chess.com",
+      "url": "https://www.chess.com/member/LinusTorvalds",
+      "info": "Name: Linus Torvalds",
+      "sources": [
+       "public-api"
+      ]
+     },
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/torvalds",
+      "info": "torvalds has 12 repositories",
+      "sources": [
+       "search-index"
+      ]
+     }
+    ]
+   },
+   {
+    "key": "username:torvalds",
+    "type": "username",
+    "query": "torvalds",
+    "results": [
+     {
+      "platform": "GitHub",
+      "url": "https://github.com/torvalds",
+      "info": "Name: Linus Torvalds",
+      "sources": [
+       "public-api"
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "separator-spellings",
+  "desc": "linus.torvalds and linustorvalds are the same guess, not shared evidence",
+  "same": false,
+  "nodes": [
+   {
+    "key": "username:linustorvalds",
+    "type": "username",
+    "query": "linustorvalds",
+    "results": [
+     {
+      "platform": "Mastodon",
+      "url": "https://mastodon.social/@linustorvalds",
+      "info": "Name: Linus Torvalds"
+     }
+    ]
+   },
+   {
+    "key": "username:linus.torvalds",
+    "type": "username",
+    "query": "linus.torvalds",
+    "results": [
+     {
+      "platform": "GitLab",
+      "url": "https://gitlab.com/linus.torvalds",
+      "info": "Name: Linus Torvalds"
+     }
+    ]
+   }
+  ]
+ }
+]

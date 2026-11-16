@@ -92,8 +92,8 @@ def test_over_common_handle_does_not_link():
     assert out["cluster_count"] == 2
 
 
-def test_specific_handle_still_links():
-    # a rare handle on few platforms must still link (no regression)
+def test_specific_handle_alone_is_a_candidate():
+    # one medium signal (local-part == rare handle) is a lead, not a merge
     nodes = [
         {"key": "username:zephyrqx", "type": "username", "query": "zephyrqx",
          "results": [{"platform": "GitHub", "url": "https://github.com/zephyrqx"}]},
@@ -101,16 +101,31 @@ def test_specific_handle_still_links():
          "results": []},
     ]
     out = correlate(nodes)
-    assert out["cluster_count"] == 1
+    assert out["cluster_count"] == 2
+    cands = [c for cl in out["clusters"] for c in cl["candidates"]]
+    assert cands and "email name reused as handle" in cands[0]["reason"]
+
+
+def test_specific_handle_with_matching_name_links():
+    nodes = [
+        {"key": "username:zephyrqx", "type": "username", "query": "zephyrqx",
+         "results": [{"platform": "GitHub", "url": "https://github.com/zephyrqx",
+                      "info": "Name: Zephyr Quillfeather"}]},
+        {"key": "email:zephyrqx", "type": "email", "query": "zephyrqx@mail.com",
+         "results": [{"platform": "Gravatar", "url": "https://gravatar.com/z",
+                      "info": "Name: Zephyr Quillfeather"}]},
+    ]
+    assert correlate(nodes)["cluster_count"] == 1
 
 
 def test_contradiction_flagged_on_conflicting_locations():
+    # strong evidence still links, but the conflict is reported
     nodes = [
         {"key": "username:sam", "type": "username", "query": "samsmith", "results": [
             {"platform": "Gravatar", "url": "https://gravatar.com/samsmith",
-             "info": "Name: Sam Smith; Location: Toronto"},
+             "info": "Name: Sam Smith; Location: Toronto; Email: sam.smith.42@mail.com"},
         ]},
-        {"key": "email:sam", "type": "email", "query": "samsmith@mail.com", "results": [
+        {"key": "email:sam", "type": "email", "query": "sam.smith.42@mail.com", "results": [
             {"platform": "Profile", "url": "https://keybase.io/samsmith",
              "info": "Location: Berlin"},
         ]},
@@ -184,10 +199,11 @@ def test_followed_handle_is_not_counted_twice():
          "results": []},
     ]
     out = correlate(nodes)
-    cluster = out["clusters"][0]
-    assert len(cluster["members"]) == 2
-    assert not any("shared handle" in s for s in cluster["signals"])
-    assert cluster["confidence"] == "low"  # local-part reuse alone is weak
+    # local-part reuse alone is weak: a candidate, never a merge
+    assert out["cluster_count"] == 2
+    email = next(c for c in out["clusters"] if "email:zq@x.com" in c["members"])
+    assert email["candidates"][0]["query"] == "zephyrq"
+    assert "shared handle" not in email["candidates"][0]["reason"]
 
 
 def test_many_weak_links_never_add_up_to_high():
@@ -199,10 +215,11 @@ def test_many_weak_links_never_add_up_to_high():
     kids = [{"key": f"username:{h}", "type": "username", "query": h, "results": []}
             for h in ("aaaa1", "bbbb2", "cccc3")]
     out = correlate([hub, *kids])
-    cluster = out["clusters"][0]
-    assert len(cluster["members"]) == 4
-    assert cluster["score"] >= 6
-    assert cluster["confidence"] == "low"
+    # each tie is one weak shared handle: nothing merges, all are candidates
+    assert all(len(c["members"]) == 1 for c in out["clusters"])
+    assert all(c["confidence"] != "high" for c in out["clusters"])
+    hub_cluster = next(c for c in out["clusters"] if "username:hubx" in c["members"])
+    assert len(hub_cluster["candidates"]) == 3
 
 
 def test_same_name_alone_is_a_candidate_not_a_link():
@@ -222,9 +239,9 @@ def test_same_name_alone_is_a_candidate_not_a_link():
 def test_same_name_still_corroborates_other_evidence():
     nodes = [
         {"key": "username:zephyrq", "type": "username", "query": "zephyrq", "results": [
-            {"platform": "GitLab", "url": "https://gitlab.com/zephyrq", "info": "Name: Zed Q"}]},
+            {"platform": "GitLab", "url": "https://gitlab.com/zephyrq", "info": "Name: Zed Quillfeather"}]},
         {"key": "email:z", "type": "email", "query": "zephyrq@mail.com", "results": [
-            {"platform": "Gravatar", "url": "https://gravatar.com/zed", "info": "Name: Zed Q"}]},
+            {"platform": "Gravatar", "url": "https://gravatar.com/zed", "info": "Name: Zed Quillfeather"}]},
     ]
     out = correlate(nodes)
     assert out["cluster_count"] == 1

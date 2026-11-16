@@ -766,6 +766,20 @@ function buildToolbar(data) {
     });
     toolbar.appendChild(links);
   }
+  if (Array.isArray(data.username_ideas) && data.username_ideas.length) {
+    const ideas = document.createElement("div");
+    ideas.className = "chip-row manual-links";
+    const label = document.createElement("span");
+    label.textContent =
+      "Guessed from the name, NOT found anywhere. Click one to check it as a username:";
+    ideas.appendChild(label);
+    data.username_ideas.forEach((handle) => {
+      const btn = buildActionButton(handle, () => pivotTo({ type: "username", value: handle }));
+      btn.title = "A guess built from the name. Running it checks whether such accounts exist.";
+      ideas.appendChild(btn);
+    });
+    toolbar.appendChild(ideas);
+  }
   if (data.notice) {
     const notice = document.createElement("div");
     notice.className = "notice";
