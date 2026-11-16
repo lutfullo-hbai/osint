@@ -12,6 +12,7 @@ same red lines (no login-walled scraping, no leaks, no probiv) hold here too.
 from __future__ import annotations
 
 import asyncio
+from collections import defaultdict
 
 from services.correlate import correlate
 from services.investigate import (
@@ -31,6 +32,8 @@ MAX_PIVOTS_PER_NODE = 6
 # Display-name matches are namesake candidates: follow only a few so they
 # cannot crowd the node budget out.
 MAX_NAME_MATCH_PIVOTS = 3
+# Usernames guessed from a name (lutfullo.abdubaniyev): check only the top few.
+MAX_NAME_VARIANT_PIVOTS = 2
 
 # Pivot provenance ("via") -> follow order. Lower is followed first.
 # "tagged" handles are people MENTIONED in a post, not the target: never
@@ -41,6 +44,7 @@ _VIA_PRIORITY = {
     None: 2,
     "email_localpart": 3,
     "name_match": 4,
+    "name_variant": 5,
 }
 NOT_FOLLOWED_VIA = {"tagged"}
 
@@ -49,14 +53,42 @@ def _followable_pivots(pivots: list[dict]) -> list[dict]:
     """Strongest pivots first; drop mentions; cap namesake candidates."""
     keep = [p for p in pivots if p.get("via") not in NOT_FOLLOWED_VIA]
     keep.sort(key=lambda p: _VIA_PRIORITY.get(p.get("via"), 2))
-    out, name_matches = [], 0
+    caps = {"name_match": MAX_NAME_MATCH_PIVOTS, "name_variant": MAX_NAME_VARIANT_PIVOTS}
+    out, used = [], defaultdict(int)
     for pivot in keep:
-        if pivot.get("via") == "name_match":
-            if name_matches >= MAX_NAME_MATCH_PIVOTS:
+        via = pivot.get("via")
+        if via in caps:
+            if used[via] >= caps[via]:
                 continue
-            name_matches += 1
+            used[via] += 1
         out.append(pivot)
     return out[:MAX_PIVOTS_PER_NODE]
+
+
+def _node_pivots(result: dict) -> list[dict]:
+    """A result's pivots plus its guessed usernames (weakest, followed last)."""
+    pivots = list(result.get("pivots") or [])
+    pivots += [
+        {"type": "username", "value": handle, "via": "name_variant"}
+        for handle in result.get("username_ideas") or []
+    ]
+    return pivots
+
+# Heavy investigators (Sherlock + Maigret + profile APIs per username) run
+# at most this many at once; a whole level fired together exhausted
+# connections and made every source fail with ConnectError.
+HEAVY_CONCURRENCY = {"username": 3, "name": 2}
+
+
+def _limited(ptype: str, value: str, semaphores: dict):
+    async def run():
+        sem = semaphores.get(ptype)
+        if sem is None:
+            return await _HANDLERS[ptype](value)
+        async with sem:
+            return await _HANDLERS[ptype](value)
+    return run()
+
 
 # Pivot type -> investigator. "ip" shares the domain investigator, which
 # routes IPs internally. "image" is intentionally excluded: it needs a URL
@@ -108,6 +140,7 @@ async def run_deep_scan(seed_query: str, seed_type: str | None = None) -> dict:
             + "."
         )
 
+    semaphores = {t: asyncio.Semaphore(n) for t, n in HEAVY_CONCURRENCY.items()}
     nodes: list[dict] = []
     edges: list[dict] = []
     seen: set[str] = set()
@@ -129,7 +162,7 @@ async def run_deep_scan(seed_query: str, seed_type: str | None = None) -> dict:
         level = queue
         queue = []
         tasks = [
-            _HANDLERS[ptype](value) for (_d, ptype, value, _p, _v) in level
+            _limited(ptype, value, semaphores) for (_d, ptype, value, _p, _v) in level
         ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -177,7 +210,7 @@ async def run_deep_scan(seed_query: str, seed_type: str | None = None) -> dict:
 
             # enqueue children
             if depth + 1 <= MAX_DEPTH:
-                for pivot in _followable_pivots(result.get("pivots", [])):
+                for pivot in _followable_pivots(_node_pivots(result)):
                     ctype = pivot.get("type")
                     cvalue = pivot.get("value")
                     if not ctype or not cvalue or ctype not in _HANDLERS:

@@ -42,6 +42,9 @@ def _build_command(username: str) -> list[str]:
         "15",
         "--no-color",
         "--print-found",
+        # use the bundled site list: fetching it from GitHub on every run made
+        # Sherlock exit 1 whenever that one download failed (ROADMAP 1.6)
+        "--local",
         "--",
         positional_arg(username),
     ]

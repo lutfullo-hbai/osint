@@ -48,7 +48,8 @@ Kesh va watch:
 - [x] 1.10 Manba vaqtincha yiqilsa uning natijalari "removed" deb yozilmaydi — S
 
 Qolganlar:
-- [~] 1.6 Sherlock `exit 1` — stdout xato xabariga qo'shildi, kuzatilmoqda
+- [x] 1.6 Sherlock `exit 1` — sababi: har ishga tushganda sayt ro'yxatini GitHub'dan yuklardi;
+      endi `--local`. Deep Scan'da og'ir tekshiruvlar bir vaqtda ≤ 3 (ConnectError to'lqini yo'qoldi)
 - [x] 1.9 Truecaller: tarmoqdan ulanib bo'lmasa timeout bilan o'chadi — S
 - [x] 1.11 Frontend: case nomini escape qilish, `API_BASE` sozlanadigan — S
 
@@ -57,17 +58,21 @@ Har bir band uchun regressiya testi (Michael Jordan namesake, netflix/budget.me 
 
 ---
 
-## Faza 2 — Bog'lash aniqligi (ehtimoliy model) — M/L
-- [ ] 2.1 Fellegi–Sunter uslubidagi vaznlar: har bir belgi uchun log(m/u). Keng tarqalgan ism,
+## Faza 2 — Bog'lash aniqligi (ehtimoliy model) ✅
+- [x] 2.1 Fellegi–Sunter uslubidagi vaznlar: har bir belgi uchun log(m/u). Keng tarqalgan ism,
       qisqa yoki umumiy handle → kichik vazn; noyob handle, bir xil avatar, aniq email → katta vazn
-- [ ] 2.2 Qoida: birlashtirish uchun ≥1 kuchli yoki ≥2 mustaqil o'rtacha dalil; faqat ism — hech qachon
-- [ ] 2.3 Ziddiyatlar vazni kamaytiradi (boshqa shahar, boshqa yosh, boshqa ish joyi)
-- [ ] 2.4 Ism variantlari: o'zbek lotin ↔ kirill (o‘/ў, g‘/ғ, sh/ш, ch/ч), ruscha transliteratsiya
+- [x] 2.2 Qoida: birlashtirish uchun ≥1 kuchli yoki ≥2 mustaqil o'rtacha dalil; faqat ism — hech qachon
+- [x] 2.3 Ziddiyatlar vazni kamaytiradi (boshqa shahar, boshqa yosh, boshqa ish joyi)
+- [x] 2.4 Ism variantlari: o'zbek lotin ↔ kirill (o‘/ў, g‘/ғ, sh/ш, ch/ч), ruscha transliteratsiya
       (-ov/-ev/-yev, -ova), apostrof shakllari (o' o‘ oʻ), ajratgichlar (`.`, `_`, `-`, yo'q)
-- [ ] 2.5 Username variant generatori (ism.familiya, ismfamiliya, i.familiya, tug'ilgan yil) —
+- [x] 2.5 Username variant generatori (ism.familiya, ismfamiliya, i.familiya, tug'ilgan yil) —
       faqat qidiruv uchun, natija nomzod sifatida
-- [ ] 2.6 Etalon to'plam: 20–30 ta qo'lda belgilangan holat (o'zimiz, ochiq jamoat shaxslari,
+- [x] 2.6 Etalon to'plam: 20–30 ta qo'lda belgilangan holat (o'zimiz, ochiq jamoat shaxslari,
       namesake'lar). Har bir o'zgarishda precision/recall o'lchanadi
+      (`backend/scripts/eval_linkage.py`; 28 holat, hozir P=1.00 R=1.00)
+- [ ] 2.7 Etalonga real, qo'lda belgilangan holatlar qo'shish (o'z scan'larimizdan). Hozirgi
+      28 ta holatni men yozganman va vaznlar ularga qarab sozlangan — bu regressiya himoyasi,
+      mustaqil aniqlik o'lchovi emas
 
 ## Faza 3 — Manbalar va qamrov — M
 - [ ] 3.1 (eski 1.5) O'z SearXNG instansiyasi (docker-compose'ga, `formats: [html, json]`);
@@ -78,6 +83,18 @@ Har bir band uchun regressiya testi (Michael Jordan namesake, netflix/budget.me 
 - [ ] 3.4 Wayback Machine: topilgan profillarning birinchi arxivlangan sanasi, eski bio
 - [ ] 3.5 Manbalar salomatligi paneli: Holehe modullari, GitHub limiti, qidiruv holati, Maigret
       o'chirilgan saytlar soni
+- [ ] 3.6 **Subfinder** (ProjectDiscovery, MIT, v2.17.0 2026-10): passiv subdomain qidiruvi.
+      Docker image'ga binary, kalitsiz manbalar standart, kalitlar ixtiyoriy. Hozirgi crt.sh / OTX /
+      HackerTarget / SecurityTrails yonida ishlaydi, natijalar birlashtiriladi. Avval 10 ta domenda
+      hozirgi usul bilan solishtiriladi (soni, vaqti) — M
+- [ ] 3.7 **theHarvester** (GPL-2.0, 4.11.1 2026-06): domen → tashkilotning ochiq e'lon qilingan
+      email va host'lari. Faqat kalitsiz/bepul manbalar, CLI sifatida (subprocess, `--`).
+      Har bir email manbasi bilan; hunter.io'ning bepul o'rnini bosadi — M
+- [ ] 3.8 Katalog yangilash: WhatsMyName "arxivlangan" deb belgilanadi; Subfinder, theHarvester,
+      Amass, SpiderFoot, Social-Analyzer, Photon havolalari qo'shiladi — S
+- [ ] 3.9 (keyinroq, 3.3'dan keyin baholanadi) **Social-Analyzer** (AGPL-3.0, faol): 1000+ sayt,
+      0–100 ishonch bahosi. Uchinchi username dvigateli sifatida faqat Maigret o'zbek ta'riflari
+      yetarli bo'lmasa; AGPL — alohida konteyner, kodini o'zimizga aralashtirmaymiz
 
 ## Faza 4 — Holehe kengaytmasi — L
 Maqsad: email bo'yicha "ro'yxatdan o'tganlik signali"ni ishonchli va kengroq qilish.
@@ -138,6 +155,11 @@ UI va sozlash:
 - [ ] 7.4 orginfo.uz: rahbar/ta'sischi → Company, Name pivot (ishonchliligi o'rta deb belgilanadi)
 - [ ] 7.5 public.sud.uz, Epieos, data.egov.uz — qo'lda tekshirish havolalari
 - [ ] 7.6 Aniqlashtiruvchi maydonlar: shahar, ish joyi, yosh, o'qish joyi
+- [ ] 7.7 Kontakt ajratuvchi (Photon g'oyasi, o'zimizning kod): sayt yoki profil sahifasidan
+      1 chuqurlikda ≤ 10 sahifa, `safe_get` orqali, robots.txt hurmat qilinadi → email, ijtimoiy
+      havolalar, telefon — har biri sahifa URL'i bilan (7.2 shu modulni ishlatadi) — M
+- [ ] 7.8 Grafni eksport qilish: GraphML va Maltego CE uchun CSV (Deep Scan node/edge,
+      dalillari bilan) — S
 
 ## Faza 8 — Qonuniy va operatsion talablar — S/M
 - [ ] 8.1 Har bir maydon manbasi va olingan vaqti saqlanadi (ZRU-547, 30-modda)
@@ -151,6 +173,29 @@ UI va sozlash:
 
 ---
 
+## Tashqi OSINT loyihalari tahlili (2026-11-16, GitHub ma'lumotlari bo'yicha)
+
+| Loyiha | Holati | Bizda | Qaror |
+|---|---|---|---|
+| Sherlock | faol, MIT | ✅ bor | yangilash (3.2) |
+| Maigret | faol, MIT | ✅ bor | yangilash, self-check, o'zbek saytlari (3.2–3.3) |
+| Holehe | 2024-09 dan beri commit yo'q | ✅ bor | Faza 4 |
+| Shodan | — | ✅ InternetDB (kalitsiz) + kalit bilan | yetarli |
+| Awesome-OSINT, OSINT Framework, Bellingcat | faol | ✅ katalogda | — |
+| WhatsMyName | **arxivlangan** | katalogda | belgilash (3.8) |
+| Subfinder | faol, MIT, v2.17.0 | ❌ | **qo'shiladi** (3.6) |
+| theHarvester | faol, GPL-2.0 | ❌ | **qo'shiladi** (3.7) |
+| Photon | oxirgi release 2019 | ❌ | g'oyasi o'zimizning kodda (7.7) |
+| Maltego CE | yopiq kod, GUI | ❌ | faqat eksport (7.8) |
+| Social-Analyzer | faol, AGPL-3.0 | ❌ | keyinroq baholanadi (3.9) |
+| OWASP Amass | faol, v5 (og'ir, DB engine) | ❌ | hozircha yo'q: passivda Subfinder yetarli |
+| SpiderFoot | oxirgi commit 2023-11, release 2022 | ❌ | integratsiya yo'q, modul g'oyalari uchun manba |
+| Recon-ng | faol, interaktiv framework | ❌ | yo'q: bizning platforma bilan bir xil vazifa |
+| PhoneInfoga | README: "stable but unmaintained" | qisman (libphonenumber) | yo'q: bizda bor narsani qiladi |
+| Blackbird | faol | ❌ | yo'q: username bazasi arxivlangan WhatsMyName, email qismi Holehe bilan bir xil |
+| GHunt | faol | ❌ | **yo'q**: Google akkauntiga login/cookie talab qiladi |
+| Osintgram | faol | ❌ | **yo'q**: Instagram login, obunachilar kontaktlarini yig'adi |
+
 ## Optimallashtirish (fazalar bilan birga)
 - Tezlik: Deep Scan (ism) hozir ~2 daqiqa; 2-chuqurlikda Maigret o'rniga yengil tekshiruv
 - Har bir tashqi manbaga timeout + semafor; rate-limit'li manbalarga navbat va backoff
@@ -163,5 +208,6 @@ UI va sozlash:
 - Sizib chiqqan bazalar, "probiv" botlari, Telegram/WhatsApp akkauntini avtomatik tekshirish — yo'q
 - Telefon raqami bo'yicha servislarda akkaunt tekshiruvi — yo'q
 - Holehe: nishonga xat/SMS yuboradigan endpoint'lar — yo'q
+- Login/cookie talab qiladigan vositalar (GHunt, Osintgram va shunga o'xshash) — yo'q
 - AI dalilsiz kontakt "taxmin qilmaydi"; topilmasa "topilmadi"
 - Natija — bitta profil emas, nomzodlar ro'yxati; yakuniy qaror insonda
