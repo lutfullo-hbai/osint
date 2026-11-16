@@ -31,10 +31,11 @@ def shorten(text: str, limit: int = 300) -> str:
     return cleaned[: limit - 3] + "..."
 
 
-async def run_command(command: list[str], timeout: int = 120) -> dict:
+async def run_command(command: list[str], timeout: int = 120, input_text: str | None = None) -> dict:
     try:
         process = await asyncio.create_subprocess_exec(
             *command,
+            stdin=asyncio.subprocess.PIPE if input_text is not None else asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -47,7 +48,8 @@ async def run_command(command: list[str], timeout: int = 120) -> dict:
 
     try:
         stdout_bytes, stderr_bytes = await asyncio.wait_for(
-            process.communicate(), timeout=timeout
+            process.communicate(input_text.encode() if input_text is not None else None),
+            timeout=timeout
         )
     except asyncio.TimeoutError:
         process.kill()

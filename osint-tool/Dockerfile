@@ -1,3 +1,6 @@
+# Subfinder ships as a static Go binary; copy it from the pinned upstream image
+FROM projectdiscovery/subfinder:v2.17.0 AS subfinder
+
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -10,6 +13,8 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends gcc tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
+
+COPY --from=subfinder /usr/local/bin/subfinder /usr/local/bin/subfinder
 
 COPY backend/requirements.txt .
 

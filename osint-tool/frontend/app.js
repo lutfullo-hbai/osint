@@ -1328,6 +1328,7 @@ async function checkApiStatus() {
       el.textContent = "[API ONLINE]";
       el.classList.add("online");
       el.classList.remove("offline");
+      checkSources();
       return;
     }
     throw new Error("unhealthy");
@@ -1335,6 +1336,30 @@ async function checkApiStatus() {
     el.textContent = "[API OFFLINE]";
     el.classList.add("offline");
     el.classList.remove("online");
+  }
+}
+
+// Source health: one compact badge, details in its tooltip.
+async function checkSources() {
+  const el = document.getElementById("sources-status");
+  if (!el) return;
+  try {
+    const data = await requestJson(`${API_BASE}/api/sources/health`, { headers: authHeaders() });
+    const entries = Object.entries(data.sources || {});
+    const bad = entries.filter(([, s]) => !s.ok);
+    el.textContent = bad.length
+      ? `[SOURCES ${entries.length - bad.length}/${entries.length} OK]`
+      : "[SOURCES OK]";
+    el.classList.toggle("online", !bad.length);
+    el.classList.toggle("offline", bad.length > 0);
+    const keys = Object.entries(data.keys || {})
+      .map(([k, on]) => `${k}: ${on ? "set" : "not set"}`)
+      .join("\n");
+    el.title =
+      entries.map(([name, s]) => `${s.ok ? "OK" : "!!"} ${name}: ${s.detail}`).join("\n") +
+      "\n\nAPI keys:\n" + keys;
+  } catch (err) {
+    el.textContent = "";
   }
 }
 

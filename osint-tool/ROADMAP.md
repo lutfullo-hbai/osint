@@ -74,23 +74,27 @@ Har bir band uchun regressiya testi (Michael Jordan namesake, netflix/budget.me 
       28 ta holatni men yozganman va vaznlar ularga qarab sozlangan — bu regressiya himoyasi,
       mustaqil aniqlik o'lchovi emas
 
-## Faza 3 — Manbalar va qamrov — M
-- [ ] 3.1 (eski 1.5) O'z SearXNG instansiyasi (docker-compose'ga, `formats: [html, json]`);
+## Faza 3 — Manbalar va qamrov ✅ (3.9 keyinroq)
+- [x] 3.1 (eski 1.5) O'z SearXNG instansiyasi (docker-compose'ga, `formats: [html, json]`);
       zaxira: Mojeek yoki Brave API (kalit bo'lsa). DDG oxirgi zaxira
-- [ ] 3.2 Sherlock va Maigret'ni yangilash; Maigret `--self-check --auto-disable` haftalik
-- [ ] 3.3 Maigret uchun o'zbek va rus saytlari ta'riflari: OLX.uz, hh.uz, Uzum, Kun.uz/Daryo
+- [x] 3.2 Sherlock va Maigret'ni yangilash; Maigret `--self-check --auto-disable` haftalik
+- [~] 3.3 Maigret uchun o'zbek va rus saytlari ta'riflari: OLX.uz, hh.uz, Uzum, Kun.uz/Daryo
       (muallif sahifalari), VK, OK.ru, Habr, Yandex Zen, Pikabu va boshq. — ochiq profil sahifasi bo'yicha
-- [ ] 3.4 Wayback Machine: topilgan profillarning birinchi arxivlangan sanasi, eski bio
-- [ ] 3.5 Manbalar salomatligi paneli: Holehe modullari, GitHub limiti, qidiruv holati, Maigret
+      Bajarildi: o'z bazamiz, o'zbek saytlari skanerga kiritildi (MDH saytlari allaqachon top-500da).
+      Qoldi: yangi o'zbek saytlari ta'riflari — har biri uchun mavjud username bilan jonli sinov
+      kerak; OLX.uz/hh.uz/Uzum profillari username emas ID bo'yicha, username qidiruviga mos emas
+- [x] 3.4 Wayback Machine: topilgan profillarning birinchi arxivlangan sanasi, eski bio
+- [x] 3.5 Manbalar salomatligi paneli: Holehe modullari, GitHub limiti, qidiruv holati, Maigret
       o'chirilgan saytlar soni
-- [ ] 3.6 **Subfinder** (ProjectDiscovery, MIT, v2.17.0 2026-10): passiv subdomain qidiruvi.
+- [x] 3.6 **Subfinder** (ProjectDiscovery, MIT, v2.17.0 2026-10): passiv subdomain qidiruvi.
       Docker image'ga binary, kalitsiz manbalar standart, kalitlar ixtiyoriy. Hozirgi crt.sh / OTX /
       HackerTarget / SecurityTrails yonida ishlaydi, natijalar birlashtiriladi. Avval 10 ta domenda
       hozirgi usul bilan solishtiriladi (soni, vaqti) — M
-- [ ] 3.7 **theHarvester** (GPL-2.0, 4.11.1 2026-06): domen → tashkilotning ochiq e'lon qilingan
+- [x] 3.7 **theHarvester** → o'zimizning "Published emails" (theHarvester Python 3.14 +
+      Playwright talab qiladi, image'ga sig'maydi; uning kalitsiz qidiruv qismi SearXNG orqali) (GPL-2.0, 4.11.1 2026-06): domen → tashkilotning ochiq e'lon qilingan
       email va host'lari. Faqat kalitsiz/bepul manbalar, CLI sifatida (subprocess, `--`).
       Har bir email manbasi bilan; hunter.io'ning bepul o'rnini bosadi — M
-- [ ] 3.8 Katalog yangilash: WhatsMyName "arxivlangan" deb belgilanadi; Subfinder, theHarvester,
+- [x] 3.8 Katalog yangilash: WhatsMyName "arxivlangan" deb belgilanadi; Subfinder, theHarvester,
       Amass, SpiderFoot, Social-Analyzer, Photon havolalari qo'shiladi — S
 - [ ] 3.9 (keyinroq, 3.3'dan keyin baholanadi) **Social-Analyzer** (AGPL-3.0, faol): 1000+ sayt,
       0–100 ishonch bahosi. Uchinchi username dvigateli sifatida faqat Maigret o'zbek ta'riflari

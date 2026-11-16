@@ -6,6 +6,7 @@ import re
 import httpx
 
 from tools.base import ToolError
+from tools.subfinder_runner import run_subfinder
 
 DOMAIN_RE = re.compile(
     r"^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z0-9-]{1,63})+$"
@@ -209,6 +210,10 @@ async def _securitytrails_subdomains(client: httpx.AsyncClient, domain: str) -> 
     return {f"{sub}.{domain}".lower() for sub in subs}
 
 
+async def _subfinder_subdomains(_client: httpx.AsyncClient, domain: str) -> set[str]:
+    return await run_subfinder(domain)
+
+
 async def subdomain_lookup(
     client: httpx.AsyncClient, domain: str
 ) -> tuple[dict, list[str], list[str]]:
@@ -218,6 +223,7 @@ async def subdomain_lookup(
         "AlienVault OTX": _otx_subdomains,
         "HackerTarget": _hackertarget_subdomains,
         "SecurityTrails": _securitytrails_subdomains,
+        "Subfinder": _subfinder_subdomains,
     }
     outcomes = await asyncio.gather(
         *(fetch(client, domain) for fetch in sources.values()),

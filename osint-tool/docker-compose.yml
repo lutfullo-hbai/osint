@@ -12,6 +12,20 @@ services:
       - osint-net
     restart: unless-stopped
 
+  searxng:
+    # private metasearch (Google, Bing, Brave, DuckDuckGo, Startpage, Qwant...)
+    # so web search no longer depends on one engine that rate-limits us
+    image: searxng/searxng:2026.10.30-ffa88e3ba
+    container_name: osint-searxng
+    environment:
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-nexus-osint-local-only-change-me}
+      - SEARXNG_BASE_URL=http://searxng:8080/
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    networks:
+      - osint-net
+    restart: unless-stopped
+
   backend:
     build:
       context: .
@@ -26,6 +40,7 @@ services:
       - OPENSANCTIONS_API_KEY=${OPENSANCTIONS_API_KEY:-}
       - OPENCORPORATES_API_KEY=${OPENCORPORATES_API_KEY:-}
       - BRAVE_API_KEY=${BRAVE_API_KEY:-}
+      - SEARXNG_URL=${SEARXNG_URL:-http://searxng:8080}
       - SECURITYTRAILS_API_KEY=${SECURITYTRAILS_API_KEY:-}
       - HUNTER_API_KEY=${HUNTER_API_KEY:-}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
@@ -63,6 +78,7 @@ services:
       - OPENSANCTIONS_API_KEY=${OPENSANCTIONS_API_KEY:-}
       - OPENCORPORATES_API_KEY=${OPENCORPORATES_API_KEY:-}
       - BRAVE_API_KEY=${BRAVE_API_KEY:-}
+      - SEARXNG_URL=${SEARXNG_URL:-http://searxng:8080}
       - SECURITYTRAILS_API_KEY=${SECURITYTRAILS_API_KEY:-}
       - HUNTER_API_KEY=${HUNTER_API_KEY:-}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
