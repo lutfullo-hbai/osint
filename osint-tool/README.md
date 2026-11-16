@@ -109,7 +109,8 @@ Limitdan oshsa `429` va `X-RateLimit-*` / `Retry-After` sarlavhalari qaytadi.
 
 ### Kalitli (ixtiyoriy) manbalar
 Kalit `.env`da bo'lsa ishlaydi, bo'lmasa o'sha manba o'tkazib yuboriladi:
-`BRAVE_API_KEY` (Google sifatidagi qidiruv, DuckDuckGo o'rniga), `HIBP_API_KEY`,
+`BRAVE_API_KEY` (Google sifatidagi qidiruv, DuckDuckGo o'rniga), `HIBP_API_KEY`
+(bo'lmasa breach tekshiruvi bepul XposedOrNot orqali ishlaydi),
 `OPENSANCTIONS_API_KEY`, `OPENCORPORATES_API_KEY`, `SECURITYTRAILS_API_KEY`
 (subdomenlar/DNS tarixi), `HUNTER_API_KEY` (exposure email'lari). To'liq ro'yxat —
 `.env.example`.
@@ -176,7 +177,8 @@ mavjud bo'lmasa, jarayon ichidagi xotira keshiga fallback qiladi.
   Chess.com, npm, Gravatar, Keybase, Mastodon, Bluesky, Docker Hub, Lichess,
   Codeforces, Hacker News, DEV) + ochiq postlar (Instagram/TikTok/... indeks,
   login'siz). Ishonch darajasi va teg qilingan `@do'stlar` pivoti.
-- **Email**: Holehe, HIBP, EmailRep, MX/SPF/DMARC va **Gravatar profil** (ism,
+- **Email**: Holehe, breach tekshiruvi (`HIBP_API_KEY` bo'lsa HIBP, bo'lmasa
+  bepul **XposedOrNot**), EmailRep, MX/SPF/DMARC va **Gravatar profil** (ism,
   joylashuv, ish, ulangan tarmoqlar → pivot). Local qism ham username pivoti.
 - **Phone**: numbering-plan ma'lumoti (operator, geo, liniya turi, timezone),
   ommaviy eslatmalar va WhatsApp/Viber/Telegram/Truecaller qo'lda tekshirish havolalari.

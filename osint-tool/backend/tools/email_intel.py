@@ -1,6 +1,9 @@
+import asyncio
 import os
 
 import httpx
+from xposedornot import XposedOrNot
+from xposedornot.exceptions import NotFoundError, RateLimitError, XposedOrNotError
 
 from tools.base import ToolError
 
@@ -83,3 +86,52 @@ async def lookup_hibp(email: str) -> tuple[dict | None, str | None]:
         "status": "found",
         "info": f"Found in {len(breaches)} breach(es): {summary}",
     }, None
+
+
+def _summarize_breaches(names: list[str], limit: int = 8) -> str:
+    shown = ", ".join(names[:limit])
+    more = len(names) - limit
+    return shown + (f" +{more} more" if more > 0 else "")
+
+
+def _xposedornot_check(email: str) -> list[str]:
+    # The official SDK is synchronous (httpx.Client + time.sleep backoff on
+    # 429), so it runs in a worker thread; see lookup_xposedornot.
+    with XposedOrNot(timeout=20) as client:
+        return list(client.check_email(email).breaches)
+
+
+async def lookup_xposedornot(email: str) -> dict:
+    """Free breach check (no key) via the official XposedOrNot SDK."""
+    try:
+        breaches = await asyncio.to_thread(_xposedornot_check, email)
+    except NotFoundError:
+        breaches = []
+    except RateLimitError:
+        raise ToolError("XposedOrNot rate limit reached. Retry later.") from None
+    except XposedOrNotError as exc:
+        raise ToolError(f"XposedOrNot lookup failed: {exc}") from None
+
+    if not breaches:
+        info = "No known breaches contain this email (XposedOrNot)."
+    else:
+        info = (
+            f"Found in {len(breaches)} breach(es): {_summarize_breaches(breaches)}"
+        )
+    return {
+        "platform": "XposedOrNot Breaches",
+        "url": "https://xposedornot.com/",
+        "status": "found",
+        "info": info,
+    }
+
+
+async def lookup_breaches(email: str) -> tuple[dict | None, str | None]:
+    """Breach check: HIBP when HIBP_API_KEY is set, otherwise free XposedOrNot.
+
+    Returns (entry, warning) like lookup_hibp. The "No known breaches" phrase in
+    the no-hit message is relied on by the footprint exposure score.
+    """
+    if os.environ.get("HIBP_API_KEY", "").strip():
+        return await lookup_hibp(email)
+    return await lookup_xposedornot(email), None

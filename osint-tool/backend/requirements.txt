@@ -14,3 +14,4 @@ ExifRead>=3.0,<4.0
 pillow>=10,<12
 pytesseract>=0.3.10,<0.4
 fpdf2>=2.7,<3
+xposedornot>=1.1,<2

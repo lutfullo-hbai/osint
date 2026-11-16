@@ -33,7 +33,7 @@ from tools.email_domain import (
     email_domain_intel,
     gravatar_lookup,
 )
-from tools.email_intel import lookup_emailrep, lookup_hibp
+from tools.email_intel import lookup_breaches, lookup_emailrep
 from tools.holehe_runner import run_holehe
 from tools.image_intel import analyze_image, fetch_image_bytes
 from tools.ip_intel import (
@@ -397,7 +397,7 @@ async def _investigate_email(email: str) -> dict:
     lookups = {
         "Holehe": run_holehe(email),
         "EmailRep": lookup_emailrep(email),
-        "HIBP": lookup_hibp(email),
+        "Breaches": lookup_breaches(email),
         "Email domain checks": email_domain_intel(email),
         "Gravatar": gravatar_lookup(email),
         "Public mentions": search_public([f'"{email}"'], max_results_per_batch=10),
@@ -410,12 +410,12 @@ async def _investigate_email(email: str) -> dict:
         results.extend(outcomes["Holehe"]["results"])
     if "EmailRep" in outcomes:
         results.append(outcomes["EmailRep"])
-    if "HIBP" in outcomes:
-        hibp_entry, hibp_warning = outcomes["HIBP"]
-        if hibp_entry:
-            results.append(hibp_entry)
-        if hibp_warning:
-            warnings.append(hibp_warning)
+    if "Breaches" in outcomes:
+        breach_entry, breach_warning = outcomes["Breaches"]
+        if breach_entry:
+            results.append(breach_entry)
+        if breach_warning:
+            warnings.append(breach_warning)
     if "Email domain checks" in outcomes:
         domain_results, domain_warnings = outcomes["Email domain checks"]
         results.extend(domain_results)
@@ -840,7 +840,7 @@ async def _investigate_footprint(query: str, mode: str, email: str, username: st
     warnings: list[str] = []
     results: list[dict] = []
     pivots: list[dict] = []
-    breached = None  # None = unknown (no key), True/False otherwise
+    breached = None  # None = unknown (lookup failed), True/False otherwise
     platform_hits = 0
     gravatar_personal = False
     disposable = False
@@ -848,7 +848,7 @@ async def _investigate_footprint(query: str, mode: str, email: str, username: st
     if mode == "email":
         lookups = {
             "Registrations": run_holehe(email),
-            "Breaches": lookup_hibp(email),
+            "Breaches": lookup_breaches(email),
             "Reputation": lookup_emailrep(email),
             "Gravatar": gravatar_lookup(email),
             "Disposable": disposable_check(email.rsplit("@", 1)[-1]),

@@ -110,7 +110,7 @@ async def test_email_survives_holehe_failure(monkeypatch):
 
     monkeypatch.setattr(svc, "run_holehe", broken)
     monkeypatch.setattr(svc, "lookup_emailrep", emailrep)
-    monkeypatch.setattr(svc, "lookup_hibp", hibp)
+    monkeypatch.setattr(svc, "lookup_breaches", hibp)
     monkeypatch.setattr(svc, "email_domain_intel", domain_intel)
     monkeypatch.setattr(svc, "gravatar_lookup", gravatar)
 
@@ -473,7 +473,7 @@ async def test_email_adds_local_part_and_gravatar_pivots(monkeypatch):
 
     monkeypatch.setattr(svc, "run_holehe", holehe)
     monkeypatch.setattr(svc, "lookup_emailrep", rep)
-    monkeypatch.setattr(svc, "lookup_hibp", hibp)
+    monkeypatch.setattr(svc, "lookup_breaches", hibp)
     monkeypatch.setattr(svc, "email_domain_intel", dom)
     monkeypatch.setattr(svc, "gravatar_lookup", grav)
     monkeypatch.setattr(svc, "search_public", mentions)
