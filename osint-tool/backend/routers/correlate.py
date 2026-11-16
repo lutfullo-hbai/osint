@@ -8,6 +8,9 @@ import store
 from security import general_limit, limiter, verify_api_key
 from services.correlate import correlate, nodes_from_findings
 
+# correlation compares every pair of nodes: keep the input bounded
+MAX_CORRELATE_NODES = 200
+
 router = APIRouter(tags=["correlate"], dependencies=[Depends(verify_api_key)])
 
 
@@ -24,14 +27,25 @@ async def run_correlate(request: Request, response: Response, payload: Correlate
             case = await asyncio.to_thread(store.get_case, payload.case_id)
             nodes = nodes_from_findings(case.get("findings", []))
         elif payload.nodes is not None:
+            if len(payload.nodes) > MAX_CORRELATE_NODES:
+                return JSONResponse(
+                    status_code=400,
+                    content={"status": "error",
+                             "message": f"At most {MAX_CORRELATE_NODES} nodes per request."},
+                )
             nodes = payload.nodes
         else:
             return JSONResponse(
                 status_code=400,
                 content={"status": "error", "message": "Provide case_id or nodes."},
             )
-        result = correlate(nodes)
+        truncated = len(nodes) > MAX_CORRELATE_NODES
+        result = await asyncio.to_thread(correlate, nodes[:MAX_CORRELATE_NODES])
         result["status"] = "success"
+        if truncated:
+            result["warnings"] = [
+                f"Only the first {MAX_CORRELATE_NODES} nodes were correlated."
+            ]
         return result
     except store.CaseError as exc:
         return JSONResponse(

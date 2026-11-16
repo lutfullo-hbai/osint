@@ -26,13 +26,13 @@ def test_shared_email_links_with_high_confidence():
          "results": []},
     ]
     out = correlate(nodes)
-    # both the shared email AND the local-part==handle link should fire
+    # the GitHub profile itself publishes the investigated address: strong
     assert out["cluster_count"] == 1
     cluster = out["clusters"][0]
     assert len(cluster["members"]) == 2
     assert cluster["confidence"] == "high"
     assert "jane@doe.com" in cluster["identifiers"]["emails"]
-    assert any("shared email" in s for s in cluster["signals"])
+    assert any("states the email" in s for s in cluster["signals"])
 
 
 def test_name_search_handle_is_candidate_not_link():

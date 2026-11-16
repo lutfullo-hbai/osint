@@ -16,6 +16,8 @@ logger = logging.getLogger("osint.cache")
 
 _client = None
 _memory: dict[str, tuple[float, str]] = {}
+# The in-process fallback (no Redis) is bounded so it cannot grow forever.
+MEMORY_MAX_ENTRIES = 1000
 
 
 async def get_client():
@@ -51,7 +53,14 @@ async def set_cached_json(key: str, value: Any, ttl: int = DEFAULT_TTL_SECONDS) 
     raw = json.dumps(value, ensure_ascii=False)
     client = await get_client()
     if client is None:
-        _memory[key] = (time.time() + ttl, raw)
+        now = time.time()
+        if key not in _memory and len(_memory) >= MEMORY_MAX_ENTRIES:
+            for stale in [k for k, (exp, _r) in _memory.items() if exp < now]:
+                _memory.pop(stale, None)
+            while len(_memory) >= MEMORY_MAX_ENTRIES:
+                # evict the entry closest to expiry
+                _memory.pop(min(_memory, key=lambda k: _memory[k][0]))
+        _memory[key] = (now + ttl, raw)
         return
 
     try:

@@ -2,7 +2,7 @@ import re
 import shutil
 import sys
 
-from tools.base import ToolError, run_command, shorten, strip_ansi
+from tools.base import ToolError, positional_arg, run_command, shorten, strip_ansi
 
 SHERLOCK_TIMEOUT_SECONDS = 300
 
@@ -38,11 +38,12 @@ def _build_command(username: str) -> list[str]:
         base = [sys.executable, "-m", "sherlock_project"]
     return [
         *base,
-        username,
         "--timeout",
         "15",
         "--no-color",
         "--print-found",
+        "--",
+        positional_arg(username),
     ]
 
 

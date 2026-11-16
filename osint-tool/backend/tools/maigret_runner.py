@@ -3,7 +3,7 @@ import json
 import os
 import tempfile
 
-from tools.base import ToolError, run_command, shorten, strip_ansi
+from tools.base import ToolError, positional_arg, run_command, shorten, strip_ansi
 
 MAIGRET_TIMEOUT_SECONDS = 900
 FOUND_STATUSES = {"claimed", "found"}
@@ -127,10 +127,10 @@ def parse_payload(payload) -> list[dict]:
 
 
 async def run_maigret(username: str) -> dict:
+    username = positional_arg(username)
     report_dir = tempfile.mkdtemp(prefix="maigret_reports_")
     command = [
         "maigret",
-        username,
         "--json",
         "simple",
         "--no-color",
@@ -139,6 +139,8 @@ async def run_maigret(username: str) -> dict:
         "10",
         "-fo",
         report_dir,
+        "--",
+        username,
     ]
     try:
         execution = await run_command(command, timeout=MAIGRET_TIMEOUT_SECONDS)

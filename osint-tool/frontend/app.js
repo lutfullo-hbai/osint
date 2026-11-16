@@ -1,4 +1,10 @@
-const API_BASE = "http://localhost:8000";
+// Override per deployment with <meta name="osint-api-base" content="..."> in
+// index.html (or window.OSINT_API_BASE set before this script loads).
+const API_BASE = (
+  window.OSINT_API_BASE ||
+  document.querySelector('meta[name="osint-api-base"]')?.content ||
+  "http://localhost:8000"
+).replace(/\/+$/, "");
 const API_KEY_STORAGE = "osint_api_key";
 
 function getApiKey() {
@@ -1566,7 +1572,7 @@ async function openCase(caseId) {
     return;
   }
   const n = detail.findings.length;
-  summaryEl.innerHTML = `<strong>${detail.case.name}</strong> — ${n} finding${
+  summaryEl.innerHTML = `<strong>${escapeHtml(detail.case.name)}</strong> — ${n} finding${
     n === 1 ? "" : "s"
   }`;
 

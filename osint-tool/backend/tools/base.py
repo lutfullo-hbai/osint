@@ -8,6 +8,18 @@ class ToolError(Exception):
     pass
 
 
+def positional_arg(value: str) -> str:
+    """A value placed on a CLI command line as data, never as an option.
+
+    Callers also put it after "--"; refusing a leading "-" is the second fence
+    (a handle like "--web" can arrive from an editable source such as Wikidata).
+    """
+    value = str(value)
+    if not value or value.startswith("-") or "\x00" in value:
+        raise ToolError("Refusing a command-line value that looks like an option.")
+    return value
+
+
 def strip_ansi(text: str) -> str:
     return ANSI_ESCAPE_RE.sub("", text)
 

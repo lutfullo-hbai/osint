@@ -11,12 +11,14 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from urllib.parse import parse_qs, urlparse
 
 # Handles shorter than this collide too easily to be trusted as a link.
 MIN_HANDLE_LEN = 4
 
 # Link weights — how strongly a shared signal argues "same entity".
 W_KB = 5             # a curated knowledge base (Wikidata) lists the account
+W_STATED_EMAIL = 5   # a profile itself publishes the email being investigated
 W_EMAIL = 3          # the same email address on two nodes
 W_LINKED = 3         # a profile explicitly links out to another node's handle
 W_AVATAR = 3         # the same perceptual avatar hash
@@ -49,14 +51,69 @@ _NAME_RE = re.compile(r"Name:\s*([^;]+)", re.IGNORECASE)
 _LINKED_RE = re.compile(r"Linked:\s*([^;]+)", re.IGNORECASE)
 _DHASH_RE = re.compile(r"\bdhash[:=]?\s*([0-9a-f]{8,})", re.IGNORECASE)
 
-# Known platforms whose profile URL ends in the user's handle.
-_HANDLE_URL_RE = re.compile(
-    r"https?://[^/]*(?:github\.com|gitlab\.com|twitter\.com|x\.com|instagram\.com|"
-    r"t\.me|telegram\.me|reddit\.com/user|tiktok\.com/@|keybase\.io|"
-    r"chess\.com/member|news\.ycombinator\.com/user|medium\.com/@|"
-    r"gravatar\.com|about\.me|replit\.com/@)/?@?([A-Za-z0-9._\-]+)",
-    re.IGNORECASE,
-)
+# Known platforms whose profile URL carries the user's handle.
+# host -> (path prefix before the handle, reserved first segments that are
+# site pages, not users). The host must match EXACTLY (after www./m.), so
+# budget.me is not t.me and netflix.com/title/1 is not x.com/title.
+_PROFILE_HOSTS: dict[str, tuple[str, frozenset]] = {
+    "github.com": ("", frozenset({
+        "topics", "orgs", "sponsors", "features", "settings", "marketplace",
+        "explore", "about", "login", "join", "pricing", "enterprise",
+        "collections", "trending", "apps", "search", "notifications",
+        "issues", "pulls", "site", "security", "readme", "events", "new",
+        "organizations", "codespaces", "customer-stories", "team", "contact",
+    })),
+    "gitlab.com": ("", frozenset({"explore", "users", "help", "groups", "projects", "dashboard"})),
+    "twitter.com": ("", frozenset({"i", "home", "intent", "search", "hashtag", "explore", "share", "settings", "messages"})),
+    "x.com": ("", frozenset({"i", "home", "intent", "search", "hashtag", "explore", "share", "settings", "messages"})),
+    "instagram.com": ("", frozenset({"p", "reel", "reels", "explore", "stories", "accounts", "tv", "direct"})),
+    "t.me": ("", frozenset({"s", "c", "joinchat", "share", "addstickers", "addemoji", "proxy", "iv"})),
+    "telegram.me": ("", frozenset({"s", "c", "joinchat", "share", "addstickers", "addemoji", "proxy", "iv"})),
+    "reddit.com": ("user/", frozenset()),
+    "tiktok.com": ("@", frozenset()),
+    "keybase.io": ("", frozenset({"docs", "blog", "download", "jobs"})),
+    "chess.com": ("member/", frozenset()),
+    "medium.com": ("@", frozenset()),
+    "gravatar.com": ("", frozenset({"avatar", "site", "support", "connect", "profile"})),
+    "about.me": ("", frozenset({"login", "signup", "people", "search"})),
+    "replit.com": ("@", frozenset()),
+}
+_HANDLE_CHARS_RE = re.compile(r"^[A-Za-z0-9._\-]+$")
+
+
+def handle_from_url(url: str) -> str | None:
+    """The username a known profile URL points at, or None."""
+    try:
+        parsed = urlparse(str(url or "").strip())
+    except ValueError:
+        return None
+    if parsed.scheme not in ("http", "https"):
+        return None
+    host = (parsed.hostname or "").lower()
+    for prefix in ("www.", "m.", "mobile.", "old."):
+        if host.startswith(prefix):
+            host = host[len(prefix):]
+            break
+    if host == "news.ycombinator.com":
+        if parsed.path.rstrip("/") != "/user":
+            return None
+        value = (parse_qs(parsed.query).get("id") or [""])[0]
+        return value if _HANDLE_CHARS_RE.match(value) else None
+    rule = _PROFILE_HOSTS.get(host)
+    if rule is None:
+        return None
+    prefix, reserved = rule
+    path = parsed.path.lstrip("/")
+    if host == "reddit.com" and path.startswith("u/"):
+        path = "user/" + path[2:]
+    if not path.lower().startswith(prefix):
+        return None
+    segment = path[len(prefix):].split("/", 1)[0]
+    if not prefix and segment.startswith("@"):
+        segment = segment[1:]
+    if not segment or segment.lower() in reserved or not _HANDLE_CHARS_RE.match(segment):
+        return None
+    return segment
 
 
 def norm_handle(value: str) -> str:
@@ -81,6 +138,8 @@ def _extract(node: dict) -> dict:
         "avatars": set(),
         "locations": set(),
         "platforms": set(),
+        # email local-parts: matched against handles once, never as handles
+        "localparts": set(),
         # handles a NAME search surfaced (display-name matches): namesake
         # candidates, never identity evidence on their own
         "candidate_handles": set(),
@@ -94,9 +153,6 @@ def _extract(node: dict) -> dict:
         ids["usernames"].add(norm_handle(query))
     elif ntype == "email" and query:
         ids["emails"].add(norm_email(query))
-        local = query.split("@", 1)[0]
-        if len(norm_handle(local)) >= MIN_HANDLE_LEN:
-            ids["usernames"].add(norm_handle(local))
     elif ntype == "name" and query:
         ids["names"].add(norm_name(query))
     elif ntype in ("domain", "ip") and query:
@@ -106,10 +162,16 @@ def _extract(node: dict) -> dict:
         platform = item.get("platform")
         if platform:
             ids["platforms"].add(platform)
+        # a web-search hit is a page that MENTIONS the query: the accounts and
+        # addresses on it are usually other people's, so they are not this
+        # node's identifiers (a name search still uses them as candidates)
+        from_search = item.get("source") == "web_search"
         url = item.get("url") or item.get("profile_url") or ""
-        m = _HANDLE_URL_RE.match(url)
-        if m and len(norm_handle(m.group(1))) >= MIN_HANDLE_LEN:
-            h = norm_handle(m.group(1))
+        raw_handle = handle_from_url(url)
+        if raw_handle and len(norm_handle(raw_handle)) >= MIN_HANDLE_LEN:
+            h = norm_handle(raw_handle)
+            if from_search and ntype != "name" and h != norm_handle(query):
+                continue
             # a name search returns everyone who shares the name, so a handle
             # in its results is a candidate, not the searched person's handle
             bucket = "candidate_handles" if ntype == "name" else "usernames"
@@ -121,6 +183,8 @@ def _extract(node: dict) -> dict:
         if linked and len(norm_handle(linked)) >= MIN_HANDLE_LEN:
             ids["usernames"].add(norm_handle(linked))
 
+        if from_search:
+            continue
         info = str(item.get("info", ""))
         for email in _EMAIL_RE.findall(info):
             ids["emails"].add(norm_email(email))
@@ -142,6 +206,9 @@ def _extract(node: dict) -> dict:
         if name_field and len(str(name_field).split()) >= 2:
             ids["names"].add(norm_name(name_field))
 
+    ids["localparts"] = {
+        norm_handle(e.split("@", 1)[0]) for e in ids["emails"]
+    } - {""}
     return ids
 
 
@@ -164,6 +231,8 @@ def nodes_from_findings(findings: list[dict]) -> list[dict]:
             "type": category,
             "query": query,
             "results": result.get("results", []),
+            # keep provenance: without it every pivot reads as unknown evidence
+            "pivots": result.get("pivots", []),
         })
     return nodes
 
@@ -288,7 +357,13 @@ def correlate(nodes: list[dict]) -> dict:
 
             shared_email = ei["emails"] & ej["emails"]
             if shared_email:
-                link(i, j, W_EMAIL, f"shared email {sorted(shared_email)[0]}")
+                email = sorted(shared_email)[0]
+                own = {refs[k][1] for k in (i, j) if refs[k][0] == "email"}
+                if email in own and len(own) == 1:
+                    # the other node's own profile publishes this exact address
+                    link(i, j, W_STATED_EMAIL, f"profile states the email {email}")
+                else:
+                    link(i, j, W_EMAIL, f"shared email {email}")
             # only link on SPECIFIC, independently observed handles
             shared_handle = {
                 h for h in (ei["usernames"] & ej["usernames"])
@@ -300,10 +375,11 @@ def correlate(nodes: list[dict]) -> dict:
             if shared_avatar:
                 link(i, j, W_AVATAR, "identical avatar image hash")
             # email local-part of one == a handle of the other (skip generic)
-            local_i = {norm_handle(e.split("@", 1)[0]) for e in ei["emails"]}
-            local_j = {norm_handle(e.split("@", 1)[0]) for e in ej["emails"]}
-            localpart_match = (local_i & ej["usernames"]) | (local_j & ei["usernames"])
-            if any(not is_generic(h) for h in localpart_match):
+            # (counted once here; a local-part is never also a "shared handle")
+            localpart_match = (
+                (ei["localparts"] & ej["usernames"]) | (ej["localparts"] & ei["usernames"])
+            )
+            if any(len(h) >= MIN_HANDLE_LEN and not is_generic(h) for h in localpart_match):
                 link(i, j, W_LOCALPART, "email name reused as handle")
             shared_name = ei["names"] & ej["names"]
             if shared_name:

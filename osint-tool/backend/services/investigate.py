@@ -35,6 +35,7 @@ from tools.email_domain import (
 )
 from tools.email_intel import lookup_breaches, lookup_emailrep
 from tools.holehe_runner import run_holehe
+from tools.hub_domains import is_hub_domain
 from tools.image_intel import analyze_image, fetch_image_bytes
 from tools.ip_intel import (
     internetdb_lookup,
@@ -112,17 +113,17 @@ def normalize_username(raw_username: str) -> str:
     username = raw_username.strip().lstrip("@")
     if not (
         USERNAME_MIN_LENGTH <= len(username) <= USERNAME_MAX_LENGTH
-    ) or not set(username) <= ALLOWED_USERNAME_CHARS:
+    ) or not set(username) <= ALLOWED_USERNAME_CHARS or username.startswith("-"):
         raise InvestigationValidationError(
-            "Username must be 2-64 characters and contain only letters, digits, "
-            "dots, underscores or hyphens."
+            "Username must be 2-64 characters, contain only letters, digits, "
+            "dots, underscores or hyphens, and not start with a hyphen."
         )
     return username
 
 
 def normalize_email(raw_email: str) -> str:
     email = raw_email.strip().lower()
-    if not EMAIL_RE.fullmatch(email):
+    if not EMAIL_RE.fullmatch(email) or email.startswith("-"):
         raise InvestigationValidationError(
             "Please provide a valid email address."
         )
@@ -163,6 +164,22 @@ _skip_cache_read: contextvars.ContextVar[bool] = contextvars.ContextVar(
 )
 
 
+# Labels of sources that failed while the current result was produced. A
+# result missing a source is cached only briefly, so a Sherlock or GitHub
+# hiccup does not pin an incomplete answer for the full TTL.
+_failed_sources: contextvars.ContextVar[list | None] = contextvars.ContextVar(
+    "failed_sources", default=None
+)
+PARTIAL_CACHE_TTL = 60
+
+
+def _mark_failed(label: str) -> None:
+    """Record a source failure for the result being produced (cache TTL)."""
+    failed = _failed_sources.get()
+    if failed is not None:
+        failed.append(label)
+
+
 async def _cached(key: str, producer, *args) -> dict:
     if not _skip_cache_read.get():
         cached = await get_cached_json(key)
@@ -170,9 +187,18 @@ async def _cached(key: str, producer, *args) -> dict:
             cached["cached"] = True
             return cached
 
-    result = await producer(*args)
+    failed: list[str] = []
+    token = _failed_sources.set(failed)
+    try:
+        result = await producer(*args)
+    finally:
+        _failed_sources.reset(token)
+    if failed and isinstance(result, dict):
+        # watches use this to tell "source down" from "account gone"
+        result["failed_sources"] = sorted(set(failed))
     if result.get("status") == "success":
-        await set_cached_json(key, result, CACHE_TTL)
+        ttl = PARTIAL_CACHE_TTL if failed else CACHE_TTL
+        await set_cached_json(key, result, ttl)
     return result
 
 
@@ -201,6 +227,8 @@ async def _collect(lookups: dict) -> tuple[dict, list[str]]:
             warnings.append(f"{label} failed unexpectedly: {type(outcome).__name__}")
         else:
             succeeded[label] = outcome
+            continue
+        _mark_failed(label)
     return succeeded, warnings
 
 
@@ -420,13 +448,20 @@ async def _investigate_email(email: str) -> dict:
         domain_results, domain_warnings = outcomes["Email domain checks"]
         results.extend(domain_results)
         warnings.extend(domain_warnings)
-    email_pivots = [{"type": "domain", "value": email.rsplit("@", 1)[-1]}]
+    email_domain = email.rsplit("@", 1)[-1]
+    # gmail.com / mail.ru say nothing about the owner: no domain pivot
+    email_pivots = [] if is_hub_domain(email_domain) else [{"type": "domain", "value": email_domain}]
     if outcomes.get("Gravatar"):
         results.extend(outcomes["Gravatar"]["results"])
         email_pivots.extend(outcomes["Gravatar"]["pivots"])
     # The local part is often reused as a username elsewhere.
     local_part = email.split("@", 1)[0]
-    if local_part and set(local_part) <= ALLOWED_USERNAME_CHARS and len(local_part) >= 3:
+    if (
+        local_part
+        and set(local_part) <= ALLOWED_USERNAME_CHARS
+        and len(local_part) >= 3
+        and not local_part.startswith("-")
+    ):
         email_pivots.append(
             {"type": "username", "value": local_part, "via": "email_localpart"}
         )
@@ -499,6 +534,7 @@ async def _investigate_phone(raw_query: str) -> dict:
         warnings.append(str(exc))
     except Exception as exc:
         warnings.append(f"Truecaller lookup failed unexpectedly: {exc}")
+        _mark_failed("Truecaller")
 
     digits = re.sub(r"\D", "", e164)
     batches = [
@@ -519,6 +555,7 @@ async def _investigate_phone(raw_query: str) -> dict:
             )
     except ToolError as exc:
         warnings.append(f"Public mentions search failed: {exc}")
+        _mark_failed("Public mentions")
 
     # Only the numbering-plan entry is not evidence of any online presence.
     found_online = any(r.get("platform") != "Telecom info" for r in results)
@@ -625,11 +662,13 @@ async def _investigate_domain(domain: str) -> dict:
                     results.append(await ip_geo_lookup(client, first_ip))
                 except ToolError as exc:
                     warnings.append(f"IP geolocation: {exc}")
+                    _mark_failed("IP geolocation")
                 try:
                     neighbour_entry, neighbours = await reverse_ip_lookup(client, first_ip)
                     results.append(neighbour_entry)
                 except ToolError as exc:
                     warnings.append(f"Reverse IP: {exc}")
+                    _mark_failed("Reverse IP")
 
     if not results:
         raise ToolError("All lookups failed: " + "; ".join(warnings))
@@ -1119,6 +1158,7 @@ async def _investigate_exposure(domain: str) -> dict:
                 findings.append(hunter_entry)
         except ToolError as exc:
             warnings.append(f"hunter.io: {exc}")
+        _mark_failed("hunter.io")
 
     level = _risk_level(risk)
     summary = {

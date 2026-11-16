@@ -15,6 +15,7 @@ import httpx
 
 from tools.base import ToolError
 from tools.domain_intel import DomainValidationError, normalize_domain
+from tools.hub_domains import is_hub_domain
 
 HEADERS = {"User-Agent": "osint-tool/1.0 (+self-hosted research tool)"}
 TIMEOUT = httpx.Timeout(12.0)
@@ -429,9 +430,12 @@ def extract_pivots(entries: list[dict]) -> list[dict]:
         if website:
             host = urlparse(website if "//" in website else f"//{website}").hostname
             try:
-                add("domain", normalize_domain(host or ""), via)
+                domain = normalize_domain(host or "")
             except DomainValidationError:
-                pass
+                domain = ""
+            # linkedin.com, github.io, linktr.ee: shared by strangers, not theirs
+            if domain and not is_hub_domain(domain):
+                add("domain", domain, via)
         linked = entry.pop("linked_username", "")
         if linked:
             add("username", linked, via)
