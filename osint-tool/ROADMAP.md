@@ -109,7 +109,9 @@ Har bir band uchun regressiya testi (Michael Jordan namesake, netflix/budget.me 
 - [x] 3b.2 SearXNG: har bir so'rov 24 soat keshlanadi (qisman javob 2 soat; tizimlar bloklagan
       paytdagi bo'sh javob keshlanmaydi); har bir qidiruv tizimining ok/xato statistikasi holat
       panelida
-- [ ] 3b.3 O'z passive DNS jadvalimiz + Mnemonic PDNS (1000/kun) + Robtex (10/soat) — S/M
+- [x] 3b.3 DNS tarixi: o'z kuzatuvlarimiz (har domen tekshiruvi saqlanadi) + Mnemonic PDNS
+      (≤10/min) + Robtex (≤8/soat) → bitta jadval; tashqi javob 7 kun kesh; domen natijasida
+      "DNS history" (eski IP'lar sanalari bilan), Watch'da o'zgarish hisoblanmaydi
 - [ ] 3b.4 E'lon qilingan emaillar: security.txt, DMARC rua/ruf, SOA RNAME; keyin odobli
       kontakt-sahifa crawler (robots.txt, ≤20 sahifa, taxminsiz) — M
 - [x] 3b.5a O'zbek rasmiy reyestrlari (data.egov.uz, 19 dataset: soliq, QQS, nohalol yetkazib
