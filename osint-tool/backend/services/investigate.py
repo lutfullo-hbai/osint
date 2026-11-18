@@ -36,7 +36,7 @@ from tools.email_domain import (
 from tools.email_intel import lookup_breaches, lookup_emailrep
 from tools.holehe_runner import run_holehe
 from tools.domain_emails import find_domain_emails
-from tools import openinfo, uz_registry
+from tools import openinfo, passive_dns, uz_registry
 from tools.hub_domains import is_hub_domain
 from tools.profile_history import annotate_first_archived
 from services.names import username_variants
@@ -637,6 +637,7 @@ async def _investigate_domain(domain: str) -> dict:
                 "Favicon": favicon_hash(client, domain),
                 "Disclosure": disclosure_files(client, domain),
                 "Published emails": find_domain_emails(domain),
+                "DNS history": passive_dns.lookup(domain),
             }
         )
 
@@ -658,6 +659,11 @@ async def _investigate_domain(domain: str) -> dict:
             disclosure_results, disclosure_warnings = outcomes["Disclosure"]
             results.extend(disclosure_results)
             warnings.extend(disclosure_warnings)
+        if "DNS history" in outcomes:
+            history_entry, history_notes = outcomes["DNS history"]
+            if history_entry:
+                results.append(history_entry)
+            warnings.extend(f"DNS history: {n}" for n in history_notes)
         # addresses the organisation itself published: shown with their page,
         # never auto-followed (they are other people's contacts)
         results.extend(outcomes.get("Published emails") or [])
@@ -677,6 +683,10 @@ async def _investigate_domain(domain: str) -> dict:
         neighbours: list[str] = []
         if "DNS" in outcomes:
             dns_entry, first_ip = outcomes["DNS"]
+            own_records = dns_entry.pop("_records", [])
+            if own_records:
+                # every lookup adds to our own DNS history
+                await asyncio.to_thread(passive_dns.record_self, domain, own_records)
             results.append(dns_entry)
             if first_ip:
                 try:

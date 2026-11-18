@@ -135,6 +135,7 @@ async def dns_lookup(domain: str) -> tuple[dict, str]:
         "url": f"https://dnschecker.org/#A/{domain}",
         "status": "found",
         "info": info,
+        "_records": records,   # popped by the caller for our passive-DNS history
     }
     return entry, first_ipv4
 
