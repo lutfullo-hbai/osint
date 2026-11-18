@@ -12,7 +12,7 @@ from tools import holehe_runner, maigret_db, sanctions_index, truecaller, uz_reg
 
 router = APIRouter(tags=["sources"], dependencies=[Depends(verify_api_key)])
 
-KEYS = ["BRAVE_API_KEY", "GITHUB_TOKEN", "HIBP_API_KEY", "SECURITYTRAILS_API_KEY",
+KEYS = ["BRAVE_API_KEY", "GITHUB_TOKEN", "COMPANIES_HOUSE_API_KEY", "HIBP_API_KEY", "SECURITYTRAILS_API_KEY",
         "HUNTER_API_KEY", "OPENSANCTIONS_API_KEY", "OPENCORPORATES_API_KEY"]
 
 

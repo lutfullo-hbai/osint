@@ -30,6 +30,7 @@ PORTAL = "https://data.egov.uz"
 USER_AGENT = "osint-tool/1.0 (self-hosted research; open-data sync)"
 TRUNCATED_AT = 65535
 MAX_HITS = 15
+MAX_PARTIAL = 8
 
 # key: (dataset id, label, columns). Column roles: name, stir, person, role,
 # region (list), extra (list), flag (a warning shown with every hit).
@@ -254,7 +255,22 @@ def search_org(query: str, path: str = DB_PATH) -> list[dict]:
             match = "org : (" + " AND ".join(f'"{t}"' for t in tokens) + ")"
             rows = _rows(conn, "SELECT record.* FROM record_fts JOIN record ON record.id = record_fts.record_id "
                                "WHERE record_fts MATCH ? LIMIT ?", (match, MAX_HITS * 4))
-    return [dict(r) for r in rows][:MAX_HITS * 2]
+    hits = [dict(r) for r in rows]
+    if not _STIR_RE.match(re.sub(r"\D", "", query)):
+        wanted = set(org_tokens(query))
+        for hit in hits:
+            # exact: every distinctive word of the registered name is in the
+            # query ("Hamkorbank" for "Hamkorbank ATB"); partial: the query is
+            # only part of a longer name ("Apple" inside "Apple Savdo")
+            have = set(org_tokens(hit["name"]))
+            hit["match"] = "exact" if have and have <= wanted else "partial"
+        exact = [h for h in hits if h["match"] == "exact"]
+        partial = [h for h in hits if h["match"] == "partial"][:MAX_PARTIAL]
+        hits = exact + partial
+    else:
+        for hit in hits:
+            hit["match"] = "exact"
+    return hits[:MAX_HITS * 2]
 
 
 def search_person(name: str, path: str = DB_PATH) -> list[dict]:
