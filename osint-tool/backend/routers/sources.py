@@ -8,7 +8,7 @@ import httpx
 from fastapi import APIRouter, Depends, Request, Response
 
 from security import general_limit, limiter, verify_api_key
-from tools import holehe_runner, maigret_db, truecaller
+from tools import holehe_runner, maigret_db, sanctions_index, truecaller
 
 router = APIRouter(tags=["sources"], dependencies=[Depends(verify_api_key)])
 
@@ -53,6 +53,17 @@ def _maigret() -> dict:
                                   f"updated {age_days:.0f} day(s) ago"}
 
 
+def _sanctions() -> dict:
+    status = sanctions_index.source_status()
+    if not status:
+        return {"ok": False, "detail": "not built yet (the worker builds it on first start)"}
+    parts = []
+    for key, row in sorted(status.items()):
+        age = (time.time() - (row.get("fetched_at") or 0)) / 86400
+        parts.append(f"{key.upper()} {row.get('records', 0)} ({age:.0f}d)")
+    return {"ok": True, "detail": "; ".join(parts)}
+
+
 async def _holehe() -> dict:
     try:
         h = await holehe_runner.health_summary()
@@ -83,6 +94,7 @@ async def sources_health(request: Request, response: Response):
         "Subfinder": {"ok": shutil.which("subfinder") is not None,
                       "detail": "installed" if shutil.which("subfinder") else "binary missing"},
         "Holehe": await _holehe(),
+        "Sanctions index": await asyncio.to_thread(_sanctions),
         "Truecaller": {"ok": tc_until <= 0,
                        "detail": "available" if tc_until <= 0 else f"skipped for {int(tc_until // 60) + 1} min (unreachable)"},
     }
