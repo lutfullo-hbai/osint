@@ -1,3 +1,4 @@
+import asyncio
 import os
 
 from arq import cron
@@ -6,6 +7,7 @@ from arq.connections import RedisSettings
 import store
 from services.investigate import InvestigationValidationError, investigate
 from services.monitor import check_one_watch, run_watch_cycle
+from tools import sanctions_index
 from tools.holehe_runner import run_canary
 from tools.maigret_db import ensure_db, run_self_check
 from tools.base import ToolError
@@ -39,9 +41,33 @@ async def holehe_canary(ctx) -> dict:
     return await run_canary()
 
 
+async def sanctions_refresh(ctx) -> dict:
+    """Daily: re-download the official sanctions lists that changed.
+
+    PEPs are weekly, but if they never loaded (Wikidata rate limit) retry daily.
+    """
+    report = await sanctions_index.refresh_sources()
+    if "pep" not in sanctions_index.source_status():
+        report["pep"] = await sanctions_index.refresh_peps()
+    return report
+
+
+async def pep_refresh(ctx) -> dict:
+    """Weekly: PEPs from Wikidata."""
+    return await sanctions_index.refresh_peps()
+
+
+async def _first_sanctions_build() -> None:
+    await sanctions_index.refresh_sources()
+    await sanctions_index.refresh_peps()
+
+
 async def startup(ctx) -> None:
     store.init_db()
     ensure_db()
+    if not sanctions_index.source_status():
+        # first run: build the index in the background, do not block startup
+        ctx["sanctions_build"] = asyncio.create_task(_first_sanctions_build())
 
 
 class WorkerSettings:
@@ -57,6 +83,8 @@ class WorkerSettings:
         cron(maigret_self_check, weekday=0, hour=4, minute=30, run_at_startup=False,
              timeout=2400),
         cron(holehe_canary, hour=5, minute=15, run_at_startup=False, timeout=600),
+        cron(sanctions_refresh, hour=3, minute=30, run_at_startup=False, timeout=1800),
+        cron(pep_refresh, weekday=6, hour=3, minute=0, run_at_startup=False, timeout=1800),
     ]
     redis_settings = RedisSettings.from_dsn(
         os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")

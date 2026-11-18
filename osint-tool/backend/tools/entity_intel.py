@@ -263,17 +263,22 @@ async def run_person_entity(name: str) -> dict:
     return {"results": results, "pivots": unique_pivots}
 
 
-async def run_sanctions_check(name: str) -> dict:
-    """Screen a name against OpenSanctions (sanctions / PEP lists).
+async def run_sanctions_check(name: str, birth_year: int | None = None) -> dict:
+    """Screen a name against sanctions and PEP lists.
 
-    Optional: needs OPENSANCTIONS_API_KEY; without it the check is skipped
-    quietly (the tool is meant to run with no paid keys).
+    Free by default: our local index of the official UN, OFAC, EU and UK lists
+    plus Wikidata PEPs (tools/sanctions_index.py, refreshed by the worker).
+    The paid OpenSanctions API is used only if OPENSANCTIONS_API_KEY is set.
     """
     import os
 
+    from tools import sanctions_index
+
+    local = await asyncio.to_thread(sanctions_index.search, name, birth_year)
+    local_results = [sanctions_index.to_result(hit) for hit in local]
     api_key = os.environ.get("OPENSANCTIONS_API_KEY", "").strip()
     if not api_key:
-        return {"results": [], "warnings": []}
+        return {"results": local_results, "warnings": []}
 
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
         response = await client.get(
@@ -309,4 +314,4 @@ async def run_sanctions_check(name: str) -> dict:
                 ),
             }
         )
-    return {"results": results, "warnings": []}
+    return {"results": local_results + results, "warnings": []}

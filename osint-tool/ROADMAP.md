@@ -100,6 +100,22 @@ Har bir band uchun regressiya testi (Michael Jordan namesake, netflix/budget.me 
       0–100 ishonch bahosi. Uchinchi username dvigateli sifatida faqat Maigret o'zbek ta'riflari
       yetarli bo'lmasa; AGPL — alohida konteyner, kodini o'zimizga aralashtirmaymiz
 
+## Faza 3b — Pullik API'lar o'rniga bepul yechimlar (researcher hisoboti, 2026-11-18)
+- [x] 3b.1 Sanksiya/PEP indeksi (OpenSanctions o'rniga): UN, OFAC SDN, EU FSF, UK Sanctions List
+      (OFSI 2026-01-28 da yopilgan) → SQLite FTS5, lotin/kirill moslash, tug'ilgan yil veto,
+      "keng tarqalgan ism" belgisi; kunlik yangilash (sha256 bo'yicha faqat o'zgarganini).
+      PEP: Wikidata P39 (UZ, KZ, KG, TJ, TM) haftalik, WDQS → QLever zaxira.
+      Natija hech qachon "sanksiyada" demaydi — "ro'yxatdagi yozuvga o'xshaydi" + manba
+- [ ] 3b.2 SearXNG: kesh (24 soat) + engine holati statistikasi (`unresponsive_engines`) — S
+- [ ] 3b.3 O'z passive DNS jadvalimiz + Mnemonic PDNS (1000/kun) + Robtex (10/soat) — S/M
+- [ ] 3b.4 E'lon qilingan emaillar: security.txt, DMARC rua/ruf, SOA RNAME; keyin odobli
+      kontakt-sahifa crawler (robots.txt, ≤20 sahifa, taxminsiz) — M
+- [ ] 3b.5 Kompaniyalar: egov reyestrlarini STIR bo'yicha birlashtirib qidiruvga ulash →
+      openinfo.uz (AJ rahbariyati) → GLEIF L2 + UK Companies House (bepul kalit) — M/L
+- [ ] 3b.6 Breach: XposedOrNot saqlanadi, HIBP'ning bepul breach katalogi bilan boyitish — S
+- Eslatma: to'liq yuridik shaxslar reyestri data.egov.uz'da manbaning o'zida 65 535 qatorda
+  kesilgan — to'liq nusxa faqat Soliq qo'mitasi/portal operatoriga murojaat bilan
+
 ## Faza 4 — Holehe kengaytmasi (poydevor ✅, yangi modullar test akkaunt kutmoqda)
 Maqsad: email bo'yicha "ro'yxatdan o'tganlik signali"ni ishonchli va kengroq qilish.
 
