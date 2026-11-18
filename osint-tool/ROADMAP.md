@@ -100,7 +100,7 @@ Har bir band uchun regressiya testi (Michael Jordan namesake, netflix/budget.me 
       0–100 ishonch bahosi. Uchinchi username dvigateli sifatida faqat Maigret o'zbek ta'riflari
       yetarli bo'lmasa; AGPL — alohida konteyner, kodini o'zimizga aralashtirmaymiz
 
-## Faza 3b — Pullik API'lar o'rniga bepul yechimlar (researcher hisoboti, 2026-11-18)
+## Faza 3b — Pullik API'lar o'rniga bepul yechimlar ✅ (researcher hisoboti, 2026-11-18)
 - [x] 3b.1 Sanksiya/PEP indeksi (OpenSanctions o'rniga): UN, OFAC SDN, EU FSF, UK Sanctions List
       (OFSI 2026-01-28 da yopilgan) → SQLite FTS5, lotin/kirill moslash, tug'ilgan yil veto,
       "keng tarqalgan ism" belgisi; kunlik yangilash (sha256 bo'yicha faqat o'zgarganini).
@@ -130,7 +130,9 @@ Har bir band uchun regressiya testi (Michael Jordan namesake, netflix/budget.me 
       qidiruvi ~14 s → 2–5 s; aniq reyestr mosliklari birinchi, qisman mosliklar oxirida
 - [ ] 3b.5 Kompaniyalar (eski band matni): egov reyestrlarini STIR bo'yicha birlashtirib qidiruvga ulash →
       openinfo.uz (AJ rahbariyati) → GLEIF L2 + UK Companies House (bepul kalit) — M/L
-- [ ] 3b.6 Breach: XposedOrNot saqlanadi, HIBP'ning bepul breach katalogi bilan boyitish — S
+- [x] 3b.6 Breach: XposedOrNot natijasi HIBP'ning bepul katalogi (faqat metama'lumot, kuniga
+      bir marta kesh) bilan boyitildi — har breach sanasi, sizgan ma'lumot turlari, umumiy
+      "sezgir ma'lumot turlari" xulosasi
 - Eslatma: to'liq yuridik shaxslar reyestri data.egov.uz'da manbaning o'zida 65 535 qatorda
   kesilgan — to'liq nusxa faqat Soliq qo'mitasi/portal operatoriga murojaat bilan
 
