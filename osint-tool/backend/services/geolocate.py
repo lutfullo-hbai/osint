@@ -173,9 +173,19 @@ async def analyze_upload(data: bytes) -> dict:
             [f"visual model guess #{rank + 1} ({share:.0%} of its top-{len(geoclip)} weight)"]))
 
     fused = await _label(fuse(candidates))
+    step1 = {"ocr_text": ocr, "text_hints": hints, "raw_candidates": candidates,
+             "preview_b64": outcome.get("preview", "")}
+    vision = await server_vision(step1)
+    clues = []
+    if vision:
+        fused = vision["candidates"]
+        clues = vision["clues"]
+        warnings.extend(vision["warnings"])
     return {
         "status": "success",
         "category": "geolocate",
+        "vision": "server" if vision else "none",
+        "clues": clues,
         "results": results,
         "ocr_text": ocr,
         "text_hints": hints,
@@ -185,6 +195,57 @@ async def analyze_upload(data: bytes) -> dict:
         "warnings": warnings,
         "notice": NOTICE,
     }
+
+
+VISION_KINDS = ["business", "landmark", "street", "district", "city", "region", "country"]
+VISION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "clues": {"type": "array", "items": {"type": "object", "properties": {
+            "clue": {"type": "string"}, "points_to": {"type": "string"}}, "required": ["clue", "points_to"]}},
+        "places": {"type": "array", "items": {"type": "object", "properties": {
+            "name": {"type": "string"}, "kind": {"type": "string", "enum": VISION_KINDS},
+            "city": {"type": "string"}, "country": {"type": "string"},
+            "confidence": {"type": "number"}, "evidence": {"type": "string"}},
+            "required": ["name", "kind", "confidence", "evidence"]}},
+        "country_codes": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["clues", "places", "country_codes"],
+}
+
+
+def vision_prompt(ocr_text: str, hints: list[dict]) -> str:
+    hint_text = "; ".join(f"{h['country']} ({h['evidence']})" for h in hints)
+    return (
+        "You are a photo geolocation analyst. Use ONLY what is visible: text on signs and "
+        "shops, language and script, architecture, road markings and signs, licence-plate "
+        "format, vehicles, vegetation, terrain, landmarks. Do not identify any person.\n"
+        f'OCR text read from the photo: "{(ocr_text or "")[:500]}"\n'
+        + (f"Text hints: {hint_text}\n" if hint_text else "")
+        + "Return: clues (each visible clue and what it points to); places (at most 5, the most "
+        "specific first: a business or landmark name you can actually read, then street, district, "
+        "city, region, country) with the exact visible evidence and a confidence 0-1; "
+        "country_codes (ISO 3166-1 alpha-2) of likely countries. If unsure, give a broader kind "
+        "with low confidence instead of guessing a specific place."
+    )
+
+
+async def server_vision(step1: dict) -> dict | None:
+    """Run the vision step on the server when the local model is reachable."""
+    from services import ai
+    if not step1.get("preview_b64") or not await ai.available():
+        return None
+    try:
+        vision = await ai.chat_json(vision_prompt(step1.get("ocr_text", ""), step1.get("text_hints", [])),
+                                    VISION_SCHEMA, model=ai.VISION_MODEL, images=[step1["preview_b64"]])
+    except ai.AIUnavailable:
+        return None
+    codes = [c.upper() for c in vision.get("country_codes") or [] if isinstance(c, str) and len(c) == 2]
+    codes += [h["country"] for h in step1.get("text_hints", []) if len(h["country"]) == 2]
+    refined = await refine(step1.get("raw_candidates", []), vision.get("places") or [],
+                           list(dict.fromkeys(codes))[:3])
+    return {"candidates": refined["candidates"], "clues": (vision.get("clues") or [])[:10],
+            "places": (vision.get("places") or [])[:6], "warnings": refined["warnings"]}
 
 
 async def refine(raw_candidates: list[dict], places: list[dict], country_codes: list[str] | None = None) -> dict:

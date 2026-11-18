@@ -37,6 +37,18 @@ services:
       - osint-net
     restart: unless-stopped
 
+  ollama-proxy:
+    # Ollama listens on the host's 127.0.0.1 only. This forwards the compose
+    # network's gateway (172.20.0.1:11435) to it, so the backend can use the
+    # local models without exposing Ollama to the LAN or changing the host.
+    image: alpine/socat:1.8.1.1
+    container_name: osint-ollama-proxy
+    network_mode: host
+    command: ["TCP-LISTEN:11435,bind=172.20.0.1,fork,reuseaddr", "TCP:127.0.0.1:11434"]
+    depends_on:
+      - redis
+    restart: unless-stopped
+
   backend:
     build:
       context: .
@@ -62,6 +74,9 @@ services:
       - OSINT_API_KEY=${OSINT_API_KEY:-}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://127.0.0.1:8080,http://localhost:8080}
       - OLLAMA_URL=${OLLAMA_URL:-http://127.0.0.1:11434}
+      - OLLAMA_BACKEND_URL=${OLLAMA_BACKEND_URL:-http://172.20.0.1:11435}
+      - OLLAMA_FAST_MODEL=${OLLAMA_FAST_MODEL:-qwen2.5:7b}
+      - OLLAMA_SMART_MODEL=${OLLAMA_SMART_MODEL:-qwen3:8b}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:7b}
       - OLLAMA_VISION_MODEL=${OLLAMA_VISION_MODEL:-qwen2.5vl:7b}
       - CASES_DB_PATH=/app/data/cases.db
@@ -142,6 +157,11 @@ services:
 networks:
   osint-net:
     driver: bridge
+    ipam:
+      config:
+        # pinned so the Ollama proxy below knows the gateway address
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1
 
 volumes:
   osint-data:

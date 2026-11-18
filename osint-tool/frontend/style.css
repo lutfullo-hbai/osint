@@ -961,3 +961,8 @@ a.chip { text-decoration: none; }
 .geo-conf-medium { color: var(--amber); }
 .geo-conf-low { color: var(--muted); }
 .geo-clues { font-size: 0.85em; color: var(--muted); }
+
+.ai-review { font-style: italic; padding-left: 12px; }
+.ai-review.ai-same { color: var(--mint); }
+.ai-review.ai-different { color: var(--red); }
+.ai-review.ai-unclear { color: var(--muted); }

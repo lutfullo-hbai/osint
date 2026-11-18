@@ -132,6 +132,14 @@ OpenStreetMap'da topib, barcha manbalarni birlashtiradi va xaritada nomzodlarni
 ishonch doirasi va dalillari bilan ko'rsatadi. Birinchi ishga tushishda GeoCLIP
 CLIP modelini (~1.7 GB) yuklab oladi. Faqat joy aniqlanadi, odam emas.
 
+### Lokal AI (server tomonda)
+Ollama kompyuterda faqat `127.0.0.1`da tinglaydi; `ollama-proxy` konteyneri (socat,
+host tarmog'ida) uni faqat compose tarmog'i shlyuziga (`172.20.0.1:11435`) uzatadi —
+Ollama LAN'ga ochilmaydi, tizim sozlamasi o'zgarmaydi. AI: Deep Scan nomzodlariga
+dalilga asoslangan "zaif ikkinchi fikr" (hech qachon birlashtirmaydi), rasm
+geolokatsiyasining vizual bosqichi. Javobdagi email/telefon/URL dalilda bo'lmasa
+o'chiriladi. Ollama ishlamasa hammasi AI'siz ishlaydi (`AI_REVIEW=0` bilan o'chiriladi).
+
 ### Pul talab qilmaydi
 Tool to'liq bepul ishlashi uchun qurilgan. Tavsiya etiladigan bepul sozlamalar:
 `GITHUB_TOKEN` (bepul; GitHub limiti soatiga 60 → 5000) va `SEARXNG_SECRET`.

@@ -147,7 +147,7 @@ Har bir band uchun regressiya testi (Michael Jordan namesake, netflix/budget.me 
       Leaflet xaritada ishonch doirasi bilan; har nomzodda dalillar va tekshirish havolalari
 - [x] G7 Tekshirish havolalari (Google Maps/Earth, OSM, Yandex, SunCalc)
 - [ ] G8 Mapillary/KartaView ko'cha fotolari bilan solishtirish havolalari; quyosh/soya tahlili
-- [ ] G9 Server tomonda vizual model (Ollama'ni konteynerdan ochish yoki GPU runtime) — API'dan
+- [x] G9 Server tomonda vizual model (Ollama'ni konteynerdan ochish yoki GPU runtime) — API'dan
       to'liq avtomat ishlashi uchun
 - Chegara: faqat joy taxmin qilinadi; odamni tanish yoki yuz bo'yicha qidirish — yo'q
 
@@ -187,16 +187,16 @@ UI va sozlash:
       korrelatsiyada faqat zaif signal (o'zi birlashtirmaydi)
 - ~~Ignorant (telefon → Instagram/Snapchat)~~ — qo'shilmaydi (telefon bo'yicha akkaunt tekshiruvi)
 
-## Faza 5 — Backend AI qatlami (Ollama) — M
-- [ ] 5.1 Ollama klient: JSON schema, timeout, `think: false`; qwen2.5:7b tez ishlar,
+## Faza 5 — Backend AI qatlami (Ollama) ✅ (5.4 Agent bilan)
+- [x] 5.1 Ollama klient: JSON schema, timeout, `think: false`; qwen2.5:7b tez ishlar,
       qwen3:8b yakuniy xulosa (8 GB GPU'da birga yuklamaslik)
-- [ ] 5.2 Har bir chaqiruv bitta tor vazifa, javobda `evidence_ids[]` majburiy
-- [ ] 5.3 Nomzodlarni saralash: "shu odammi?" ha / yo'q / noaniq + sabab. Bu faqat zaif signal,
+- [x] 5.2 Har bir chaqiruv bitta tor vazifa, javobda `evidence_ids[]` majburiy
+- [x] 5.3 Nomzodlarni saralash: "shu odammi?" ha / yo'q / noaniq + sabab. Bu faqat zaif signal,
       birlashtirish qarorini Faza 2 modeli qiladi
 - [ ] 5.4 Pivot filtri: keyingi qadamga qaysi pivot arziydi
-- [ ] 5.5 Uydirmaga qarshi tekshiruv: javobdagi har bir email, raqam, URL dalilda so'zma-so'z
+- [x] 5.5 Uydirmaga qarshi tekshiruv: javobdagi har bir email, raqam, URL dalilda so'zma-so'z
       bo'lishi shart, aks holda olib tashlanadi
-- [ ] 5.6 AI o'chirilgan yoki Ollama yo'q bo'lsa hamma narsa AI'siz ishlaydi
+- [x] 5.6 AI o'chirilgan yoki Ollama yo'q bo'lsa hamma narsa AI'siz ishlaydi
 
 ## Faza 6 — "Thinking / Agent" rejimi — L
 - [ ] 6.1 Erkin matn parser: ism (lotin/kirill variantlari), yosh, shahar, handle, email, telefon

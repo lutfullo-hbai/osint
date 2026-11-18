@@ -12,8 +12,10 @@ same red lines (no login-walled scraping, no leaks, no probiv) hold here too.
 from __future__ import annotations
 
 import asyncio
+import os
 from collections import defaultdict
 
+from services import ai
 from services.correlate import correlate
 from services.investigate import (
     InvestigationValidationError,
@@ -24,6 +26,8 @@ from services.investigate import (
     investigate_phone,
     investigate_username,
 )
+
+AI_REVIEW = os.environ.get("AI_REVIEW", "1").strip() not in ("0", "false", "no")
 
 # Bounds — keep a scan finite and friendly to upstream rate limits.
 MAX_DEPTH = 2
@@ -244,6 +248,13 @@ async def run_deep_scan(seed_query: str, seed_type: str | None = None) -> dict:
             uniq_edges.append(e)
 
     correlation = correlate(nodes)
+    # a weak, cited second opinion on unmerged candidates (never merges)
+    reviewed = 0
+    if AI_REVIEW:
+        try:
+            reviewed = await ai.review_clusters(nodes, correlation["clusters"])
+        except Exception:  # noqa: BLE001 - AI is optional
+            reviewed = 0
 
     response = {
         "status": "success",
@@ -256,6 +267,7 @@ async def run_deep_scan(seed_query: str, seed_type: str | None = None) -> dict:
         "clusters": correlation["clusters"],
         "cluster_count": correlation["cluster_count"],
         "truncated": truncated,
+        "ai_reviewed": reviewed,
         "notice": (
             "Deep Scan auto-follows public-source pivots from your seed. "
             "Matches across platforms are leads, not proof — a shared handle "
