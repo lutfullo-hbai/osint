@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -73,6 +74,7 @@ if not audit_logger.handlers:
     audit_logger.propagate = False
 
 MAX_AUDIT_BODY_BYTES = 64 * 1024
+MAX_REQUEST_BYTES = 16 * 1024 * 1024   # the largest upload is a 15 MB image
 
 
 def _query_hash(body: bytes) -> str | None:
@@ -98,12 +100,19 @@ async def audit_and_request_id(request: Request, call_next):
     if request.method in ("POST", "PUT", "PATCH") and request.url.path.startswith(
         "/api/"
     ):
-        try:
-            body = await request.body()
-            if len(body) <= MAX_AUDIT_BODY_BYTES:
-                query_hash = _query_hash(body)
-        except Exception:
-            query_hash = None
+        declared = request.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > MAX_REQUEST_BYTES:
+            # refuse before reading a single byte of an oversized body
+            return JSONResponse(status_code=413, content={
+                "status": "error",
+                "message": f"Request body is larger than {MAX_REQUEST_BYTES // (1024 * 1024)} MB."})
+        # only small JSON bodies are read for the audit hash; uploads are not
+        is_json = request.headers.get("content-type", "").startswith("application/json")
+        if is_json and declared.isdigit() and int(declared) <= MAX_AUDIT_BODY_BYTES:
+            try:
+                query_hash = _query_hash(await request.body())
+            except Exception:
+                query_hash = None
 
     started = time.perf_counter()
     response = None

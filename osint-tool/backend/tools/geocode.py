@@ -40,11 +40,16 @@ async def _get(path: str, params: dict):
         try:
             async with httpx.AsyncClient(timeout=TIMEOUT, headers={"User-Agent": USER_AGENT}) as client:
                 response = await client.get(f"{NOMINATIM}{path}", params={**params, "format": "jsonv2"})
+        except httpx.HTTPError:
+            return None          # geocoding is an enrichment: never fail the whole answer
         finally:
             _last_call = time.monotonic()
     if response.status_code != 200:
         return None
-    data = response.json()
+    try:
+        data = response.json()
+    except ValueError:
+        return None
     await set_cached_json(key, data, CACHE_TTL_SECONDS)
     return data
 

@@ -9,6 +9,8 @@ ALLOWED_SCHEMES = {"http", "https"}
 ALLOWED_PORTS = {80, 443}
 BLOCKED_HOST_SUFFIXES = (".local", ".internal", ".localhost", ".home.arpa")
 MAX_REDIRECTS = 5
+# a page or image fetched for analysis never needs more than this
+MAX_RESPONSE_BYTES = 10 * 1024 * 1024
 
 
 class UnsafeURLError(ValueError):
@@ -83,8 +85,32 @@ def _pinned(parsed, address: str) -> str:
     return parsed._replace(netloc=netloc).geturl()
 
 
+class ResponseTooLarge(UnsafeURLError):
+    pass
+
+
+async def _bounded_get(client: httpx.AsyncClient, url: str, max_bytes: int, **kwargs) -> httpx.Response:
+    """Stream a response and stop once it grows past max_bytes."""
+    async with client.stream("GET", url, **kwargs) as response:
+        declared = response.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > max_bytes:
+            raise ResponseTooLarge(f"Response is larger than {max_bytes // (1024 * 1024)} MB.")
+        chunks, size = [], 0
+        # decoded bytes: the limit also catches a small gzip that inflates hugely
+        async for chunk in response.aiter_bytes():
+            size += len(chunk)
+            if size > max_bytes:
+                raise ResponseTooLarge(f"Response is larger than {max_bytes // (1024 * 1024)} MB.")
+            chunks.append(chunk)
+        headers = [(k, v) for k, v in response.headers.multi_items()
+                   if k.lower() not in ("content-length", "content-encoding", "transfer-encoding")]
+        return httpx.Response(response.status_code, headers=headers, content=b"".join(chunks),
+                              request=response.request, extensions=response.extensions)
+
+
 async def safe_get(
-    client: httpx.AsyncClient, url: str, max_redirects: int = MAX_REDIRECTS
+    client: httpx.AsyncClient, url: str, max_redirects: int = MAX_REDIRECTS,
+    max_bytes: int = MAX_RESPONSE_BYTES,
 ) -> httpx.Response:
     """GET a user-supplied URL without letting it reach a private address.
 
@@ -97,8 +123,10 @@ async def safe_get(
     for _ in range(max_redirects + 1):
         parsed, host, addresses = await _check_url(current)
         extensions = {"sni_hostname": host} if parsed.scheme.lower() == "https" else {}
-        response = await client.get(
+        response = await _bounded_get(
+            client,
             _pinned(parsed, addresses[0]),
+            max_bytes,
             headers={"Host": parsed.netloc.rsplit("@", 1)[-1]},
             extensions=extensions,
             follow_redirects=False,

@@ -198,6 +198,20 @@ UI va sozlash:
       bo'lishi shart, aks holda olib tashlanadi
 - [x] 5.6 AI o'chirilgan yoki Ollama yo'q bo'lsa hamma narsa AI'siz ishlaydi
 
+## Faza 5b — Ikkinchi review tuzatishlari ✅ (2026-11-18)
+- [x] B1 Sanksiya qidiruvida kombinatsion portlash (26 so'z → OOM): generator + ≤6 so'z
+- [x] B2 Indeks qurilmagan bo'lsa jim "topilmadi" emas — xato/ogohlantirish, qisqa kesh
+- [x] B3 Holehe siyosati fail-closed allowlist (`register`, `other`; login opt-in); `holehe==1.61`
+- [x] M1 Katta so'rov tanasi o'qishdan oldin 413; `safe_get` oqim bilan, ≤10 MB (gzip bomb ham)
+- [x] M2 ollama-proxy faqat compose tarmog'idan (socat `range=`), boshqa tarmoqlar rad etiladi
+- [x] M3 Nominatim xatosi butun geolokatsiyani yiqitmaydi; mijoz yuborgan nomzodlar tekshiriladi
+- [x] M4 Wikidata: 8 nomzod ichida bir xil ismli inson bo'lsa "knowledge_base" berilmaydi
+- [x] M5 Decompression bomb: ≤40 MP, OCR/GeoCLIP kichraytirilgan rasmda
+- [x] M6 PEP har mamlakat alohida manba — bittasi yiqilsa boshqalari yo'qolmaydi
+- [x] L Leaflet SRI; robots.txt 5xx → crawl qilinmaydi; Maigret DB yangilanayotganda panel yiqilmaydi;
+      README: OSM tile'lari ko'rilayotgan hududni oshkor qiladi
+- [ ] L Klaster ichidagi bilvosita ziddiyat (A–B–C) vetosi; jarayonlararo umumiy rate-limit
+
 ## Faza 6 — "Thinking / Agent" rejimi — L
 - [ ] 6.1 Erkin matn parser: ism (lotin/kirill variantlari), yosh, shahar, handle, email, telefon
       (masalan "lutfullo abdubaniyev 19 yosh namangandan")

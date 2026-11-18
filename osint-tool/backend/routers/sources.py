@@ -49,7 +49,12 @@ def _maigret() -> dict:
     if not os.path.exists(path):
         return {"ok": True, "detail": "bundled database (custom copy not built yet)"}
     age_days = (time.time() - os.path.getmtime(path)) / 86400
-    return {"ok": True, "detail": f"custom database, {maigret_db.disabled_count(path)} sites disabled, "
+    try:
+        disabled = maigret_db.disabled_count(path)
+    except (OSError, ValueError):
+        # the weekly self-check may be rewriting the file right now
+        return {"ok": True, "detail": "custom database is being updated"}
+    return {"ok": True, "detail": f"custom database, {disabled} sites disabled, "
                                   f"updated {age_days:.0f} day(s) ago"}
 
 

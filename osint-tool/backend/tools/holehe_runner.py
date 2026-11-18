@@ -44,7 +44,8 @@ UNKNOWN_PAUSE_AFTER = 10              # all-unknown answers before a pause
 UNKNOWN_PAUSE_SECONDS = 24 * 3600
 FALSE_POSITIVE_PAUSE_SECONDS = 7 * 24 * 3600
 
-NEVER_RUN_METHODS = {"password recovery"}
+NEVER_RUN_METHODS = {"password recovery"}   # documented; enforced by the allowlist
+ALLOWED_METHODS = {"register", "other"}
 OPT_IN_METHODS = {"login": "HOLEHE_ALLOW_LOGIN"}
 OPT_IN_CATEGORIES = {"porn": "HOLEHE_INCLUDE_ADULT"}
 
@@ -92,9 +93,12 @@ def _opted_in(env: str) -> bool:
 
 
 def policy_allows(module: HoleheModule) -> bool:
-    if module.method in NEVER_RUN_METHODS:
-        return False
-    if module.method in OPT_IN_METHODS and not _opted_in(OPT_IN_METHODS[module.method]):
+    # allowlist, fail closed: a method we do not recognise (a new Holehe
+    # release, a renamed field, a parse miss) is never run
+    if module.method in OPT_IN_METHODS:
+        if not _opted_in(OPT_IN_METHODS[module.method]):
+            return False
+    elif module.method not in ALLOWED_METHODS:
         return False
     if module.category in OPT_IN_CATEGORIES and not _opted_in(OPT_IN_CATEGORIES[module.category]):
         return False

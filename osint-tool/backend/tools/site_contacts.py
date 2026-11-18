@@ -140,9 +140,14 @@ async def crawl_contacts(domain: str) -> tuple[list[tuple[str, str, str]], list[
         robots = RobotFileParser()
         try:
             r = await safe_get(client, urljoin(base, "/robots.txt"))
+            if r.status_code >= 500:
+                # RFC 9309: an unreachable robots.txt means "assume disallowed"
+                notes.append("robots.txt unavailable (server error): not crawling")
+                return found, notes
             robots.parse(r.text.splitlines() if r.status_code == 200 else [])
         except (httpx.HTTPError, UnsafeURLError):
-            robots.parse([])
+            notes.append("robots.txt unreachable: not crawling")
+            return found, notes
 
         queue, seen = [base], set()
         while queue and len(seen) < MAX_PAGES:

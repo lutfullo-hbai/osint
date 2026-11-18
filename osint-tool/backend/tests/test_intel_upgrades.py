@@ -293,6 +293,7 @@ async def test_name_keeps_structured_sources_when_web_search_fails(monkeypatch):
     monkeypatch.setattr(svc, "run_name_sources", sources)
     monkeypatch.setattr(svc, "run_person_entity", no_entity)
     monkeypatch.setattr(svc, "run_sanctions_check", no_sanctions)
+    monkeypatch.setattr(svc.uz_registry, "search_person", lambda _n: [])
 
     result = await svc._investigate_name("Ali Valiyev")
 
@@ -388,10 +389,14 @@ def test_claim_helpers_tolerate_missing_and_malformed():
     assert ei._claim_ids(claims, "P106") == ["Q1"]
 
 
-async def test_sanctions_skipped_without_key(monkeypatch):
+async def test_sanctions_without_index_is_an_error_not_a_clean_result(monkeypatch, tmp_path):
+    # no paid key and no local index yet: must not read as "not sanctioned"
+    from tools import sanctions_index
     monkeypatch.delenv("OPENSANCTIONS_API_KEY", raising=False)
-    outcome = await ei.run_sanctions_check("Jane Doe")
-    assert outcome == {"results": [], "warnings": []}   # quiet: no paid-key nag
+    monkeypatch.setattr(sanctions_index.search, "__defaults__", (None, str(tmp_path / "none.db")))
+    import pytest as _pytest
+    with _pytest.raises(ei.ToolError, match="not built yet"):
+        await ei.run_sanctions_check("Jane Doe")
 
 
 async def test_name_includes_knowledge_base_first_with_its_pivots(monkeypatch):

@@ -29,12 +29,14 @@ import xml.etree.ElementTree as ET
 import httpx
 
 from services.names import is_common_token, name_tokens, names_match
-from tools.base import ToolError
+from tools.base import IndexNotReady, ToolError
 
 DB_PATH = os.environ.get("SANCTIONS_DB_PATH", "/app/data/sanctions.db")
 USER_AGENT = "osint-tool/1.0 (self-hosted research; sanctions list sync)"
 DOWNLOAD_TIMEOUT = httpx.Timeout(180.0, connect=20.0)
 MAX_CANDIDATES = 400
+MAX_QUERY_TOKENS = 6     # a real name has a few words; longer input is noise
+MAX_SUBSETS = 20
 MAX_HITS = 10
 
 SOURCES = {
@@ -337,7 +339,7 @@ async def refresh_sources(path: str = DB_PATH) -> dict:
 async def refresh_peps(path: str = DB_PATH) -> dict:
     """Weekly: PEPs per country from Wikidata (CC0)."""
     init_db(path)
-    report, entities = {}, []
+    report = {}
     async with httpx.AsyncClient(timeout=httpx.Timeout(90.0), headers={
         "User-Agent": USER_AGENT, "Accept": "application/sparql-results+json"}) as client:
         for country, qid in PEP_COUNTRIES.items():
@@ -352,15 +354,20 @@ async def refresh_peps(path: str = DB_PATH) -> dict:
                 if payload is None:
                     raise ToolError(last_error)
                 found = parse_peps(payload, country)
-                entities.extend(found)
+                if found:
+                    # one source per country: a failure for one country
+                    # keeps that country's previous PEPs instead of wiping them
+                    digest = hashlib.sha256(json.dumps([e["ext_id"] for e in found]).encode()).hexdigest()
+                    await asyncio.to_thread(store_source, f"pep:{country}", found, digest, WIKIDATA_SPARQL, path)
                 report[country] = len(found)
             except Exception as exc:  # noqa: BLE001
                 report[country] = f"error: {type(exc).__name__}"
             await asyncio.sleep(2)   # be gentle with the public endpoint
-    if entities:
-        digest = hashlib.sha256(json.dumps([e["ext_id"] for e in entities]).encode()).hexdigest()
-        await asyncio.to_thread(store_source, "pep", entities, digest, WIKIDATA_SPARQL, path)
     return report
+
+
+def has_peps(path: str = DB_PATH) -> bool:
+    return any(key.startswith("pep") for key in source_status(path))
 
 
 # ---------------- search ----------------
@@ -373,17 +380,20 @@ def _word_count(name: str) -> int:
 
 def search(name: str, birth_year: int | None = None, path: str = DB_PATH) -> list[dict]:
     """Listed entries whose name matches across scripts; birth year can veto."""
-    tokens = sorted(name_tokens(name))
-    if len(tokens) < 2 or not os.path.exists(path):
+    tokens = sorted(name_tokens(name))[:MAX_QUERY_TOKENS]
+    if len(tokens) < 2:
         return []
+    if not source_status(path):
+        raise IndexNotReady("sanctions index is not built yet (the worker builds it on first start)")
     # A match needs the shorter name fully inside the longer one, so every
     # candidate contains all tokens of some 2+ token subset of the query.
     # AND-queries keep common words ("ali", "muhammad") from flooding the
     # candidate list; subsets cover a listed name shorter than the query.
-    subsets = [tokens] + [
-        list(c) for k in range(len(tokens) - 1, 1, -1)
-        for c in itertools.combinations(tokens, k)
-    ][:20]
+    # islice: the combinations are generated lazily and cut at 20 — building
+    # the full list first explodes (26 tokens -> 67M lists -> out of memory).
+    subsets = [tokens] + [list(c) for c in itertools.islice(
+        (c for k in range(len(tokens) - 1, 1, -1) for c in itertools.combinations(tokens, k)),
+        MAX_SUBSETS)]
     with _connect(path) as conn:
         rows = []
         try:
@@ -392,8 +402,8 @@ def search(name: str, birth_year: int | None = None, path: str = DB_PATH) -> lis
                     "SELECT entity_id, name FROM name_fts WHERE name_fts MATCH ? LIMIT ?",
                     (" AND ".join(f'"{t}"' for t in subset), MAX_CANDIDATES),
                 ).fetchall()
-        except sqlite3.OperationalError:
-            return []
+        except sqlite3.OperationalError as exc:
+            raise ToolError(f"sanctions index unreadable: {exc}") from exc
         query_words = _word_count(name)
         common_name = all(is_common_token(t) for t in tokens)
         best: dict[int, tuple[str, int]] = {}
@@ -418,13 +428,13 @@ def search(name: str, birth_year: int | None = None, path: str = DB_PATH) -> lis
                          "common_name": common_name,
                          "nationalities": json.loads(e["nationalities"] or "[]"),
                          "programs": json.loads(e["programs"] or "[]"), "strength": strength})
-    hits.sort(key=lambda h: (h["strength"] != "strong", h["source"] == "pep"))
+    hits.sort(key=lambda h: (h["strength"] != "strong", h["source"].startswith("pep")))
     return hits[:MAX_HITS]
 
 
 def to_result(hit: dict) -> dict:
     """One index hit -> a result card that never claims identity."""
-    is_pep = hit["source"] == "pep"
+    is_pep = hit["source"].startswith("pep")
     label = "PEP (Wikidata)" if is_pep else SOURCES[hit["source"]]["label"]
     parts = [
         f"A {'public office holder' if is_pep else 'listed ' + hit['kind']} named "

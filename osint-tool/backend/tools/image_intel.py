@@ -6,10 +6,19 @@ import math
 from urllib.parse import quote
 
 import exifread
+import warnings
+
 from PIL import Image
 
+# Decompression-bomb guard: a 15 MB PNG can declare ~180M pixels and unpack to
+# hundreds of MB. Refuse anything above 40 MP (a 48 MP phone photo is shown
+# downscaled by every platform anyway) — as an error, not just a warning.
+Image.MAX_IMAGE_PIXELS = 40_000_000
+warnings.simplefilter("error", Image.DecompressionBombWarning)
+OCR_MAX_SIDE = 2400
+
 from tools.base import ToolError
-from tools.net_guard import safe_get
+from tools.net_guard import ResponseTooLarge, safe_get
 
 MAX_IMAGE_BYTES = 15 * 1024 * 1024
 PREVIEW_MAX_PX = 1024
@@ -224,6 +233,9 @@ def ocr_text(data: bytes) -> str:
             installed = {"eng"}
         langs = "+".join(l for l in OCR_LANGS if l in installed) or "eng"
         with Image.open(io.BytesIO(data)) as image:
+            image.draft("RGB", (OCR_MAX_SIDE, OCR_MAX_SIDE))   # cheap JPEG downscale on decode
+            image = image.convert("RGB")
+            image.thumbnail((OCR_MAX_SIDE, OCR_MAX_SIDE))
             text = pytesseract.image_to_string(image, lang=langs)
     except pytesseract.TesseractNotFoundError as exc:
         raise ToolError("the tesseract OCR engine is not installed") from exc
@@ -402,7 +414,10 @@ def analyze_image(data: bytes, url: str) -> dict:
 
 
 async def fetch_image_bytes(client, url: str) -> tuple[bytes, str, str]:
-    response = await safe_get(client, url)
+    try:
+        response = await safe_get(client, url, max_bytes=MAX_IMAGE_BYTES)
+    except ResponseTooLarge as exc:
+        raise ToolError(f"Image is larger than {MAX_IMAGE_BYTES // (1024 * 1024)} MB.") from exc
     if response.status_code != 200:
         raise ToolError(f"Image URL returned HTTP {response.status_code}.")
     if len(response.content) > MAX_IMAGE_BYTES:
