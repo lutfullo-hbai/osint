@@ -40,9 +40,13 @@ def _predict(data: bytes, top_k: int):
     import torch.nn.functional as F
     from PIL import Image
 
+    Image.MAX_IMAGE_PIXELS = 40_000_000      # decompression-bomb guard
     model = _load()
     with Image.open(io.BytesIO(data)) as image:
-        pixels = model.image_encoder.preprocess_image(image.convert("RGB"))
+        image.draft("RGB", (1024, 1024))
+        image = image.convert("RGB")
+        image.thumbnail((1024, 1024))          # CLIP sees 224 px anyway
+        pixels = model.image_encoder.preprocess_image(image)
     with torch.no_grad():
         features = F.normalize(model.image_encoder(pixels), dim=1)
         logits = model.logit_scale.exp() * (features @ _gallery.t())

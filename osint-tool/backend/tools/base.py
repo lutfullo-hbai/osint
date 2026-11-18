@@ -8,6 +8,14 @@ class ToolError(Exception):
     pass
 
 
+class IndexNotReady(ToolError):
+    """A local index (sanctions, registers) has not been built yet.
+
+    Must never read as "no match": a silent empty answer from a screening
+    index is the most dangerous kind of wrong.
+    """
+
+
 class NotConfigured(ToolError):
     """An optional (usually paid) source whose key is not set.
 

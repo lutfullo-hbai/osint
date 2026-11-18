@@ -44,9 +44,9 @@ services:
     image: alpine/socat:1.8.1.1
     container_name: osint-ollama-proxy
     network_mode: host
-    command: ["TCP-LISTEN:11435,bind=172.20.0.1,fork,reuseaddr", "TCP:127.0.0.1:11434"]
-    depends_on:
-      - redis
+    # range=: only clients from this compose network are accepted — containers
+    # on other docker networks and LAN hosts are refused even if routable
+    command: ["TCP-LISTEN:11435,bind=172.20.0.1,range=172.20.0.0/16,fork,reuseaddr", "TCP:127.0.0.1:11434"]
     restart: unless-stopped
 
   backend:

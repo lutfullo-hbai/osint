@@ -47,7 +47,7 @@ async def sanctions_refresh(ctx) -> dict:
     PEPs are weekly, but if they never loaded (Wikidata rate limit) retry daily.
     """
     report = await sanctions_index.refresh_sources()
-    if "pep" not in sanctions_index.source_status():
+    if not sanctions_index.has_peps():
         report["pep"] = await sanctions_index.refresh_peps()
     return report
 

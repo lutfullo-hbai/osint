@@ -130,6 +130,26 @@ def fuse(candidates: list[dict]) -> list[dict]:
     return merged
 
 
+def _clean_candidate(raw) -> dict | None:
+    if not isinstance(raw, dict):
+        return None
+    try:
+        lat, lon = float(raw["lat"]), float(raw["lon"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return None
+    try:
+        radius = int(min(max(float(raw.get("radius_m", 50000)), 30), 1_000_000))
+        score = min(max(float(raw.get("score", 0.3)), 0.0), 1.0)
+    except (TypeError, ValueError):
+        return None
+    sources = [str(s)[:40] for s in raw.get("sources") or [] if isinstance(s, str)][:4] or ["client"]
+    evidence = [str(e)[:200] for e in raw.get("evidence") or [] if isinstance(e, str)][:6]
+    return _candidate(lat, lon, radius, sources[0], score, evidence, label=str(raw.get("label") or "")[:200]) | {
+        "sources": sources}
+
+
 async def _label(fused: list[dict], top: int = 4) -> list[dict]:
     """Give the best candidates a human-readable place name (cached lookups)."""
     for cand in fused[:top]:
@@ -250,7 +270,8 @@ async def server_vision(step1: dict) -> dict | None:
 
 async def refine(raw_candidates: list[dict], places: list[dict], country_codes: list[str] | None = None) -> dict:
     """Step 2: geocode the place names a vision model saw, then fuse everything."""
-    candidates = [c for c in raw_candidates if isinstance(c, dict) and "lat" in c][:20]
+    # these come back from the client: rebuild them from validated fields
+    candidates = [c for c in (_clean_candidate(c) for c in raw_candidates[:20]) if c]
     codes = [c.upper() for c in (country_codes or []) if isinstance(c, str) and len(c) == 2][:3]
     notes = []
     for place in [p for p in places if isinstance(p, dict)][:MAX_VISION_PLACES]:

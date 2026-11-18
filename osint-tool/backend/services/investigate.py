@@ -832,9 +832,12 @@ async def _investigate_company(query: str) -> dict:
         openinfo.lookup(query),
         return_exceptions=True,
     )
-    if isinstance(uz_hits, BaseException):
-        uz_hits = []
     warnings = []
+    if isinstance(uz_hits, BaseException):
+        # never let a missing index read as "not registered"
+        warnings.append(f"UZ registers: {uz_hits}")
+        _mark_failed("UZ registers")
+        uz_hits = []
     if isinstance(disclosure, BaseException):
         warnings.append(f"openinfo.uz: {disclosure}")
         _mark_failed("openinfo.uz")

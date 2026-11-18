@@ -19,7 +19,8 @@ WIKIMEDIA_HEADERS = {
     "Accept": "application/json",
 }
 TIMEOUT = httpx.Timeout(15.0)
-MAX_CANDIDATES = 2
+MAX_CANDIDATES = 2          # entities fetched in full (detail + accounts)
+GRADING_CANDIDATES = 8      # entities checked for "another human with this exact name"
 INSTANCE_OF_PROPERTY = "P31"
 HUMAN_QID = "Q5"
 
@@ -182,7 +183,8 @@ async def _entity_detail(client, qid: str, label: str, description: str) -> tupl
     return entry, pivots, is_human
 
 
-def _grade_pivots(name: str, details: list[tuple[dict, list[dict], bool]]) -> list[dict]:
+def _grade_pivots(name: str, details: list[tuple[dict, list[dict], bool]],
+                  other_matching_humans: int = 0) -> list[dict]:
     """Decide how strongly each entity's accounts identify the searched person.
 
     A Wikidata search returns every item that shares the name. Only a human
@@ -196,7 +198,8 @@ def _grade_pivots(name: str, details: list[tuple[dict, list[dict], bool]]) -> li
     matching = [
         d for d in details if d[2] and _norm_label(d[0].get("title")) == wanted
     ]
-    unique = matching[0] if len(matching) == 1 else None
+    # a namesake further down the search (not fetched in full) also counts
+    unique = matching[0] if len(matching) == 1 and other_matching_humans == 0 else None
     graded = []
     for detail in details:
         entry, pivots, is_human = detail
@@ -205,6 +208,25 @@ def _grade_pivots(name: str, details: list[tuple[dict, list[dict], bool]]) -> li
         via = "knowledge_base" if detail is unique else "name_match"
         graded.extend({**p, "via": via} for p in pivots)
     return graded
+
+
+async def _matching_humans(client, name: str, qids: list[str]) -> int:
+    """How many of these items are humans labelled exactly like the query."""
+    if not qids:
+        return 0
+    try:
+        data = await _get_json(client, "https://www.wikidata.org/w/api.php", params={
+            "action": "wbgetentities", "ids": "|".join(qids), "props": "labels|claims",
+            "languages": "en", "format": "json"})
+    except ToolError:
+        return 1      # unknown: be conservative, do not call anyone "unique"
+    wanted = _norm_label(name)
+    count = 0
+    for entity in (data.get("entities") or {}).values():
+        label = ((entity.get("labels") or {}).get("en") or {}).get("value", "")
+        if HUMAN_QID in _claim_ids(entity.get("claims") or {}, INSTANCE_OF_PROPERTY) and _norm_label(label) == wanted:
+            count += 1
+    return count
 
 
 async def run_person_entity(name: str) -> dict:
@@ -220,13 +242,15 @@ async def run_person_entity(name: str) -> dict:
                 "language": "en",
                 "uselang": "en",
                 "type": "item",
-                "limit": MAX_CANDIDATES,
+                "limit": GRADING_CANDIDATES,
                 "format": "json",
             },
         )
-        candidates = search.get("search") or []
-        if not candidates:
+        found = search.get("search") or []
+        if not found:
             return {"results": [], "pivots": []}
+        candidates = found[:MAX_CANDIDATES]
+        others = await _matching_humans(client, name, [c["id"] for c in found[MAX_CANDIDATES:]])
 
         detail_tasks = [
             _entity_detail(
@@ -248,7 +272,7 @@ async def run_person_entity(name: str) -> dict:
     *detail_outcomes, summary_outcome = outcomes
     details = [o for o in detail_outcomes if isinstance(o, tuple)]
     results.extend(entry for entry, _p, _h in details)
-    pivots = _grade_pivots(name, details)
+    pivots = _grade_pivots(name, details, others)
     if isinstance(summary_outcome, dict):
         results.insert(0, summary_outcome)
 
@@ -274,9 +298,14 @@ async def run_sanctions_check(name: str, birth_year: int | None = None) -> dict:
 
     from tools import sanctions_index
 
-    local = await asyncio.to_thread(sanctions_index.search, name, birth_year)
-    local_results = [sanctions_index.to_result(hit) for hit in local]
     api_key = os.environ.get("OPENSANCTIONS_API_KEY", "").strip()
+    try:
+        local = await asyncio.to_thread(sanctions_index.search, name, birth_year)
+    except ToolError:
+        if not api_key:
+            raise          # surfaces as a warning + short cache, never as "clean"
+        local = []
+    local_results = [sanctions_index.to_result(hit) for hit in local]
     if not api_key:
         return {"results": local_results, "warnings": []}
 

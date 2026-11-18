@@ -131,6 +131,8 @@ qwen2.5vl:7b`) ishga tushirib joy nomlari va belgilarni oladi → server ularni
 OpenStreetMap'da topib, barcha manbalarni birlashtiradi va xaritada nomzodlarni
 ishonch doirasi va dalillari bilan ko'rsatadi. Birinchi ishga tushishda GeoCLIP
 CLIP modelini (~1.7 GB) yuklab oladi. Faqat joy aniqlanadi, odam emas.
+Eslatma: xarita fonlari `tile.openstreetmap.org`'dan yuklanadi — ko'rilayotgan hudud
+(ya'ni tergov qilinayotgan joy) OSM serverlariga ma'lum bo'ladi.
 
 ### Lokal AI (server tomonda)
 Ollama kompyuterda faqat `127.0.0.1`da tinglaydi; `ollama-proxy` konteyneri (socat,

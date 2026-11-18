@@ -23,7 +23,7 @@ import time
 import httpx
 
 from services.names import fold, name_tokens, names_match
-from tools.base import ToolError
+from tools.base import IndexNotReady, ToolError
 
 DB_PATH = os.environ.get("UZ_REGISTRY_DB_PATH", "/app/data/uz_registry.db")
 PORTAL = "https://data.egov.uz"
@@ -241,8 +241,8 @@ def _rows(conn, sql, args):
 
 def search_org(query: str, path: str = DB_PATH) -> list[dict]:
     """By STIR (exact) or by organisation name (every distinctive token)."""
-    if not os.path.exists(path):
-        return []
+    if not dataset_status(path):
+        raise IndexNotReady("Uzbek register index is not built yet (the worker builds it on first start)")
     query = str(query or "").strip()
     with _connect(path) as conn:
         digits = re.sub(r"\D", "", query)
@@ -275,9 +275,11 @@ def search_org(query: str, path: str = DB_PATH) -> list[dict]:
 
 def search_person(name: str, path: str = DB_PATH) -> list[dict]:
     """People listed with a role in an official register (board member, notary...)."""
-    tokens = sorted(name_tokens(name))
-    if len(tokens) < 2 or not os.path.exists(path):
+    tokens = sorted(name_tokens(name))[:6]
+    if len(tokens) < 2:
         return []
+    if not dataset_status(path):
+        raise IndexNotReady("Uzbek register index is not built yet (the worker builds it on first start)")
     with _connect(path) as conn:
         match = "person : (" + " AND ".join(f'"{t}"' for t in tokens) + ")"
         rows = _rows(conn, "SELECT record.* FROM record_fts JOIN record ON record.id = record_fts.record_id "
