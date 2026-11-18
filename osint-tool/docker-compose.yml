@@ -13,8 +13,8 @@ services:
     restart: unless-stopped
 
   searxng:
-    # private metasearch (Google, Bing, Brave, DuckDuckGo, Startpage, Qwant...)
-    # so web search no longer depends on one engine that rate-limits us
+    # private metasearch: one query fans out to several engines (see
+    # searxng/settings.yml), so web search no longer depends on one engine
     image: searxng/searxng:2026.10.30-ffa88e3ba
     container_name: osint-searxng
     environment:

@@ -25,3 +25,26 @@ outgoing:
   max_request_timeout: 12.0
   pool_connections: 50
   pool_maxsize: 10
+
+# Engines: the upstream defaults leave Google, Bing, Qwant, Yandex off and do
+# not load Startpage/Mojeek at all. Turn on the general web engines we want;
+# SearXNG suspends any that start blocking, the others keep answering.
+engines:
+  - name: google
+    disabled: false
+  - name: bing
+    disabled: false
+  - name: brave
+    disabled: false
+  - name: startpage
+    disabled: false
+    inactive: false
+  - name: mojeek
+    disabled: false
+    inactive: false
+  - name: qwant
+    disabled: false
+  - name: yandex
+    disabled: false
+  - name: duckduckgo
+    disabled: false

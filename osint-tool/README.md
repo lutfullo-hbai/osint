@@ -108,8 +108,11 @@ IP bo'yicha, `slowapi` orqali (env bilan sozlanadi):
 Limitdan oshsa `429` va `X-RateLimit-*` / `Retry-After` sarlavhalari qaytadi.
 
 ### Veb-qidiruv va passiv manbalar (kalitsiz)
-- **SearXNG** (`searxng` konteyneri, faqat ichki tarmoqda): bitta so'rov Google, Bing,
-  Brave, Startpage va boshqalarga tarqaladi. Tartib: Brave API (kalit bo'lsa) → SearXNG →
+- **SearXNG** (`searxng` konteyneri, faqat ichki tarmoqda): bitta so'rov bir nechta qidiruv
+  tizimiga tarqaladi (`searxng/settings.yml` → `engines`). Bloklagan tizimni SearXNG o'zi
+  vaqtincha to'xtatadi, qolganlari javob beradi; bloklarni aylanib o'tmaymiz. Holati IP'ga
+  bog'liq — 2026-11-18 da bu serverdan Brave, Bing va Google CSE ishlagan, Google, Startpage,
+  Mojeek, Qwant, DuckDuckGo esa bloklagan. Tartib: Brave API (kalit bo'lsa) → SearXNG →
   DuckDuckGo. Bittasi bloklasa keyingisi ishlaydi. `.env`da `SEARXNG_SECRET` o'rnating.
 - **Subfinder** (image ichida): passiv subdomain qidiruvi, crt.sh/OTX/HackerTarget bilan birga.
 - **Domen email'lari**: tashkilot ochiq e'lon qilgan manzillar, har biri topilgan sahifasi bilan
