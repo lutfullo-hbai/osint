@@ -112,7 +112,10 @@ Har bir band uchun regressiya testi (Michael Jordan namesake, netflix/budget.me 
 - [x] 3b.3 DNS tarixi: o'z kuzatuvlarimiz (har domen tekshiruvi saqlanadi) + Mnemonic PDNS
       (≤10/min) + Robtex (≤8/soat) → bitta jadval; tashqi javob 7 kun kesh; domen natijasida
       "DNS history" (eski IP'lar sanalari bilan), Watch'da o'zgarish hisoblanmaydi
-- [ ] 3b.4 E'lon qilingan emaillar: security.txt, DMARC rua/ruf, SOA RNAME; keyin odobli
+- [x] 3b.4 E'lon qilingan emaillar: security.txt, DMARC rua/ruf, SOA RNAME va odobli kontakt-sahifa
+      crawler (robots.txt, ≤8 sahifa, 2 s pauza, login/captcha'da to'xtaydi, taxminsiz) — qidiruv
+      snippetlari bilan birlashtirilgan; DNS/provayder manzillari korrelatsiyada dalil emas
+- (eski matn) 3b.4 E'lon qilingan emaillar: security.txt, DMARC rua/ruf, SOA RNAME; keyin odobli
       kontakt-sahifa crawler (robots.txt, ≤20 sahifa, taxminsiz) — M
 - [x] 3b.5a O'zbek rasmiy reyestrlari (data.egov.uz, 19 dataset: soliq, QQS, nohalol yetkazib
       beruvchilar, birja, NNT, diniy, notariuslar, yuridik maslahat, hakamlik, ekstremistik
