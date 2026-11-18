@@ -225,7 +225,7 @@ def _extract(node: dict) -> dict:
             ids["usernames"].add(norm_handle(linked))
             ids["linked_handles"].add(norm_handle(linked))
 
-        if from_search:
+        if from_search or item.get("source") == "dns_contact":
             continue
         info = str(item.get("info", ""))
         for email in _EMAIL_RE.findall(info):
