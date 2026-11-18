@@ -606,7 +606,12 @@ async def test_investigate_company_builds_response_with_pivots(monkeypatch):
         return {"results": [{"platform": "Company (GLEIF)", "title": "X", "status": "found"}],
                 "pivots": [{"type": "company", "value": "Parent Inc"}]}
 
+    async def no_disclosure(_q):
+        return {"results": [], "pivots": []}
+
     monkeypatch.setattr(svc, "run_company_search", fake)
+    monkeypatch.setattr(svc.openinfo, "lookup", no_disclosure)
+    monkeypatch.setattr(svc.uz_registry, "search_org", lambda _q: [])
     result = await svc._investigate_company("X Corp")
     assert result["category"] == "company"
     assert result["count"] == 1

@@ -76,7 +76,10 @@ def test_auto_detected_columns(db):
 async def test_company_search_survives_gleif_outage(db, monkeypatch):
     async def gleif_down(_q):
         raise inv.ToolError("GLEIF is unreachable")
+    async def no_disclosure(_q):
+        return {"results": [], "pivots": []}
     monkeypatch.setattr(inv, "run_company_search", gleif_down)
+    monkeypatch.setattr(inv.openinfo, "lookup", no_disclosure)
     monkeypatch.setattr(uz, "DB_PATH", db)
     monkeypatch.setattr(uz.search_org, "__defaults__", (db,))
     out = await inv._investigate_company("306939961")

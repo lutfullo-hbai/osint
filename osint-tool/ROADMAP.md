@@ -115,7 +115,11 @@ Har bir band uchun regressiya testi (Michael Jordan namesake, netflix/budget.me 
       tashkilotlar, davlat korxonalari, kuzatuv kengashlari, DXSh) → SQLite FTS5; kompaniya
       qidiruvi STIR yoki nom bo'yicha (lotin/kirill, huquqiy shakl so'zlarisiz), ism qidiruvida
       reyestrda lavozimi bilan turgan shaxslar; haftalik yangilash
-- [ ] 3b.5 Kompaniyalar (qolgani): egov reyestrlarini STIR bo'yicha birlashtirib qidiruvga ulash →
+- [x] 3b.5b openinfo.uz (emitentlar oshkor qilgan ma'lumot): kompaniya qidiruvida direktor, bosh
+      hisobchi, mas'ul xodim, STIR, tiker, manzil, sayt; faqat so'rov bo'yicha, 1 so'rov/s, 7 kun
+      kesh; kirill so'rov o'zbek lotiniga o'giriladi; sayt → domen pivot
+- [ ] 3b.5c GLEIF Level-2 + UK Companies House; kompaniya qidiruvini tezlashtirish (GLEIF/SEC/GDELT ~13 s)
+- [ ] 3b.5 Kompaniyalar (eski band matni): egov reyestrlarini STIR bo'yicha birlashtirib qidiruvga ulash →
       openinfo.uz (AJ rahbariyati) → GLEIF L2 + UK Companies House (bepul kalit) — M/L
 - [ ] 3b.6 Breach: XposedOrNot saqlanadi, HIBP'ning bepul breach katalogi bilan boyitish — S
 - Eslatma: to'liq yuridik shaxslar reyestri data.egov.uz'da manbaning o'zida 65 535 qatorda
