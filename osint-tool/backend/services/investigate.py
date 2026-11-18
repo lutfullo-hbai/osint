@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 import httpx
 
 from cache import DEFAULT_TTL_SECONDS, get_cached_json, set_cached_json
-from tools.base import ToolError
+from tools.base import NotConfigured, ToolError
 from tools.domain_enrich import (
     audit_security_headers,
     http_fingerprint,
@@ -224,6 +224,8 @@ async def _collect(lookups: dict) -> tuple[dict, list[str]]:
     succeeded = {}
     warnings = []
     for label, outcome in zip(labels, outcomes):
+        if isinstance(outcome, NotConfigured):
+            continue   # optional paid source without a key: not a failure
         if isinstance(outcome, ToolError):
             warnings.append(f"{label}: {outcome}")
         elif isinstance(outcome, BaseException):
@@ -1084,7 +1086,7 @@ async def _hunter_emails(client, domain: str):
 
     api_key = _os.environ.get("HUNTER_API_KEY", "").strip()
     if not api_key:
-        raise ToolError("skipped: set HUNTER_API_KEY to list exposed emails.")
+        raise NotConfigured("HUNTER_API_KEY not set")
     response = await client.get(
         "https://api.hunter.io/v2/domain-search",
         params={"domain": domain, "api_key": api_key, "limit": 10},
@@ -1170,9 +1172,11 @@ async def _investigate_exposure(domain: str) -> dict:
             hunter_entry = await _hunter_emails(client, domain)
             if hunter_entry:
                 findings.append(hunter_entry)
+        except NotConfigured:
+            pass
         except ToolError as exc:
             warnings.append(f"hunter.io: {exc}")
-        _mark_failed("hunter.io")
+            _mark_failed("hunter.io")
 
     level = _risk_level(risk)
     summary = {

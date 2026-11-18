@@ -10,7 +10,7 @@ from urllib.parse import quote
 
 import httpx
 
-from tools.base import ToolError
+from tools.base import NotConfigured, ToolError
 
 GLEIF_BASE = "https://api.gleif.org/api/v1"
 HEADERS = {
@@ -204,10 +204,7 @@ async def opencorporates_search(client: httpx.AsyncClient, query: str) -> dict:
 
     token = os.environ.get("OPENCORPORATES_API_KEY", "").strip()
     if not token:
-        raise ToolError(
-            "skipped: set OPENCORPORATES_API_KEY to enable registry search "
-            "(https://opencorporates.com/api_accounts/new)."
-        )
+        raise NotConfigured("OPENCORPORATES_API_KEY not set")
     response = await client.get(
         "https://api.opencorporates.com/v0.4/companies/search",
         params={"q": query, "api_token": token, "per_page": 5},
@@ -248,6 +245,8 @@ async def _extra_sources(client: httpx.AsyncClient, query: str) -> tuple[list[di
     results = []
     warnings = []
     for label, outcome in zip(sources, outcomes):
+        if isinstance(outcome, NotConfigured):
+            continue
         if isinstance(outcome, ToolError):
             warnings.append(f"{label}: {outcome}")
         elif isinstance(outcome, BaseException):

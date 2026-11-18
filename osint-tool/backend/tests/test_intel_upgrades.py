@@ -391,8 +391,7 @@ def test_claim_helpers_tolerate_missing_and_malformed():
 async def test_sanctions_skipped_without_key(monkeypatch):
     monkeypatch.delenv("OPENSANCTIONS_API_KEY", raising=False)
     outcome = await ei.run_sanctions_check("Jane Doe")
-    assert outcome["results"] == []
-    assert "OPENSANCTIONS_API_KEY" in outcome["warnings"][0]
+    assert outcome == {"results": [], "warnings": []}   # quiet: no paid-key nag
 
 
 async def test_name_includes_knowledge_base_first_with_its_pivots(monkeypatch):
@@ -724,9 +723,8 @@ async def test_sec_edgar_aggregates_entities_and_forms():
 async def test_opencorporates_skipped_without_key(monkeypatch):
     monkeypatch.delenv("OPENCORPORATES_API_KEY", raising=False)
     import pytest as _pytest
-    with _pytest.raises(ci.ToolError) as exc:
+    with _pytest.raises(ci.NotConfigured):
         await ci.opencorporates_search(None, "Apple")
-    assert "OPENCORPORATES_API_KEY" in str(exc.value)
 
 
 async def test_gdelt_handles_rate_limit(monkeypatch):
@@ -807,17 +805,15 @@ async def test_securitytrails_skipped_without_key(monkeypatch):
     from tools import domain_intel as di
     monkeypatch.delenv("SECURITYTRAILS_API_KEY", raising=False)
     import pytest as _pytest
-    with _pytest.raises(di.ToolError) as exc:
+    with _pytest.raises(di.NotConfigured):
         await di._securitytrails_subdomains(None, "example.com")
-    assert "SECURITYTRAILS_API_KEY" in str(exc.value)
 
 
 async def test_hunter_skipped_without_key(monkeypatch):
     monkeypatch.delenv("HUNTER_API_KEY", raising=False)
     import pytest as _pytest
-    with _pytest.raises(svc.ToolError) as exc:
+    with _pytest.raises(svc.NotConfigured):
         await svc._hunter_emails(None, "example.com")
-    assert "HUNTER_API_KEY" in str(exc.value)
 
 
 async def test_brave_search_parses_results(monkeypatch):

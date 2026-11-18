@@ -1363,7 +1363,7 @@ async function checkSources() {
       .join("\n");
     el.title =
       entries.map(([name, s]) => `${s.ok ? "OK" : "!!"} ${name}: ${s.detail}`).join("\n") +
-      "\n\nAPI keys:\n" + keys;
+      "\n\nOptional keys (paid ones are not needed; free sources cover them):\n" + keys;
   } catch (err) {
     el.textContent = "";
   }

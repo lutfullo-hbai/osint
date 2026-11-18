@@ -266,20 +266,14 @@ async def run_person_entity(name: str) -> dict:
 async def run_sanctions_check(name: str) -> dict:
     """Screen a name against OpenSanctions (sanctions / PEP lists).
 
-    Requires OPENSANCTIONS_API_KEY; without it the check is skipped with a note,
-    the same pattern as the HIBP breach check.
+    Optional: needs OPENSANCTIONS_API_KEY; without it the check is skipped
+    quietly (the tool is meant to run with no paid keys).
     """
     import os
 
     api_key = os.environ.get("OPENSANCTIONS_API_KEY", "").strip()
     if not api_key:
-        return {
-            "results": [],
-            "warnings": [
-                "Sanctions/PEP screening skipped: set OPENSANCTIONS_API_KEY to "
-                "enable it (https://www.opensanctions.org/api/)."
-            ],
-        }
+        return {"results": [], "warnings": []}
 
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
         response = await client.get(

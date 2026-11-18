@@ -121,14 +121,16 @@ Limitdan oshsa `429` va `X-RateLimit-*` / `Retry-After` sarlavhalari qaytadi.
 - **Manbalar holati**: `GET /api/sources/health` va sarlavhadagi `[SOURCES ...]` belgisi
   (ustiga olib borilsa tafsilotlar).
 
-### Kalitli (ixtiyoriy) manbalar
-Kalit `.env`da bo'lsa ishlaydi, bo'lmasa o'sha manba o'tkazib yuboriladi:
-`BRAVE_API_KEY` (Google sifatidagi qidiruv, DuckDuckGo o'rniga), `HIBP_API_KEY`
-(bo'lmasa breach tekshiruvi bepul XposedOrNot orqali ishlaydi),
-`OPENSANCTIONS_API_KEY`, `OPENCORPORATES_API_KEY`, `SECURITYTRAILS_API_KEY`,
-`GITHUB_TOKEN` (bepul; GitHub limiti soatiga 60 → 5000)
-(subdomenlar/DNS tarixi), `HUNTER_API_KEY` (exposure email'lari). To'liq ro'yxat —
-`.env.example`.
+### Pul talab qilmaydi
+Tool to'liq bepul ishlashi uchun qurilgan. Tavsiya etiladigan bepul sozlamalar:
+`GITHUB_TOKEN` (bepul; GitHub limiti soatiga 60 → 5000) va `SEARXNG_SECRET`.
+
+Pullik yoki cheklangan kalitlar (`HIBP_API_KEY`, `BRAVE_API_KEY`,
+`SECURITYTRAILS_API_KEY`, `HUNTER_API_KEY`, `OPENCORPORATES_API_KEY`,
+`OPENSANCTIONS_API_KEY`) shart emas: bo'sh bo'lsa o'sha manba jimgina o'tkazib
+yuboriladi, uning ishini bepul manba bajaradi (XposedOrNot, SearXNG, Subfinder,
+"Published emails", GLEIF/SEC EDGAR). Hozircha bepul o'rnini bosuvchisi yo'q
+yagona narsa — sanksiya/PEP tekshiruvi. To'liq ro'yxat — `.env.example`.
 
 ### Async joblar (Redis + ARQ)
 Og'ir skanlar (ayniqsa Maigret — bir necha daqiqa) HTTP so'rovni bloklamaydi.
