@@ -36,7 +36,7 @@ from tools.email_domain import (
 from tools.email_intel import lookup_breaches, lookup_emailrep
 from tools.holehe_runner import run_holehe
 from tools.domain_emails import find_domain_emails
-from tools import uz_registry
+from tools import openinfo, uz_registry
 from tools.hub_domains import is_hub_domain
 from tools.profile_history import annotate_first_archived
 from services.names import username_variants
@@ -816,22 +816,29 @@ async def investigate_image(raw_url: str) -> dict:
 
 async def _investigate_company(query: str) -> dict:
     # Uzbek official registers (local index) alongside the global LEI register
-    outcome, uz_hits = await asyncio.gather(
+    outcome, uz_hits, disclosure = await asyncio.gather(
         run_company_search(query),
         asyncio.to_thread(uz_registry.search_org, query),
+        openinfo.lookup(query),
         return_exceptions=True,
     )
     if isinstance(uz_hits, BaseException):
         uz_hits = []
     warnings = []
+    if isinstance(disclosure, BaseException):
+        warnings.append(f"openinfo.uz: {disclosure}")
+        _mark_failed("openinfo.uz")
+        disclosure = {"results": [], "pivots": []}
     if isinstance(outcome, BaseException):
-        if not uz_hits:
+        if not uz_hits and not disclosure["results"]:
             raise outcome
         warnings.append(f"GLEIF: {outcome}")
         _mark_failed("GLEIF")
         outcome = {"results": [], "pivots": [], "warnings": []}
     uz_results = [uz_registry.to_result(hit) for hit in uz_hits]
-    results = uz_results + outcome["results"]
+    # the company's own disclosure (management, contacts) first
+    results = disclosure["results"] + uz_results + outcome["results"]
+    outcome["pivots"] = list(outcome.get("pivots") or []) + disclosure["pivots"]
     if warnings:
         outcome.setdefault("warnings", []).extend(warnings)
     response = {
