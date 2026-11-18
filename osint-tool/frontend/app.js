@@ -1203,6 +1203,16 @@ function buildClusters(data) {
         row.className = "card-meta";
         row.textContent = `@${x.query} — ${x.reason}`;
         cand.appendChild(row);
+        if (x.ai_review) {
+          // local model's cited opinion: a weak signal, the human decides
+          const ai = document.createElement("div");
+          ai.className = `card-meta ai-review ai-${x.ai_review.verdict}`;
+          const verdict = { same: "looks like the same person", different: "looks like a different person",
+                            unclear: "unclear" }[x.ai_review.verdict] || x.ai_review.verdict;
+          ai.textContent = `   AI (${x.ai_review.model}, weak signal): ${verdict} — ${x.ai_review.reason}` +
+            (x.ai_review.evidence_ids.length ? ` [${x.ai_review.evidence_ids.join(", ")}]` : "");
+          cand.appendChild(ai);
+        }
       });
       card.appendChild(cand);
     }
@@ -1834,6 +1844,19 @@ async function geolocateRun(form) {
   geoRender(step1.candidates, step1.preview_b64);
   (step1.warnings || []).forEach((w) => geoStep(w).fail("note"));
 
+  if (step1.vision === "server") {
+    // the server already ran the local vision model and refined the result
+    geoStep("Clues from the local vision model (run on the server)").done(
+      `${(step1.clues || []).length} clue(s)`);
+    const box = document.getElementById("geo-clues");
+    box.innerHTML = "";
+    (step1.clues || []).forEach((c) => {
+      const p = document.createElement("p");
+      p.textContent = `• ${c.clue} → ${c.points_to}`;
+      box.appendChild(p);
+    });
+    return;
+  }
   if (!step1.preview_b64) return;
   let vision;
   const s2 = geoStep("Looking for clues with the local vision model");
