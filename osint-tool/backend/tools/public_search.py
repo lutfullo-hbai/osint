@@ -205,34 +205,121 @@ def parse_searxng(data: dict, limit: int) -> list[dict]:
     return out
 
 
+# Search results barely change within a day; caching them spares the engines
+# (and our IP) repeated identical queries. Empty answers are kept shorter.
+SEARCH_CACHE_TTL = 24 * 3600
+EMPTY_CACHE_TTL = 3600
+PARTIAL_CACHE_TTL = 2 * 3600
+ENGINE_STATS_KEY = "osint:searxng:engines"
+_engine_stats_memory: dict[str, dict] = {}
+
+
+def _batch_key(batch: str, limit: int) -> str:
+    import hashlib
+    return "osint:search:" + hashlib.sha256(f"{limit}|{batch}".encode()).hexdigest()
+
+
+async def record_engine_stats(data: dict) -> None:
+    """Per-engine success/failure counts from one SearXNG answer."""
+    import json as _json
+    import time as _time
+
+    from cache import get_client
+
+    contributed = {e for item in data.get("results") or [] for e in (item.get("engines") or [])}
+    failed = {str(pair[0]): str(pair[1]) for pair in data.get("unresponsive_engines") or []
+              if isinstance(pair, (list, tuple)) and len(pair) == 2}
+    if not contributed and not failed:
+        return
+    client = await get_client()
+    current = {}
+    if client is not None:
+        try:
+            raw = await client.hgetall(ENGINE_STATS_KEY)
+            current = {k: _json.loads(v) for k, v in (raw or {}).items()}
+        except Exception:  # noqa: BLE001 - stats are advisory
+            current = {}
+    else:
+        current = dict(_engine_stats_memory)
+    now = _time.time()
+    updates = {}
+    for engine in contributed | set(failed):
+        row = dict(current.get(engine) or {"ok": 0, "fail": 0})
+        if engine in failed:
+            row["fail"] = row.get("fail", 0) + 1
+            row["last_error"] = failed[engine][:80]
+        else:
+            row["ok"] = row.get("ok", 0) + 1
+        row["last_seen"] = now
+        updates[engine] = row
+    if client is not None:
+        try:
+            await client.hset(ENGINE_STATS_KEY, mapping={k: _json.dumps(v) for k, v in updates.items()})
+        except Exception:  # noqa: BLE001
+            pass
+    else:
+        _engine_stats_memory.update(updates)
+
+
+async def engine_stats() -> dict[str, dict]:
+    import json as _json
+
+    from cache import get_client
+    client = await get_client()
+    if client is None:
+        return dict(_engine_stats_memory)
+    try:
+        raw = await client.hgetall(ENGINE_STATS_KEY)
+        return {k: _json.loads(v) for k, v in (raw or {}).items()}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 async def _searxng_search(query_batches: list[str], max_results_per_batch: int) -> list[dict]:
     """Our own SearXNG: one query fans out to Google, Bing, Brave, Startpage...
 
     The URL is operator configuration (the compose-internal service), so it is
     called directly rather than through the public-URL SSRF guard.
     """
+    from cache import get_cached_json, set_cached_json
+
     base = os.environ.get("SEARXNG_URL", "").strip().rstrip("/")
     results, seen, failed = [], set(), 0
+    sent = 0
     async with httpx.AsyncClient(timeout=SEARXNG_TIMEOUT_SECONDS) as client:
-        for index, batch in enumerate(query_batches):
-            if index > 0:
-                await asyncio.sleep(SEARXNG_DELAY_SECONDS)
-            try:
-                response = await client.get(
-                    f"{base}/search",
-                    params={"q": batch, "format": "json", "safesearch": 0},
-                )
-                if response.status_code != 200:
+        for batch in query_batches:
+            key = _batch_key(batch, max_results_per_batch)
+            items = await get_cached_json(key)
+            if items is None:
+                if sent > 0:
+                    await asyncio.sleep(SEARXNG_DELAY_SECONDS)
+                sent += 1
+                try:
+                    response = await client.get(
+                        f"{base}/search",
+                        params={"q": batch, "format": "json", "safesearch": 0},
+                    )
+                    if response.status_code != 200:
+                        failed += 1
+                        continue
+                    data = response.json()
+                    items = parse_searxng(data, max_results_per_batch)
+                except (httpx.HTTPError, ValueError):
                     failed += 1
                     continue
-                items = parse_searxng(response.json(), max_results_per_batch)
-            except (httpx.HTTPError, ValueError):
-                failed += 1
-                continue
+                await record_engine_stats(data)
+                engines_failed = bool(data.get("unresponsive_engines"))
+                if items:
+                    # some engines down: their results may be missing, keep it short
+                    await set_cached_json(key, items, PARTIAL_CACHE_TTL if engines_failed else SEARCH_CACHE_TTL)
+                elif not engines_failed:
+                    # a real "nothing found"; an empty answer while engines are
+                    # blocked is not cached at all
+                    await set_cached_json(key, items, EMPTY_CACHE_TTL)
             for item in items:
-                key = item["url"].split("#")[0].lower().rstrip("/")
-                if key not in seen:
-                    seen.add(key)
+                url_key = item["url"].split("#")[0].lower().rstrip("/")
+                if url_key not in seen:
+                    seen.add(url_key)
                     results.append(item)
     if not results and failed == len(query_batches):
         raise ToolError("SearXNG did not respond.")
