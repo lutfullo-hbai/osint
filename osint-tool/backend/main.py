@@ -24,6 +24,7 @@ from routers import (
     email,
     exposure,
     footprint,
+    geolocate,
     image,
     jobs,
     name,
@@ -147,6 +148,7 @@ app.include_router(dossier.router)
 app.include_router(watches.router)
 app.include_router(jobs.router)
 app.include_router(sources.router)
+app.include_router(geolocate.router)
 
 
 @app.get("/")

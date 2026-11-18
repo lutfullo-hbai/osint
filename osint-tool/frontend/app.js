@@ -1669,3 +1669,236 @@ async function openCase(caseId) {
     items.forEach((item) => resultsEl.appendChild(buildCard(item)));
   });
 }
+
+// ================= Geolocate: photo -> places on a map =================
+// Step 1 (server): EXIF GPS, OCR, GeoCLIP. Step 2 (browser -> local Ollama
+// vision model): visible clues and place names. Step 3 (server): geocode the
+// names with OpenStreetMap and fuse every source into ranked candidates.
+const GEO_KINDS = ["business", "landmark", "street", "district", "city", "region", "country"];
+let geoMap = null;
+let geoLayer = null;
+
+function geoStep(text) {
+  const list = document.getElementById("geo-steps");
+  list.classList.remove("hidden");
+  const li = document.createElement("li");
+  li.textContent = text;
+  li.className = "run";
+  list.appendChild(li);
+  return {
+    done(note) { li.className = "done"; if (note) li.textContent = `${text} — ${note}`; },
+    fail(note) { li.className = "fail"; li.textContent = `${text} — ${note}`; },
+  };
+}
+
+function geoReset() {
+  document.getElementById("geo-steps").innerHTML = "";
+  document.getElementById("geo-error").classList.add("hidden");
+  document.getElementById("geo-list").innerHTML = "";
+  document.getElementById("geo-clues").innerHTML = "";
+}
+
+function geoRender(candidates, preview) {
+  const layout = document.getElementById("geo-layout");
+  layout.classList.remove("hidden");
+  if (preview) document.getElementById("geo-preview").src = `data:image/jpeg;base64,${preview}`;
+  if (typeof L === "undefined") {
+    document.getElementById("geo-map").textContent = "Map library failed to load.";
+  } else {
+    if (!geoMap) {
+      geoMap = L.map("geo-map", { worldCopyJump: true }).setView([41.3, 64.5], 4);
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors",
+      }).addTo(geoMap);
+    }
+    if (geoLayer) geoLayer.remove();
+    geoLayer = L.featureGroup().addTo(geoMap);
+  }
+  const list = document.getElementById("geo-list");
+  list.innerHTML = "";
+  if (!candidates.length) {
+    list.textContent = "No location could be estimated from this photo.";
+    return;
+  }
+  const colors = { high: "#34d399", medium: "#fbbf24", low: "#8b93b8" };
+  candidates.slice(0, 8).forEach((c, i) => {
+    const card = document.createElement("div");
+    card.className = "geo-cand";
+    const title = document.createElement("h4");
+    title.textContent = `#${i + 1} ${c.label || `${c.lat}, ${c.lon}`}`;
+    const meta = document.createElement("div");
+    meta.className = "geo-meta";
+    const conf = document.createElement("span");
+    conf.className = `geo-conf-${c.confidence}`;
+    conf.textContent = `${c.confidence} confidence`;
+    meta.append(conf, ` · ±${c.radius_m >= 1000 ? Math.round(c.radius_m / 1000) + " km" : c.radius_m + " m"}` +
+      ` · ${c.sources.join(" + ")}` + (c.agrees_with ? ` · agrees with ${c.agrees_with.join(", ")}` : ""));
+    const ev = document.createElement("ul");
+    c.evidence.slice(0, 4).forEach((e) => {
+      const li = document.createElement("li");
+      li.textContent = e;
+      ev.appendChild(li);
+    });
+    const links = document.createElement("div");
+    links.className = "geo-links";
+    Object.entries(c.links || {}).slice(0, 5).forEach(([label, href]) => {
+      const a = document.createElement("a");
+      a.href = href;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.textContent = `${label} ↗`;
+      links.appendChild(a);
+    });
+    card.append(title, meta, ev, links);
+    list.appendChild(card);
+    if (geoLayer) {
+      const color = colors[c.confidence] || colors.low;
+      const marker = L.circleMarker([c.lat, c.lon], { radius: 7, color, fillOpacity: 0.9 })
+        .bindTooltip(`#${i + 1} ${c.confidence}`);
+      const area = L.circle([c.lat, c.lon], { radius: Math.max(c.radius_m, 30), color, weight: 1, fillOpacity: 0.08 });
+      geoLayer.addLayer(area).addLayer(marker);
+      card.addEventListener("click", () => geoMap.fitBounds(area.getBounds(), { maxZoom: 16 }));
+    }
+  });
+  if (geoLayer && geoLayer.getLayers().length) {
+    const best = candidates[0];
+    const bestArea = L.circle([best.lat, best.lon], { radius: Math.max(best.radius_m, 30) });
+    geoMap.fitBounds(bestArea.getBounds(), { maxZoom: 15 });
+    setTimeout(() => geoMap.invalidateSize(), 50);
+  }
+}
+
+async function geoVision(step1) {
+  const { url, vision } = ollamaConfig();
+  const schema = {
+    type: "object",
+    properties: {
+      clues: { type: "array", items: { type: "object", properties: {
+        clue: { type: "string" }, points_to: { type: "string" } }, required: ["clue", "points_to"] } },
+      places: { type: "array", items: { type: "object", properties: {
+        name: { type: "string" }, kind: { type: "string", enum: GEO_KINDS },
+        city: { type: "string" }, country: { type: "string" },
+        confidence: { type: "number" }, evidence: { type: "string" } },
+        required: ["name", "kind", "confidence", "evidence"] } },
+      country_codes: { type: "array", items: { type: "string" } },
+    },
+    required: ["clues", "places", "country_codes"],
+  };
+  const hints = (step1.text_hints || []).map((h) => `${h.country} (${h.evidence})`).join("; ");
+  const prompt =
+    "You are a photo geolocation analyst. Use ONLY what is visible: text on signs and " +
+    "shops, language and script, architecture, road markings and signs, licence-plate " +
+    "format, vehicles, vegetation, terrain, landmarks. Do not identify any person.\n" +
+    `OCR text read from the photo: "${(step1.ocr_text || "").slice(0, 500)}"\n` +
+    (hints ? `Text hints: ${hints}\n` : "") +
+    "Return: clues (each visible clue and what it points to); places (at most 5, the most " +
+    "specific first: a business or landmark name you can actually read, then street, district, " +
+    "city, region, country) with the exact visible evidence and a confidence 0-1; " +
+    "country_codes (ISO 3166-1 alpha-2) of likely countries. If unsure, give a broader kind " +
+    "with low confidence instead of guessing a specific place.";
+  const response = await fetch(`${url}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: vision,
+      messages: [{ role: "user", content: prompt, images: [step1.preview_b64] }],
+      stream: false,
+      format: schema,
+      options: { temperature: 0.1 },
+    }),
+  });
+  if (!response.ok) throw new Error(`Ollama returned HTTP ${response.status}`);
+  const payload = await response.json();
+  return JSON.parse((payload.message && payload.message.content) || "{}");
+}
+
+async function geolocateRun(form) {
+  geoReset();
+  const errorBox = document.getElementById("geo-error");
+  let step1;
+  const s1 = geoStep("Reading GPS, text and visual features on the server");
+  try {
+    const response = await fetch(`${API_BASE}/api/geolocate`, { method: "POST", headers: authHeaders(), body: form });
+    step1 = await response.json();
+    if (!response.ok || step1.status !== "success") throw new Error(step1.message || `HTTP ${response.status}`);
+    const exif = step1.candidates.some((c) => c.sources.includes("EXIF GPS"));
+    s1.done(exif ? "GPS found in the photo" : `${step1.candidates.length} visual guess(es), OCR ${step1.ocr_text ? "found text" : "found no text"}`);
+  } catch (err) {
+    s1.fail(err.message);
+    errorBox.textContent = `Could not analyze the image: ${err.message}`;
+    errorBox.classList.remove("hidden");
+    return;
+  }
+  document.getElementById("geo-notice").textContent = step1.notice || "";
+  geoRender(step1.candidates, step1.preview_b64);
+  (step1.warnings || []).forEach((w) => geoStep(w).fail("note"));
+
+  if (!step1.preview_b64) return;
+  let vision;
+  const s2 = geoStep("Looking for clues with the local vision model");
+  try {
+    vision = await geoVision(step1);
+    s2.done(`${(vision.places || []).length} place(s), ${(vision.clues || []).length} clue(s)`);
+  } catch (err) {
+    s2.fail(`skipped (${err.message}). Pull it with: ollama pull qwen2.5vl:7b`);
+    return;
+  }
+  const clues = document.getElementById("geo-clues");
+  clues.innerHTML = "";
+  (vision.clues || []).slice(0, 10).forEach((c) => {
+    const p = document.createElement("p");
+    p.textContent = `• ${c.clue} → ${c.points_to}`;
+    clues.appendChild(p);
+  });
+
+  const s3 = geoStep("Finding those places on OpenStreetMap and combining all sources");
+  try {
+    const codes = [...new Set([...(vision.country_codes || []),
+      ...(step1.text_hints || []).map((h) => h.country).filter((c) => /^[A-Z]{2}$/.test(c))])]
+      .filter((c) => /^[A-Za-z]{2}$/.test(c)).slice(0, 3);
+    const response = await fetch(`${API_BASE}/api/geolocate/refine`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ candidates: step1.raw_candidates || [], places: (vision.places || []).slice(0, 6),
+                             country_codes: codes }),
+    });
+    const step3 = await response.json();
+    if (!response.ok || step3.status !== "success") throw new Error(step3.message || `HTTP ${response.status}`);
+    s3.done(`${step3.candidates.length} candidate place(s)`);
+    (step3.warnings || []).forEach((w) => geoStep(w).fail("note"));
+    geoRender(step3.candidates, null);
+  } catch (err) {
+    s3.fail(err.message);
+  }
+}
+
+(function setupGeolocate() {
+  const drop = document.getElementById("geo-drop");
+  const fileInput = document.getElementById("geo-file");
+  if (!drop || !fileInput) return;
+  const runFile = (file) => {
+    if (!file) return;
+    const form = new FormData();
+    form.append("file", file);
+    geolocateRun(form);
+  };
+  document.getElementById("geo-pick").addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", () => runFile(fileInput.files[0]));
+  document.getElementById("geo-url-go").addEventListener("click", () => {
+    const value = document.getElementById("geo-url").value.trim();
+    if (!value) return;
+    const form = new FormData();
+    form.append("url", value);
+    geolocateRun(form);
+  });
+  ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => {
+    e.preventDefault();
+    drop.classList.add("dragover");
+  }));
+  ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => {
+    e.preventDefault();
+    drop.classList.remove("dragover");
+  }));
+  drop.addEventListener("drop", (e) => runFile(e.dataTransfer.files[0]));
+})();
