@@ -5,7 +5,7 @@ import re
 
 import httpx
 
-from tools.base import ToolError
+from tools.base import NotConfigured, ToolError
 from tools.subfinder_runner import run_subfinder
 
 DOMAIN_RE = re.compile(
@@ -196,7 +196,7 @@ async def _hackertarget_subdomains(client: httpx.AsyncClient, domain: str) -> se
 async def _securitytrails_subdomains(client: httpx.AsyncClient, domain: str) -> set[str]:
     api_key = os.environ.get("SECURITYTRAILS_API_KEY", "").strip()
     if not api_key:
-        raise ToolError("skipped (set SECURITYTRAILS_API_KEY)")
+        raise NotConfigured("SECURITYTRAILS_API_KEY not set")
     response = await client.get(
         f"https://api.securitytrails.com/v1/domain/{domain}/subdomains",
         headers={"APIKEY": api_key},
@@ -234,6 +234,8 @@ async def subdomain_lookup(
     used = []
     warnings = []
     for label, outcome in zip(sources, outcomes):
+        if isinstance(outcome, NotConfigured):
+            continue
         if isinstance(outcome, ToolError):
             warnings.append(f"{label}: {outcome}")
         elif isinstance(outcome, BaseException):

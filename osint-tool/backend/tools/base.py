@@ -8,6 +8,14 @@ class ToolError(Exception):
     pass
 
 
+class NotConfigured(ToolError):
+    """An optional (usually paid) source whose key is not set.
+
+    Callers skip it silently: the tool is built to work without paid keys,
+    so a missing one is not a warning.
+    """
+
+
 def positional_arg(value: str) -> str:
     """A value placed on a CLI command line as data, never as an option.
 
