@@ -36,6 +36,7 @@ from tools.email_domain import (
 from tools.email_intel import lookup_breaches, lookup_emailrep
 from tools.holehe_runner import run_holehe
 from tools.domain_emails import find_domain_emails
+from tools import uz_registry
 from tools.hub_domains import is_hub_domain
 from tools.profile_history import annotate_first_archived
 from services.names import username_variants
@@ -244,6 +245,7 @@ async def _investigate_name(name: str) -> dict:
             "Public sources": run_name_sources(name),
             "Knowledge base": run_person_entity(name),
             "Sanctions": run_sanctions_check(name),
+            "UZ registers": asyncio.to_thread(uz_registry.search_person, name),
         }
     )
     if not outcomes:
@@ -259,6 +261,9 @@ async def _investigate_name(name: str) -> dict:
     if "Sanctions" in outcomes:
         results.extend(outcomes["Sanctions"]["results"])
         warnings.extend(outcomes["Sanctions"]["warnings"])
+    # people listed with a role in an official register (board, notary...)
+    results.extend(uz_registry.to_result(hit, as_person=True)
+                   for hit in outcomes.get("UZ registers") or [])
     if "Public sources" in outcomes:
         sources = outcomes["Public sources"]
         results.extend(sources["results"])
@@ -810,8 +815,25 @@ async def investigate_image(raw_url: str) -> dict:
 
 
 async def _investigate_company(query: str) -> dict:
-    outcome = await run_company_search(query)
-    results = outcome["results"]
+    # Uzbek official registers (local index) alongside the global LEI register
+    outcome, uz_hits = await asyncio.gather(
+        run_company_search(query),
+        asyncio.to_thread(uz_registry.search_org, query),
+        return_exceptions=True,
+    )
+    if isinstance(uz_hits, BaseException):
+        uz_hits = []
+    warnings = []
+    if isinstance(outcome, BaseException):
+        if not uz_hits:
+            raise outcome
+        warnings.append(f"GLEIF: {outcome}")
+        _mark_failed("GLEIF")
+        outcome = {"results": [], "pivots": [], "warnings": []}
+    uz_results = [uz_registry.to_result(hit) for hit in uz_hits]
+    results = uz_results + outcome["results"]
+    if warnings:
+        outcome.setdefault("warnings", []).extend(warnings)
     response = {
         "status": "success",
         "category": "company",
@@ -819,8 +841,10 @@ async def _investigate_company(query: str) -> dict:
         "results": results,
         "count": len(results),
         "notice": (
-            "Legal-entity data from the public LEI register. A name can match "
-            "several entities worldwide; confirm jurisdiction and local reg. id."
+            "Uzbek official registers (data.egov.uz) and the global LEI register. "
+            "A name can match several entities; confirm with the STIR (tax id). "
+            "The portal's legal-entity register is truncated, so absence here "
+            "does not mean the company does not exist."
         ),
     }
     if outcome["pivots"]:
@@ -829,8 +853,8 @@ async def _investigate_company(query: str) -> dict:
         response["warnings"] = outcome["warnings"]
     if not results:
         response["message"] = (
-            "No legal entity with this name (or LEI) is in the GLEIF register. "
-            "Not every company has an LEI."
+            "No match in the Uzbek registers or the GLEIF register. Try the STIR "
+            "(9-digit tax id) or a distinctive word of the name."
         )
     return response
 

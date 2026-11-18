@@ -7,7 +7,7 @@ from arq.connections import RedisSettings
 import store
 from services.investigate import InvestigationValidationError, investigate
 from services.monitor import check_one_watch, run_watch_cycle
-from tools import sanctions_index
+from tools import sanctions_index, uz_registry
 from tools.holehe_runner import run_canary
 from tools.maigret_db import ensure_db, run_self_check
 from tools.base import ToolError
@@ -57,6 +57,11 @@ async def pep_refresh(ctx) -> dict:
     return await sanctions_index.refresh_peps()
 
 
+async def uz_registry_refresh(ctx) -> dict:
+    """Weekly: Uzbek official registers from data.egov.uz."""
+    return await uz_registry.refresh()
+
+
 async def _first_sanctions_build() -> None:
     await sanctions_index.refresh_sources()
     await sanctions_index.refresh_peps()
@@ -65,6 +70,8 @@ async def _first_sanctions_build() -> None:
 async def startup(ctx) -> None:
     store.init_db()
     ensure_db()
+    if not uz_registry.dataset_status():
+        ctx["uz_registry_build"] = asyncio.create_task(uz_registry.refresh())
     if not sanctions_index.source_status():
         # first run: build the index in the background, do not block startup
         ctx["sanctions_build"] = asyncio.create_task(_first_sanctions_build())
@@ -85,6 +92,7 @@ class WorkerSettings:
         cron(holehe_canary, hour=5, minute=15, run_at_startup=False, timeout=600),
         cron(sanctions_refresh, hour=3, minute=30, run_at_startup=False, timeout=1800),
         cron(pep_refresh, weekday=6, hour=3, minute=0, run_at_startup=False, timeout=1800),
+        cron(uz_registry_refresh, weekday=6, hour=4, minute=0, run_at_startup=False, timeout=1800),
     ]
     redis_settings = RedisSettings.from_dsn(
         os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")

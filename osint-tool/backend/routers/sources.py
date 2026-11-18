@@ -8,7 +8,7 @@ import httpx
 from fastapi import APIRouter, Depends, Request, Response
 
 from security import general_limit, limiter, verify_api_key
-from tools import holehe_runner, maigret_db, sanctions_index, truecaller
+from tools import holehe_runner, maigret_db, sanctions_index, truecaller, uz_registry
 
 router = APIRouter(tags=["sources"], dependencies=[Depends(verify_api_key)])
 
@@ -53,6 +53,17 @@ def _maigret() -> dict:
                                   f"updated {age_days:.0f} day(s) ago"}
 
 
+def _uz_registry() -> dict:
+    status = uz_registry.dataset_status()
+    if not status:
+        return {"ok": False, "detail": "not built yet (the worker builds it on first start)"}
+    total = sum(r.get("rows") or 0 for r in status.values())
+    oldest = max((time.time() - (r.get("fetched_at") or 0)) / 86400 for r in status.values())
+    truncated = [k for k, r in status.items() if r.get("truncated")]
+    return {"ok": True, "detail": f"{len(status)} registers, {total} records, oldest {oldest:.0f}d"
+                                  + (f"; portal-truncated: {', '.join(truncated)}" if truncated else "")}
+
+
 def _sanctions() -> dict:
     status = sanctions_index.source_status()
     if not status:
@@ -95,6 +106,7 @@ async def sources_health(request: Request, response: Response):
                       "detail": "installed" if shutil.which("subfinder") else "binary missing"},
         "Holehe": await _holehe(),
         "Sanctions index": await asyncio.to_thread(_sanctions),
+        "UZ registers": await asyncio.to_thread(_uz_registry),
         "Truecaller": {"ok": tc_until <= 0,
                        "detail": "available" if tc_until <= 0 else f"skipped for {int(tc_until // 60) + 1} min (unreachable)"},
     }

@@ -110,7 +110,12 @@ Har bir band uchun regressiya testi (Michael Jordan namesake, netflix/budget.me 
 - [ ] 3b.3 O'z passive DNS jadvalimiz + Mnemonic PDNS (1000/kun) + Robtex (10/soat) — S/M
 - [ ] 3b.4 E'lon qilingan emaillar: security.txt, DMARC rua/ruf, SOA RNAME; keyin odobli
       kontakt-sahifa crawler (robots.txt, ≤20 sahifa, taxminsiz) — M
-- [ ] 3b.5 Kompaniyalar: egov reyestrlarini STIR bo'yicha birlashtirib qidiruvga ulash →
+- [x] 3b.5a O'zbek rasmiy reyestrlari (data.egov.uz, 19 dataset: soliq, QQS, nohalol yetkazib
+      beruvchilar, birja, NNT, diniy, notariuslar, yuridik maslahat, hakamlik, ekstremistik
+      tashkilotlar, davlat korxonalari, kuzatuv kengashlari, DXSh) → SQLite FTS5; kompaniya
+      qidiruvi STIR yoki nom bo'yicha (lotin/kirill, huquqiy shakl so'zlarisiz), ism qidiruvida
+      reyestrda lavozimi bilan turgan shaxslar; haftalik yangilash
+- [ ] 3b.5 Kompaniyalar (qolgani): egov reyestrlarini STIR bo'yicha birlashtirib qidiruvga ulash →
       openinfo.uz (AJ rahbariyati) → GLEIF L2 + UK Companies House (bepul kalit) — M/L
 - [ ] 3b.6 Breach: XposedOrNot saqlanadi, HIBP'ning bepul breach katalogi bilan boyitish — S
 - Eslatma: to'liq yuridik shaxslar reyestri data.egov.uz'da manbaning o'zida 65 535 qatorda
