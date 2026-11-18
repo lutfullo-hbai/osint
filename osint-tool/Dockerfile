@@ -12,6 +12,7 @@ WORKDIR /app
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends gcc tesseract-ocr \
+       tesseract-ocr-rus tesseract-ocr-uzb tesseract-ocr-uzb-cyrl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=subfinder /usr/local/bin/subfinder /usr/local/bin/subfinder

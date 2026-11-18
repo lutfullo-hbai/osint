@@ -26,6 +26,17 @@ services:
       - osint-net
     restart: unless-stopped
 
+  geoclip:
+    # image -> likely GPS points (GeoCLIP, MIT). Internal only, CPU.
+    build:
+      context: ./geoclip
+    container_name: osint-geoclip
+    volumes:
+      - geoclip-cache:/cache
+    networks:
+      - osint-net
+    restart: unless-stopped
+
   backend:
     build:
       context: .
@@ -41,6 +52,7 @@ services:
       - OPENCORPORATES_API_KEY=${OPENCORPORATES_API_KEY:-}
       - BRAVE_API_KEY=${BRAVE_API_KEY:-}
       - SEARXNG_URL=${SEARXNG_URL:-http://searxng:8080}
+      - GEOCLIP_URL=${GEOCLIP_URL:-http://geoclip:8090}
       - SECURITYTRAILS_API_KEY=${SECURITYTRAILS_API_KEY:-}
       - HUNTER_API_KEY=${HUNTER_API_KEY:-}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
@@ -81,6 +93,7 @@ services:
       - OPENCORPORATES_API_KEY=${OPENCORPORATES_API_KEY:-}
       - BRAVE_API_KEY=${BRAVE_API_KEY:-}
       - SEARXNG_URL=${SEARXNG_URL:-http://searxng:8080}
+      - GEOCLIP_URL=${GEOCLIP_URL:-http://geoclip:8090}
       - SECURITYTRAILS_API_KEY=${SECURITYTRAILS_API_KEY:-}
       - HUNTER_API_KEY=${HUNTER_API_KEY:-}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
@@ -130,3 +143,4 @@ networks:
 
 volumes:
   osint-data:
+  geoclip-cache:

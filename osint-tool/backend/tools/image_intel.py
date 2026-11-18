@@ -184,6 +184,7 @@ def reverse_image_links(url: str) -> dict[str, str]:
     }
 
 
+OCR_LANGS = ("eng", "rus", "uzb", "uzb_cyrl")
 OCR_MIN_CHARS = 3
 OCR_MAX_CHARS = 600
 
@@ -216,8 +217,14 @@ def ocr_text(data: bytes) -> str:
     except ImportError as exc:
         raise ToolError("pytesseract is not installed") from exc
     try:
+        # signs here are often Uzbek (Latin or Cyrillic) or Russian
+        try:
+            installed = set(pytesseract.get_languages(config=""))
+        except Exception:
+            installed = {"eng"}
+        langs = "+".join(l for l in OCR_LANGS if l in installed) or "eng"
         with Image.open(io.BytesIO(data)) as image:
-            text = pytesseract.image_to_string(image)
+            text = pytesseract.image_to_string(image, lang=langs)
     except pytesseract.TesseractNotFoundError as exc:
         raise ToolError("the tesseract OCR engine is not installed") from exc
     except Exception as exc:

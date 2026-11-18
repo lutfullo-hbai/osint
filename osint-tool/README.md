@@ -124,6 +124,14 @@ Limitdan oshsa `429` va `X-RateLimit-*` / `Retry-After` sarlavhalari qaytadi.
 - **Manbalar holati**: `GET /api/sources/health` va sarlavhadagi `[SOURCES ...]` belgisi
   (ustiga olib borilsa tafsilotlar).
 
+### Rasm geolokatsiyasi (Geolocate tabi)
+Rasm yuklanadi → server EXIF GPS, OCR (eng/rus/uzb/uzb_cyrl) va GeoCLIP (`geoclip`
+konteyneri, CPU) natijalarini beradi → brauzer lokal vizual modelni (`ollama pull
+qwen2.5vl:7b`) ishga tushirib joy nomlari va belgilarni oladi → server ularni
+OpenStreetMap'da topib, barcha manbalarni birlashtiradi va xaritada nomzodlarni
+ishonch doirasi va dalillari bilan ko'rsatadi. Birinchi ishga tushishda GeoCLIP
+CLIP modelini (~1.7 GB) yuklab oladi. Faqat joy aniqlanadi, odam emas.
+
 ### Pul talab qilmaydi
 Tool to'liq bepul ishlashi uchun qurilgan. Tavsiya etiladigan bepul sozlamalar:
 `GITHUB_TOKEN` (bepul; GitHub limiti soatiga 60 → 5000) va `SEARXNG_SECRET`.

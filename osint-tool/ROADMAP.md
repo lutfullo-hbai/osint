@@ -116,6 +116,21 @@ Har bir band uchun regressiya testi (Michael Jordan namesake, netflix/budget.me 
 - Eslatma: to'liq yuridik shaxslar reyestri data.egov.uz'da manbaning o'zida 65 535 qatorda
   kesilgan — to'liq nusxa faqat Soliq qo'mitasi/portal operatoriga murojaat bilan
 
+## Faza G — Rasm geolokatsiyasi (rasm → xaritadagi joy)
+- [x] G1 Rasm faylini yuklash (yoki URL) — "Geolocate" tabi, drag & drop
+- [x] G2 OCR: ingliz + rus + o'zbek (lotin/kirill); telefon kodi va domen → mamlakat ishorasi
+- [x] G3 Lokal vizual model (Qwen2.5-VL 7B, brauzerdan Ollama) — ko'rinadigan belgilar va joy
+      nomlari, JSON schema, odamni aniqlamaydi
+- [x] G4 GeoCLIP (MIT) alohida CPU konteyner; galereya embeddinglari bir marta hisoblanadi
+- [x] G5 OpenStreetMap Nominatim geokodlash (1 so'rov/s, 30 kun kesh)
+- [x] G6 Birlashtirish: yaqin nomzodlar birlashadi, mustaqil manbalar kelishsa ishonch oshadi;
+      Leaflet xaritada ishonch doirasi bilan; har nomzodda dalillar va tekshirish havolalari
+- [x] G7 Tekshirish havolalari (Google Maps/Earth, OSM, Yandex, SunCalc)
+- [ ] G8 Mapillary/KartaView ko'cha fotolari bilan solishtirish havolalari; quyosh/soya tahlili
+- [ ] G9 Server tomonda vizual model (Ollama'ni konteynerdan ochish yoki GPU runtime) — API'dan
+      to'liq avtomat ishlashi uchun
+- Chegara: faqat joy taxmin qilinadi; odamni tanish yoki yuz bo'yicha qidirish — yo'q
+
 ## Faza 4 — Holehe kengaytmasi (poydevor ✅, yangi modullar test akkaunt kutmoqda)
 Maqsad: email bo'yicha "ro'yxatdan o'tganlik signali"ni ishonchli va kengroq qilish.
 
