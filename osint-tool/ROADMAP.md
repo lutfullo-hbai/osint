@@ -118,7 +118,9 @@ Har bir band uchun regressiya testi (Michael Jordan namesake, netflix/budget.me 
 - [x] 3b.5b openinfo.uz (emitentlar oshkor qilgan ma'lumot): kompaniya qidiruvida direktor, bosh
       hisobchi, mas'ul xodim, STIR, tiker, manzil, sayt; faqat so'rov bo'yicha, 1 so'rov/s, 7 kun
       kesh; kirill so'rov o'zbek lotiniga o'giriladi; sayt → domen pivot
-- [ ] 3b.5c GLEIF Level-2 + UK Companies House; kompaniya qidiruvini tezlashtirish (GLEIF/SEC/GDELT ~13 s)
+- [x] 3b.5c GLEIF Level-2 (sho'ba kompaniyalar) + UK Companies House (bepul kalit, kalitsiz jim
+      o'tadi); manbalar parallel; GDELT 6 s timeout, 5 s limitga rioya, 6 soat kesh — kompaniya
+      qidiruvi ~14 s → 2–5 s; aniq reyestr mosliklari birinchi, qisman mosliklar oxirida
 - [ ] 3b.5 Kompaniyalar (eski band matni): egov reyestrlarini STIR bo'yicha birlashtirib qidiruvga ulash →
       openinfo.uz (AJ rahbariyati) → GLEIF L2 + UK Companies House (bepul kalit) — M/L
 - [ ] 3b.6 Breach: XposedOrNot saqlanadi, HIBP'ning bepul breach katalogi bilan boyitish — S

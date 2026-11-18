@@ -46,6 +46,13 @@ def test_search_by_name_across_scripts_and_forms(db):
     assert uz.search_org("MCHJ", path=db) == []           # legal form alone is not a name
 
 
+def test_exact_matches_rank_before_partial(db):
+    uz.store_dataset("brokers", uz.rows_to_records("brokers", [
+        {"Brokerlik idorasining nomi": "Type Maker Invest MChJ", "Hudud": "Toshkent"}]), False, db)
+    hits = uz.search_org("Type Maker", path=db)
+    assert [h["match"] for h in hits][-1] == "partial" and hits[0]["match"] == "exact"
+
+
 def test_unscrupulous_supplier_is_flagged(db):
     hit = next(h for h in uz.search_org("306939961", path=db) if h["dataset"] == "unscrupulous_suppliers")
     result = uz.to_result(hit)

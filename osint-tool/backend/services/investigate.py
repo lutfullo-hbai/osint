@@ -835,9 +835,11 @@ async def _investigate_company(query: str) -> dict:
         warnings.append(f"GLEIF: {outcome}")
         _mark_failed("GLEIF")
         outcome = {"results": [], "pivots": [], "warnings": []}
-    uz_results = [uz_registry.to_result(hit) for hit in uz_hits]
-    # the company's own disclosure (management, contacts) first
-    results = disclosure["results"] + uz_results + outcome["results"]
+    uz_exact = [uz_registry.to_result(h) for h in uz_hits if h.get("match") != "partial"]
+    uz_partial = [uz_registry.to_result(h) for h in uz_hits if h.get("match") == "partial"]
+    # the company's own disclosure first, exact register matches, the global
+    # registers, then Uzbek companies whose name merely contains the query
+    results = disclosure["results"] + uz_exact + outcome["results"] + uz_partial
     outcome["pivots"] = list(outcome.get("pivots") or []) + disclosure["pivots"]
     if warnings:
         outcome.setdefault("warnings", []).extend(warnings)

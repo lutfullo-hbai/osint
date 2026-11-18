@@ -6,6 +6,7 @@ Free, no key, covers legal entities worldwide. This is company data, not people.
 """
 import asyncio
 import re
+import time
 from urllib.parse import quote
 
 import httpx
@@ -20,6 +21,7 @@ HEADERS = {
 TIMEOUT = httpx.Timeout(20.0)
 LEI_RE = re.compile(r"^[A-Z0-9]{18}[0-9]{2}$")
 MAX_MATCHES = 5
+MAX_CHILDREN = 5
 
 
 class CompanyValidationError(ValueError):
@@ -123,6 +125,68 @@ async def _parents(client: httpx.AsyncClient, lei: str) -> tuple[list[dict], lis
     return results, pivots
 
 
+async def _children(client: httpx.AsyncClient, lei: str) -> tuple[list[dict], list[dict]]:
+    """Direct subsidiaries that report this entity as their parent (GLEIF L2)."""
+    data = await _get(client, f"/lei-records/{lei}/direct-children", params={"page[size]": MAX_CHILDREN})
+    records = (data or {}).get("data") or []
+    total = ((data or {}).get("meta") or {}).get("pagination", {}).get("total", len(records))
+    results, pivots = [], []
+    for record in records[:MAX_CHILDREN]:
+        results.append(format_record(record, "Subsidiary (GLEIF)"))
+        name = ((record.get("attributes") or {}).get("entity") or {}).get("legalName", {}).get("name")
+        if name:
+            pivots.append({"type": "company", "value": name})
+    if total > len(records):
+        results.append({
+            "platform": "Subsidiaries (GLEIF)",
+            "url": f"https://search.gleif.org/#/record/{lei}",
+            "status": "found",
+            "info": f"{total} direct subsidiaries report this parent; the first {len(records)} are shown.",
+        })
+    return results, pivots
+
+
+async def companies_house_search(client: httpx.AsyncClient, query: str) -> list[dict]:
+    """UK Companies House (free API key): company + its current officers."""
+    import os
+
+    key = os.environ.get("COMPANIES_HOUSE_API_KEY", "").strip()
+    if not key:
+        raise NotConfigured("COMPANIES_HOUSE_API_KEY not set")
+    auth = httpx.BasicAuth(key, "")
+    base = "https://api.company-information.service.gov.uk"
+    response = await client.get(f"{base}/search/companies", params={"q": query, "items_per_page": 3}, auth=auth)
+    if response.status_code == 401:
+        raise ToolError("Companies House rejected the API key.")
+    if response.status_code != 200:
+        raise ToolError(f"Companies House returned HTTP {response.status_code}.")
+    items = response.json().get("items") or []
+    if not items:
+        raise ToolError("No UK company matched.")
+    results = []
+    for index, item in enumerate(items[:3]):
+        number = item.get("company_number", "")
+        parts = [f"Organisation: {item.get('title', '')}", f"Company number: {number}",
+                 f"Status: {item.get('company_status', '')}", f"Incorporated: {item.get('date_of_creation', '')}",
+                 f"Address: {item.get('address_snippet', '')}"]
+        if index == 0 and number:
+            officers = await client.get(f"{base}/company/{number}/officers",
+                                        params={"items_per_page": 10}, auth=auth)
+            if officers.status_code == 200:
+                active = [o for o in officers.json().get("items") or [] if not o.get("resigned_on")]
+                if active:
+                    parts.append("Officers: " + "; ".join(
+                        f"{o.get('name')} ({o.get('officer_role')}, since {o.get('appointed_on', '?')})"
+                        for o in active[:5]))
+        results.append({
+            "platform": "UK Companies House",
+            "url": f"https://find-and-update.company-information.service.gov.uk/company/{number}",
+            "status": "found",
+            "info": "; ".join(p for p in parts if not p.endswith(": ")),
+        })
+    return results
+
+
 async def sec_edgar_search(client: httpx.AsyncClient, query: str) -> dict:
     """Entities and filings mentioning this name in SEC EDGAR (mostly US public)."""
     response = await client.get(
@@ -162,17 +226,44 @@ async def sec_edgar_search(client: httpx.AsyncClient, query: str) -> dict:
     }
 
 
+# GDELT allows one request per 5 seconds and answers slowly when busy: keep
+# it from holding the whole company search hostage.
+GDELT_TIMEOUT = httpx.Timeout(6.0, connect=4.0)
+GDELT_INTERVAL_SECONDS = 5.0
+GDELT_CACHE_TTL = 6 * 3600
+_gdelt_lock = asyncio.Lock()
+_gdelt_last = 0.0
+
+
 async def gdelt_news(client: httpx.AsyncClient, query: str) -> dict:
-    response = await client.get(
-        "https://api.gdeltproject.org/api/v2/doc/doc",
-        params={
-            "query": f'"{query}"',
-            "format": "json",
-            "maxrecords": 5,
-            "sort": "datedesc",
-            "timespan": "6months",
-        },
-    )
+    global _gdelt_last
+    from cache import get_cached_json, set_cached_json
+
+    key = f"osint:gdelt:{query.casefold()}"
+    cached = await get_cached_json(key)
+    if cached is not None:
+        if cached.get("empty"):
+            raise ToolError("No recent news mentions this name.")
+        return cached
+    async with _gdelt_lock:
+        wait = _gdelt_last + GDELT_INTERVAL_SECONDS - time.monotonic()
+        if wait > 0:
+            raise ToolError("GDELT skipped: its one-request-per-5-seconds limit was just used.")
+        _gdelt_last = time.monotonic()
+    try:
+        response = await client.get(
+            "https://api.gdeltproject.org/api/v2/doc/doc",
+            params={
+                "query": f'"{query}"',
+                "format": "json",
+                "maxrecords": 5,
+                "sort": "datedesc",
+                "timespan": "6months",
+            },
+            timeout=GDELT_TIMEOUT,
+        )
+    except httpx.TimeoutException as exc:
+        raise ToolError("GDELT did not answer in time.") from exc
     if response.status_code == 429:
         raise ToolError("GDELT rate limit reached (one request / 5s).")
     content_type = response.headers.get("content-type", "")
@@ -183,12 +274,13 @@ async def gdelt_news(client: httpx.AsyncClient, query: str) -> dict:
     except ValueError as exc:
         raise ToolError("GDELT returned malformed JSON.") from exc
     if not articles:
+        await set_cached_json(key, {"empty": True}, GDELT_CACHE_TTL)
         raise ToolError("No recent news mentions this name.")
     lines = []
     for article in articles[:5]:
         date = str(article.get("seendate", ""))[:8]
         lines.append(f"{date} {article.get('domain', '')}: {article.get('title', '')[:70]}")
-    return {
+    result = {
         "platform": "News (GDELT)",
         "url": (
             "https://www.gdeltproject.org/"
@@ -196,6 +288,8 @@ async def gdelt_news(client: httpx.AsyncClient, query: str) -> dict:
         "status": "found",
         "info": " | ".join(lines),
     }
+    await set_cached_json(key, result, GDELT_CACHE_TTL)
+    return result
 
 
 async def opencorporates_search(client: httpx.AsyncClient, query: str) -> dict:
@@ -240,6 +334,7 @@ async def _extra_sources(client: httpx.AsyncClient, query: str) -> tuple[list[di
         "SEC EDGAR": sec_edgar_search(client, query),
         "News": gdelt_news(client, query),
         "OpenCorporates": opencorporates_search(client, query),
+        "UK Companies House": companies_house_search(client, query),
     }
     outcomes = await _asyncio.gather(*sources.values(), return_exceptions=True)
     results = []
@@ -251,6 +346,8 @@ async def _extra_sources(client: httpx.AsyncClient, query: str) -> tuple[list[di
             warnings.append(f"{label}: {outcome}")
         elif isinstance(outcome, BaseException):
             warnings.append(f"{label}: {type(outcome).__name__}")
+        elif isinstance(outcome, list):
+            results.extend(outcome)
         else:
             results.append(outcome)
     return results, warnings
@@ -266,29 +363,28 @@ async def run_company_search(query: str) -> dict:
             if not record:
                 return {"results": [], "pivots": [], "warnings": []}
             results = [format_record(record)]
-            parent_results, pivots = await _parents(client, query.upper())
-            results.extend(parent_results)
-            return {"results": results, "pivots": pivots, "warnings": []}
+            (parent_results, pivots), (child_results, child_pivots) = await asyncio.gather(
+                _parents(client, query.upper()), _children(client, query.upper()))
+            results.extend(parent_results + child_results)
+            return {"results": results, "pivots": pivots + child_pivots, "warnings": []}
 
-        data = await _get(
-            client,
-            "/lei-records",
-            params={
-                "filter[entity.legalName]": query,
-                "page[size]": MAX_MATCHES,
-            },
+        # GLEIF search and the extra sources run at the same time
+        data, (extra_results, extra_warnings) = await asyncio.gather(
+            _get(client, "/lei-records",
+                 params={"filter[entity.legalName]": query, "page[size]": MAX_MATCHES}),
+            _extra_sources(client, query),
         )
         records = (data or {}).get("data") or []
-        extra_results, extra_warnings = await _extra_sources(client, query)
         if not records and not extra_results:
             return {"results": [], "pivots": [], "warnings": extra_warnings}
 
         results = [format_record(record) for record in records]
         pivots = []
         if records:
-            parent_results, pivots = await _parents(
-                client, records[0]["attributes"]["lei"]
-            )
-            results.extend(parent_results)
+            lei = records[0]["attributes"]["lei"]
+            (parent_results, pivots), (child_results, child_pivots) = await asyncio.gather(
+                _parents(client, lei), _children(client, lei))
+            results.extend(parent_results + child_results)
+            pivots += child_pivots
         results.extend(extra_results)
         return {"results": results, "pivots": pivots, "warnings": extra_warnings}
