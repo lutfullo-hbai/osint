@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 
 import httpx
 from xposedornot import XposedOrNot
@@ -94,6 +95,62 @@ def _summarize_breaches(names: list[str], limit: int = 8) -> str:
     return shown + (f" +{more} more" if more > 0 else "")
 
 
+HIBP_CATALOG_URL = "https://haveibeenpwned.com/api/v3/breaches"   # free, no key
+CATALOG_CACHE_KEY = "osint:hibp:catalog"
+CATALOG_TTL = 24 * 3600
+_SENSITIVE_CLASSES = ("Passwords", "Password hints", "Phone numbers", "Physical addresses",
+                      "Dates of birth", "Security questions and answers", "Credit cards",
+                      "Bank account numbers", "Government issued IDs")
+
+
+def _norm_breach(name: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", str(name or "").lower())
+
+
+async def breach_catalog() -> dict[str, dict]:
+    """HIBP's public breach catalogue (metadata only, no personal data), cached a day."""
+    from cache import get_cached_json, set_cached_json
+
+    cached = await get_cached_json(CATALOG_CACHE_KEY)
+    if cached is not None:
+        return cached
+    async with httpx.AsyncClient(timeout=httpx.Timeout(20.0),
+                                 headers={"User-Agent": "osint-tool/1.0 (breach catalogue)"}) as client:
+        response = await client.get(HIBP_CATALOG_URL)
+    if response.status_code != 200:
+        raise ToolError(f"HIBP catalogue HTTP {response.status_code}")
+    catalog = {}
+    for b in response.json():
+        entry = {"title": b.get("Title") or b.get("Name"), "date": b.get("BreachDate", ""),
+                 "classes": b.get("DataClasses") or [], "count": b.get("PwnCount") or 0,
+                 "domain": b.get("Domain") or ""}
+        for key in {_norm_breach(b.get("Name")), _norm_breach(b.get("Title"))} - {""}:
+            catalog[key] = entry
+    await set_cached_json(CATALOG_CACHE_KEY, catalog, CATALOG_TTL)
+    return catalog
+
+
+def describe_breaches(names: list[str], catalog: dict[str, dict], limit: int = 8) -> str:
+    """'Adobe (2013-10-04: Email addresses, Passwords, ...)' + exposed-data summary."""
+    parts, sensitive = [], set()
+    for name in names[:limit]:
+        meta = catalog.get(_norm_breach(name))
+        if meta:
+            classes = ", ".join(meta["classes"][:4]) + ("…" if len(meta["classes"]) > 4 else "")
+            parts.append(f"{meta['title']} ({meta['date']}: {classes})")
+            sensitive |= {c for c in meta["classes"] if c in _SENSITIVE_CLASSES}
+        else:
+            parts.append(name)
+    for name in names[limit:]:
+        meta = catalog.get(_norm_breach(name))
+        if meta:
+            sensitive |= {c for c in meta["classes"] if c in _SENSITIVE_CLASSES}
+    text = ", ".join(parts) + (f" +{len(names) - limit} more" if len(names) > limit else "")
+    if sensitive:
+        text += ". Sensitive data types exposed across these breaches: " + ", ".join(sorted(sensitive))
+    return text
+
+
 def _xposedornot_check(email: str) -> list[str]:
     # The official SDK is synchronous (httpx.Client + time.sleep backoff on
     # 429), so it runs in a worker thread; see lookup_xposedornot.
@@ -115,8 +172,13 @@ async def lookup_xposedornot(email: str) -> dict:
     if not breaches:
         info = "No known breaches contain this email (XposedOrNot)."
     else:
+        try:
+            catalog = await breach_catalog()
+        except (ToolError, httpx.HTTPError, ValueError):
+            catalog = {}      # enrichment is optional; the names still stand
         info = (
-            f"Found in {len(breaches)} breach(es): {_summarize_breaches(breaches)}"
+            f"Found in {len(breaches)} breach(es): {describe_breaches(breaches, catalog)}"
+            + (". Breach dates and data types: HIBP public catalogue." if catalog else "")
         )
     return {
         "platform": "XposedOrNot Breaches",

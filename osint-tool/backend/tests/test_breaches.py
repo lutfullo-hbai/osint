@@ -9,6 +9,34 @@ from tools.base import ToolError
 def _no_hibp_key(monkeypatch):
     monkeypatch.delenv("HIBP_API_KEY", raising=False)
 
+    async def no_catalog():
+        return {}
+    monkeypatch.setattr(email_intel, "breach_catalog", no_catalog)
+
+
+CATALOG = {
+    "adobe": {"title": "Adobe", "date": "2013-10-04", "count": 152445165, "domain": "adobe.com",
+              "classes": ["Email addresses", "Password hints", "Passwords", "Usernames"]},
+    "linkedin": {"title": "LinkedIn", "date": "2012-05-05", "count": 164611595, "domain": "linkedin.com",
+                 "classes": ["Email addresses", "Passwords"]},
+}
+
+
+def test_describe_breaches_adds_dates_and_sensitive_types():
+    text = email_intel.describe_breaches(["Adobe", "LinkedIn", "SomeForum"], CATALOG)
+    assert text.startswith("Adobe (2013-10-04: Email addresses, Password hints, Passwords, Usernames)")
+    assert "LinkedIn (2012-05-05: Email addresses, Passwords)" in text and "SomeForum" in text
+    assert "Sensitive data types exposed across these breaches: Password hints, Passwords" in text
+
+
+async def test_xposedornot_result_is_enriched(monkeypatch):
+    async def catalog():
+        return CATALOG
+    monkeypatch.setattr(email_intel, "breach_catalog", catalog)
+    monkeypatch.setattr(email_intel, "_xposedornot_check", lambda _e: ["Adobe"])
+    entry, _w = await email_intel.lookup_breaches("a@example.com")
+    assert "Adobe (2013-10-04" in entry["info"] and "HIBP public catalogue" in entry["info"]
+
 
 async def test_xposedornot_reports_breaches(monkeypatch):
     names = [f"Breach{i}" for i in range(10)]
