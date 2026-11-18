@@ -106,7 +106,9 @@ Har bir band uchun regressiya testi (Michael Jordan namesake, netflix/budget.me 
       "keng tarqalgan ism" belgisi; kunlik yangilash (sha256 bo'yicha faqat o'zgarganini).
       PEP: Wikidata P39 (UZ, KZ, KG, TJ, TM) haftalik, WDQS → QLever zaxira.
       Natija hech qachon "sanksiyada" demaydi — "ro'yxatdagi yozuvga o'xshaydi" + manba
-- [ ] 3b.2 SearXNG: kesh (24 soat) + engine holati statistikasi (`unresponsive_engines`) — S
+- [x] 3b.2 SearXNG: har bir so'rov 24 soat keshlanadi (qisman javob 2 soat; tizimlar bloklagan
+      paytdagi bo'sh javob keshlanmaydi); har bir qidiruv tizimining ok/xato statistikasi holat
+      panelida
 - [ ] 3b.3 O'z passive DNS jadvalimiz + Mnemonic PDNS (1000/kun) + Robtex (10/soat) — S/M
 - [ ] 3b.4 E'lon qilingan emaillar: security.txt, DMARC rua/ruf, SOA RNAME; keyin odobli
       kontakt-sahifa crawler (robots.txt, ≤20 sahifa, taxminsiz) — M

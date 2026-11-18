@@ -8,7 +8,7 @@ import httpx
 from fastapi import APIRouter, Depends, Request, Response
 
 from security import general_limit, limiter, verify_api_key
-from tools import holehe_runner, maigret_db, sanctions_index, truecaller, uz_registry
+from tools import holehe_runner, maigret_db, public_search, sanctions_index, truecaller, uz_registry
 
 router = APIRouter(tags=["sources"], dependencies=[Depends(verify_api_key)])
 
@@ -51,6 +51,22 @@ def _maigret() -> dict:
     age_days = (time.time() - os.path.getmtime(path)) / 86400
     return {"ok": True, "detail": f"custom database, {maigret_db.disabled_count(path)} sites disabled, "
                                   f"updated {age_days:.0f} day(s) ago"}
+
+
+async def _engine_summary() -> str:
+    """'; engines: brave 98% ok, google blocked (access denied)...'"""
+    stats = await public_search.engine_stats()
+    if not stats:
+        return ""
+    parts = []
+    for engine, row in sorted(stats.items(), key=lambda kv: -(kv[1].get("ok", 0))):
+        total = row.get("ok", 0) + row.get("fail", 0)
+        if not total:
+            continue
+        share = row.get("ok", 0) / total
+        parts.append(f"{engine} {share:.0%} ok" if share >= 0.5 else
+                     f"{engine} failing ({row.get('last_error', '?')})")
+    return "; engines: " + ", ".join(parts[:10]) if parts else ""
 
 
 def _uz_registry() -> dict:
@@ -99,7 +115,7 @@ async def sources_health(request: Request, response: Response):
     sources = {
         "Web search": {"ok": searxng["ok"] or len(order) > 1,
                        "detail": "order: " + " → ".join(order)},
-        "SearXNG": searxng,
+        "SearXNG": {**searxng, "detail": searxng["detail"] + await _engine_summary()},
         "GitHub API": github,
         "Maigret": await asyncio.to_thread(_maigret),
         "Subfinder": {"ok": shutil.which("subfinder") is not None,
