@@ -1,0 +1,85 @@
+# O'zgarishlar tarixi
+
+Versiyalar [Semantic Versioning](https://semver.org/) bo'yicha: `MAJOR.MINOR.PATCH`.
+`1.0.0` Agent rejimi (ROADMAP Faza 6) tayyor bo'lganda qo'yiladi.
+Versiya raqami bitta joyda turadi: `backend/VERSION`.
+
+Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi teg
+(`vX.Y.Z`) va GitHub Release oladi.
+
+## [0.5.1] — 2026-11-19
+### Qo'shildi
+- Versiyalash: `backend/VERSION`, shu CHANGELOG, eski bosqichlarga orqaga qarab teglar.
+- GitHub Actions CI: har push va PR'da Docker testlari va frontend sintaksis tekshiruvi.
+- `dev` va `stage` branchlari; `main` himoyalangan (CI o'tmasa merge yo'q).
+
+### O'zgardi
+- API ko'rsatadigan versiya endi `backend/VERSION`'dan olinadi (avval qo'lda yozilgan `1.0.0` edi).
+
+## [0.5.0] — 2026-11-18
+To'liq bepul ishlash, yangi bepul manbalar, rasm geolokatsiyasi, lokal AI.
+
+### Qo'shildi
+- Bepul sanksiya/PEP indeksi: BMT, OFAC, EI, Buyuk Britaniya ro'yxatlari (OpenSanctions API o'rniga).
+- Rasm geolokatsiyasi: EXIF, OCR, GeoCLIP, lokal vision model, xaritada natija.
+- O'zbekiston rasmiy reyestrlari (data.egov.uz, 19 to'plam) kompaniya va ism qidiruvida.
+- openinfo.uz: kompaniya rahbariyati rasmiy oshkor qilingan ma'lumotdan.
+- DNS tarixi (o'z kuzatuvlari + Mnemonic + Robtex), SecurityTrails o'rniga.
+- E'lon qilingan emaillar (security.txt, DMARC, sayt sahifalari), Hunter o'rniga.
+- Breach natijalari HIBP'ning bepul katalogi bilan boyitildi.
+- Server tomonidagi lokal AI qatlami: dalilga asoslangan, uydirmasiz, faqat zaif signal.
+
+### O'zgardi
+- Pullik kalitlar ixtiyoriy; kalit bo'lmasa manba jim o'tkazib yuboriladi.
+- SearXNG qidiruv tizimlari aniq yoqildi, natijalar keshlanadi, tizimlar holati ko'rsatiladi.
+- Kompaniya qidiruvi tezroq: sho'ba kompaniyalar, Companies House.
+
+### Tuzatildi
+- Ikkinchi code review topilmalari (B1–B3, M1–M6): uzun so'rovda xotira tugashi,
+  jim "toza" sanksiya javobi, katta javoblar, rasm "decompression bomb", Ollama proxy ochiqligi va boshqalar.
+
+## [0.4.0] — 2026-11-16
+Yangi ROADMAP bo'yicha Faza 1–4.
+
+### Qo'shildi
+- Faza 1: Deep Scan sifati.
+- Faza 2: ehtimoliy bog'lash (Fellegi–Sunter uslubida ball).
+- Faza 3: yangi manbalar va qamrov.
+- Faza 4 (poydevor): Holehe jarayon ichida, xavfsiz modullar ro'yxati bilan.
+- XposedOrNot: kalitsiz breach tekshiruvi.
+
+### Tuzatildi
+- Faza 1b: review tuzatishlari.
+- Telefon natijasida tekshirilmagan havolalar aniq belgilandi.
+- Tez tuzatishlar: CORS, watch keshi, dossier nomi.
+
+## [0.3.0] — 2026-11-09
+### Qo'shildi
+- Monitoring (Watch): jadval bo'yicha qayta skan va o'zgarishlarni aniqlash.
+
+## [0.2.0] — 2026-11-09
+### Qo'shildi
+- Case (tergov) boshqaruvi.
+- Deep Scan: pivotlarni avtomatik kuzatish.
+- Korrelatsiya dvigateli (identity clusters).
+- PDF dossier (Unicode shrift bilan).
+
+### Tuzatildi
+- Korrelatsiyada handle shovqini (stoplist va chastota chegarasi).
+
+## [0.1.0] — 2026-11-07
+Birinchi to'liq to'plam.
+
+### Qo'shildi
+- Username, email, telefon, ism qidiruvlari (Sherlock, Maigret, Holehe va boshqalar).
+- Kompaniya: SEC EDGAR, GDELT, OpenCorporates; Corporate Exposure Scanner.
+- Domen: Wayback CDX, favicon hash, robots/security.txt, SAN pivotlari.
+- Digital Footprint hisoboti, entity graph, PDF eksport.
+- Lokal Qwen (Ollama) orqali AI xulosa va rasm tahlili.
+
+[0.5.1]: https://github.com/lutfullo-hbai/osint/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/lutfullo-hbai/osint/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/lutfullo-hbai/osint/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/lutfullo-hbai/osint/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/lutfullo-hbai/osint/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/lutfullo-hbai/osint/releases/tag/v0.1.0
