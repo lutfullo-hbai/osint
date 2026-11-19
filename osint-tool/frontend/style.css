@@ -407,6 +407,11 @@ main {
   line-height: 1.55;
   word-break: break-word;
 }
+.card-meta .retrieved {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  opacity: 0.8;
+}
 .card-meta .tag,
 .tag {
   display: inline-block;
@@ -1058,3 +1063,39 @@ a.agent-source:hover { background: rgba(34, 211, 238, 0.12); }
 #panel-contacts .results > .warnings,
 #panel-contacts .results > .empty-state { grid-column: 1 / -1; }
 .agent-contacts .agent-value { align-items: center; }
+
+/* ---- Data tab (8.2-8.4) ---- */
+#panel-data { display: none; }
+#panel-data.active { display: grid; gap: 18px; }
+.data-block {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  min-width: 0;
+}
+.data-title { margin: 0 0 8px; font-size: 1rem; }
+.data-danger { border-color: rgba(251, 113, 133, 0.35); }
+.data-list { display: grid; gap: 6px; }
+.data-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px;
+}
+.data-row-text { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
+.data-row-meta { color: var(--muted); font-family: var(--mono); font-size: 0.78rem; }
+.data-table-wrap { overflow-x: auto; max-width: 100%; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.data-table th, .data-table td {
+  text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border);
+  vertical-align: top; overflow-wrap: anywhere;
+}
+.data-table th { color: var(--muted); font-weight: 600; }
+.data-table td:first-child { font-family: var(--mono); white-space: nowrap; }
+.data-table td.bad { color: var(--red); }
+.data-check { display: flex; gap: 8px; align-items: center; margin: 6px 0 10px; color: var(--muted); }
+.case-new button.ghost, #panel-data button.ghost {
+  background: transparent; border: 1px solid var(--border-strong); color: var(--text);
+  border-radius: 10px; padding: 8px 12px; cursor: pointer; font-family: var(--mono);
+}
+.case-new button.danger { background: var(--red); color: #160309; }
+.case-new button:disabled { opacity: 0.45; cursor: not-allowed; }

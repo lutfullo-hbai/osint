@@ -74,24 +74,25 @@ tekshiradi:
   multicast IP'lar rad etiladi
 - redirect'lar qo'lda kuzatiladi va har bir manzil qayta tekshiriladi
 
-### API key (ixtiyoriy)
-`OSINT_API_KEY` bo'sh bo'lsa API ochiq (lokal rejim). O'rnatilsa, barcha `/api/*`
-so'rovlar `X-API-Key` sarlavhasini talab qiladi (`/health` ochiq qoladi).
+### Kirish (API kalit) — ROADMAP 8.4
+- **Kalit yo'q** (standart): API faqat shu kompyuter va lokal tarmoqdan (127.0.0.1,
+  10.x, 172.16–31.x, 192.168.x) javob beradi. Ommaviy IP'dan kelgan so'rov **403**
+  oladi. Ataylab ochish uchun `ALLOW_OPEN_ACCESS=1` qo'ying (tavsiya etilmaydi).
+- **`OSINT_API_KEY`**: barcha `/api/*` so'rovlar `X-API-Key` sarlavhasini talab qiladi
+  (`/health` ochiq). Bu kalit egasi — `admin`.
+- **`OSINT_USERS=alice:<kalit>,bob:<kalit>`**: nomli kalitlar, audit log'da "kim"
+  ko'rinadi. Audit log'ni o'qish va hammasini o'chirish faqat `admin`'ga ruxsat.
 
 ```bash
-OSINT_API_KEY=my-secret docker compose up -d --build
+OSINT_API_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))") docker compose up -d --build
 ```
 
-Barcha sozlamalar `.env.example` faylida hujjatlashtirilgan (nusxalab `.env` qiling).
-Kalit bo'lmasa, tegishli manba o'tkazib yuboriladi (buzilmaydi).
+Kalit kamida 16 belgi bo'lsin (qisqa bo'lsa ishga tushishda ogohlantirish chiqadi).
+Teskari proksi (nginx, Caddy) orqasida tarmoqqa ochsangiz, **albatta** kalit qo'ying:
+proksi orqali kelgan so'rov lokal ko'rinadi.
 
-Frontend kalitni brauzer `localStorage`'ida saqlaydi:
-
-```js
-localStorage.setItem("osint_api_key", "my-secret");
-```
-
-O'chirish: `localStorage.removeItem("osint_api_key")`.
+Frontend'da kalit **Data** tabida kiritiladi va faqat shu brauzerda saqlanadi.
+Barcha sozlamalar `.env.example` faylida (nusxalab `.env` qiling).
 
 ### Rate limiting
 IP bo'yicha, `slowapi` orqali (env bilan sozlanadi):
@@ -231,14 +232,38 @@ mavjud bo'lmasa, jarayon ichidagi xotira keshiga fallback qiladi.
   (Google/OSM/Yandex/Bing/Earth/StreetView/SunCalc), **OCR**, **dHash**, EXIF
   thumbnail va teskari rasm qidiruvi. Fayl yuklash yo'q — faqat `http(s)` URL.
 
-### Audit log
-Har bir so'rov stdout'ga JSON-lines ko'rinishida yoziladi: `request_id`, metod, yo'l,
-client IP, status, davomiylik va **query SHA-256 hash** (xom PII saqlanmaydi). Javobda
-`X-Request-ID` sarlavhasi qaytadi.
+### Audit log — ROADMAP 8.3
+Har bir qidiruv, saqlash, o'chirish va yuklab olish (PDF, graf) lokal SQLite'ga
+yoziladi: **kim** (kalit nomi yoki `local`), **qachon** (UTC), **nima** (yo'l,
+kategoriya, qidirilgan matn), client IP va status. Rad etilgan so'rovlar ham
+(`refused`, 401/403) yoziladi. Ko'rish: **Data** tabi yoki `GET /api/audit` (admin).
+
+- `AUDIT_RETENTION_DAYS=90` — eski yozuvlar avtomatik o'chiriladi
+- `AUDIT_LOG_QUERIES=0` — qidirilgan matn o'rniga faqat uning SHA-256 hash'i saqlanadi
+
+Bundan tashqari har bir so'rov stdout'ga JSON-lines bo'lib chiqadi (u yerda faqat
+query hash, xom matn yo'q) va javobda `X-Request-ID` qaytadi:
 
 ```bash
 docker compose logs -f backend | grep '"event": "audit"'
 ```
+
+### Manba va vaqt — ROADMAP 8.1
+Har bir natija o'z manbasini (`platform`, `url`) va **olingan vaqtini**
+(`retrieved_at`, UTC) olib yuradi. Keshdan qaytgan javob asl so'rov vaqtini saqlaydi.
+Agent nomzodining har bir maydoni, shaxs kartasi (PDF) va case'ga saqlangan
+topilmalar ham shu vaqtni ko'rsatadi.
+
+### To'liq o'chirish — ROADMAP 8.2
+- Case: **Cases** tabida; Agent run (qadamlar, nomzodlar, qarorlar bilan):
+  **Data** tabida yoki `DELETE /api/agent/{id}`
+- **Hammasi**: **Data** tabida "DELETE ALL" deb yozib, yoki
+  `DELETE /api/data {"confirm": "DELETE ALL", "include_audit": false}` (admin).
+  O'chiriladi: case'lar, topilmalar, watch'lar, Agent run'lar, Redis'dagi kesh va job
+  natijalari. `secure_delete` + `VACUUM` bilan diskda nusxa qolmaydi. Ochiq
+  ma'lumotlar to'plamlari (sanksiyalar, reyestrlar) shaxsiy ma'lumot emas va qoladi.
+  Audit log faqat `include_audit: true` bo'lsa o'chadi; o'chirish so'rovining o'zi
+  audit'ga yoziladi.
 
 ## Testlar
 
@@ -248,10 +273,44 @@ docker compose --profile test run --rm tests
 
 Testlar SSRF (private IP, redirect), API key (401) va rate limit (429)ni qamrab oladi.
 
-## Muhim eslatma
+## Foydalanish shartlari — ROADMAP 8.5
 
-Faqat ochiq manbalardan va **ruxsat etilgan** tekshiruvlar uchun foydalaning.
-Truecaller/reverse-search kabi tashqi xizmatlar o'z ToS'iga ega.
+Bu vosita ochiq manbalardagi ma'lumotni **qonuniy maqsadda** tekshirish uchun.
+Foydalanish orqali quyidagilarga rozilik bildirasiz.
+
+**Ruxsat etilgan maqsadlar**
+- O'zingizni himoya qilish: o'z raqamli izingizni, sizib chiqqan ma'lumotlaringizni,
+  sizning nomingizdan ochilgan soxta profillarni tekshirish
+- Firibgarlik va ijtimoiy muhandislikdan himoya: kontragent, ish beruvchi, sotuvchi
+  yoki tanishuv ilovasidagi shaxsni ochiq manbalar bo'yicha tekshirish
+- Kompaniya xavfsizligi va due diligence, ruxsat etilgan pentest va red team
+- Jurnalistik tadqiqot, akademik tadqiqot, yo'qolgan odamni qidirish (vakolatli
+  tashkilotlar bilan hamkorlikda)
+
+**Taqiqlanadi**
+- **Doxxing**: shaxsning manzili, telefoni, oilasi va shunga o'xshash ma'lumotlarini
+  uni qo'rqitish, sharmanda qilish yoki unga zarar yetkazish uchun yig'ish yoki tarqatish
+- Ta'qib qilish (stalking), kuzatish, tahdid, shantaj, kamsitish
+- Sobiq yoki hozirgi sherigingizni, qo'shningizni yoki boshqa shaxsni uning
+  roziligisiz kuzatish
+- Yig'ilgan ma'lumotni sotish yoki ma'lumotlar bazasiga to'plash
+- Sizib chiqqan bazalar, "probiv" xizmatlari yoki login/parol talab qiladigan
+  manbalar bilan birlashtirish (vosita ularni ataylab ishlatmaydi)
+
+**Sizning javobgarligingiz**
+- Natija — **nomzodlar ro'yxati**, identifikatsiya emas. Har bir qiymat manba
+  havolasi bilan beriladi; undan foydalanishdan oldin manbani o'zingiz tekshiring.
+  Yakuniy qaror sizda.
+- Shaxsga doir ma'lumotlar bilan ishlaganda o'z mamlakatingiz qonunlariga amal
+  qiling (O'zbekistonda: "Shaxsga doir ma'lumotlar to'g'risida"gi Qonun, ZRU-547;
+  Yevropada: GDPR). Ma'lumotni maqsadga kerakli muddatdan ortiq saqlamang:
+  keraksiz case va run'larni o'chiring (8.2).
+- Tashqi xizmatlar (Truecaller, qidiruv tizimlari, saytlar) o'z foydalanish
+  shartlariga ega; vosita robots.txt va so'rov chegaralariga amal qiladi.
+- Bu bo'lim yuridik maslahat emas. Shubha bo'lsa, huquqshunos bilan maslahatlashing.
+
+Vositani tarmoqqa ochgan bo'lsangiz, kirishni kalit bilan cheklang (8.4) va audit
+log'ni (8.3) kuzatib boring: kim nimani qidirganini bilish suiiste'molning oldini oladi.
 
 ## Versiya va ish tartibi
 

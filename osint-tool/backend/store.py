@@ -6,6 +6,8 @@ import sqlite3
 import uuid
 from datetime import datetime, timezone
 
+from services.provenance import stamp
+
 DB_PATH = os.environ.get("CASES_DB_PATH", "/app/data/cases.db")
 MAX_NAME = 120
 
@@ -25,6 +27,8 @@ def _connect() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    # 8.2: deleted rows are overwritten with zeros, not left in free pages
+    conn.execute("PRAGMA secure_delete=ON")
     return conn
 
 
@@ -78,6 +82,13 @@ def init_db() -> None:
             "note TEXT, at TEXT NOT NULL, PRIMARY KEY (run_id, candidate_id), "
             "FOREIGN KEY(run_id) REFERENCES agent_runs(id) ON DELETE CASCADE)"
         )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS audit_log ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, user TEXT NOT NULL, "
+            "client TEXT, method TEXT NOT NULL, path TEXT NOT NULL, status INTEGER, "
+            "action TEXT, query TEXT, request_id TEXT)"
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log(at)")
 
 
 def create_case(name: str) -> dict:
@@ -145,7 +156,7 @@ def add_finding(case_id: str, category: str, query: str, result: dict) -> dict:
         conn.execute(
             "INSERT INTO findings (id, case_id, category, query, result, created_at) "
             "VALUES (?,?,?,?,?,?)",
-            (finding_id, case_id, category, query, json.dumps(result), now),
+            (finding_id, case_id, category, query, json.dumps(stamp(result, now)), now),
         )
         conn.execute("UPDATE cases SET updated_at=? WHERE id=?", (now, case_id))
     return {"id": finding_id, "created_at": now}
@@ -377,6 +388,8 @@ def add_agent_step(run_id: str, kind: str, text: str) -> None:
                            (run_id,)).fetchone()[0]
         if seq > MAX_AGENT_STEPS:
             return
+        if conn.execute("SELECT 1 FROM agent_runs WHERE id = ?", (run_id,)).fetchone() is None:
+            return                              # the run was deleted while it worked (8.2)
         conn.execute("INSERT INTO agent_steps VALUES (?, ?, ?, ?, ?)",
                      (run_id, seq, kind[:20], str(text)[:400], _now()))
         conn.execute("UPDATE agent_runs SET updated_at = ? WHERE id = ?", (_now(), run_id))
@@ -423,3 +436,75 @@ def set_agent_decision(run_id: str, candidate_id: str, decision: str, note: str 
             conn.execute("INSERT OR REPLACE INTO agent_decisions VALUES (?, ?, ?, ?, ?)",
                          (run_id, candidate_id, decision, str(note or "")[:300], now))
     return {"candidate_id": candidate_id, "decision": decision, "note": str(note or "")[:300], "at": now}
+
+
+def delete_agent_run(run_id: str) -> None:
+    """8.2: a run with its steps, candidates and your decisions."""
+    with _connect() as conn:
+        conn.execute("PRAGMA foreign_keys=ON")
+        conn.execute("DELETE FROM agent_steps WHERE run_id=?", (run_id,))
+        conn.execute("DELETE FROM agent_decisions WHERE run_id=?", (run_id,))
+        if conn.execute("DELETE FROM agent_runs WHERE id=?", (run_id,)).rowcount == 0:
+            raise CaseError("Run not found.")
+
+
+# ---- Full deletion (8.2) ----
+
+USER_TABLES = ("findings", "cases", "watch_events", "watches",
+               "agent_steps", "agent_decisions", "agent_runs")
+
+
+def wipe_all(include_audit: bool = False) -> dict:
+    """Delete every case, finding, watch and Agent run, then compact the file
+    so nothing is left in free pages or the WAL. The public datasets
+    (sanctions, registers) are not user data and stay."""
+    counts = {}
+    with _connect() as conn:
+        for table in USER_TABLES + (("audit_log",) if include_audit else ()):
+            counts[table] = conn.execute(f"DELETE FROM {table}").rowcount   # noqa: S608 - fixed names
+    with _connect() as conn:
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        conn.execute("VACUUM")
+    return counts
+
+
+# ---- Audit log (8.3) ----
+
+AUDIT_RETENTION_DAYS = int(os.environ.get("AUDIT_RETENTION_DAYS", "90"))
+MAX_AUDIT_QUERY = 200
+AUDIT_PAGE = 200
+
+
+def add_audit(entry: dict) -> None:
+    """Who, when, what. Old entries beyond the retention period are dropped."""
+    query = entry.get("query")
+    with _connect() as conn:
+        conn.execute(
+            "INSERT INTO audit_log (at, user, client, method, path, status, action, query, request_id) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            (entry.get("at") or _now(), str(entry.get("user") or "?")[:40], entry.get("client"),
+             entry.get("method") or "", str(entry.get("path") or "")[:300], entry.get("status"),
+             entry.get("action"), str(query)[:MAX_AUDIT_QUERY] if query else None, entry.get("request_id")),
+        )
+        if AUDIT_RETENTION_DAYS > 0:
+            cutoff = datetime.now(timezone.utc).timestamp() - AUDIT_RETENTION_DAYS * 86400
+            conn.execute("DELETE FROM audit_log WHERE at < ?",
+                         (datetime.fromtimestamp(cutoff, timezone.utc).isoformat(timespec="seconds"),))
+
+
+def list_audit(limit: int = 100, user: str = "", search: str = "", before_id: int = 0) -> list[dict]:
+    sql, args = "SELECT * FROM audit_log WHERE 1=1", []
+    if user:
+        sql += " AND user = ?"
+        args.append(user)
+    if search:
+        sql += " AND (query LIKE ? OR path LIKE ? OR action LIKE ?)"
+        like = "%" + search.replace("%", "").replace("_", "") + "%"
+        args += [like, like, like]
+    if before_id:
+        sql += " AND id < ?"
+        args.append(before_id)
+    sql += " ORDER BY id DESC LIMIT ?"
+    args.append(max(1, min(int(limit), AUDIT_PAGE)))
+    with _connect() as conn:
+        return [dict(r) for r in conn.execute(sql, args).fetchall()]
