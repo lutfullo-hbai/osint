@@ -6,3 +6,7 @@ __pycache__/
 # session transcripts
 session-*.md
 .session-*.md.save
+
+# 9-modul: dalil jurnali (shaxsiy ma'lumot, git'ga joylanmaydi)
+dalillar.jsonl
+dalillar/

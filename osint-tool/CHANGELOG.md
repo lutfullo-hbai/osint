@@ -8,6 +8,14 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 (`vX.Y.Z`) va GitHub Release oladi.
 
 ## [Unreleased]
+O'quv kursining yakuniy moduli (Faza 9).
+
+### Qo'shildi
+- **9-modul: yakuniy loyiha** (`09-yakuniy-loyiha/`): self-OSINT metodologiyasi, dalillarni
+  hujjatlashtirish, Admiralty bahosi, 8 bosqichli loyiha va baholash mezonlari,
+  hisobot va rozilik shablonlari.
+- `evidence_log.py`: dalil jurnali — URL, UTC vaqt, SHA-256, nusxa va `verify`, NEXUS JSON
+  eksportidan import (`retrieved_at` bilan), Markdown ilova.
 
 ## [0.8.0] — 2026-11-19
 Qonuniy va operatsion talablar (Faza 8).
