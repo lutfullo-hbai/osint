@@ -48,7 +48,10 @@ _SKIP_TAGS_RE = re.compile(r"<(script|style|noscript|svg)\b[^>]*>.*?</\1>", re.I
 # messenger links that carry a handle or a number in the path
 _MESSENGER_RE = re.compile(r"^https?://(?:www\.)?(t\.me|telegram\.me|wa\.me|api\.whatsapp\.com)/", re.IGNORECASE)
 _SKIP_SITES = ("schema.org", "w3.org", "googleapis.com", "gstatic.com", "googletagmanager.com",
-               "google-analytics.com", "cloudflare.com", "jsdelivr.net", "fonts.", "cdn.")
+               "google-analytics.com", "cloudflare.com", "jsdelivr.net", "fonts.", "cdn.",
+               # app-store and share links are not the person's own site
+               "apps.apple.com", "itunes.apple.com", "play.google.com", "appgallery.huawei.com",
+               "addtoany.com", "sharethis.com")
 
 
 def _strip_html(html: str) -> str:
