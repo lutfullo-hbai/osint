@@ -8,6 +8,10 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 (`vX.Y.Z`) va GitHub Release oladi.
 
 ## [Unreleased]
+
+## [0.7.1] — 2026-11-19
+Faza 7 sinovi tuzatishlari.
+
 ### Tuzatildi
 - Contacts: `file:`, `ftp:`, `javascript:` manzillariga aniq xabar; App Store va ulashish havolalari "website" emas.
 - Contacts tabi: natija kartasi to'liq kenglikda, har bir manba sahifa yo'li bilan ("/contact").
@@ -114,7 +118,8 @@ Birinchi to'liq to'plam.
 - Digital Footprint hisoboti, entity graph, PDF eksport.
 - Lokal Qwen (Ollama) orqali AI xulosa va rasm tahlili.
 
-[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/lutfullo-hbai/osint/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/lutfullo-hbai/osint/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/lutfullo-hbai/osint/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/lutfullo-hbai/osint/compare/v0.5.0...v0.5.1
