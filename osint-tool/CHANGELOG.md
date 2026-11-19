@@ -9,6 +9,22 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-11-19
+Shaxs kartasi va yangi manbalar (Faza 7).
+
+### Qo'shildi
+- **Shaxs kartasi (7.1)**: Agent nomzodi uchun PDF — manbali maydonlar, kontaktlar, dalillar zanjiri, qaroringiz.
+- **Kontakt ajratuvchi (7.2, 7.7)**: profil matni va shaxsiy saytdan email, telefon, profil havolalari;
+  yangi Contacts tab (istalgan sahifa URL'i).
+- **orginfo.uz (7.4)**: ism bo'yicha rahbar/ta'sischi bo'lgan kompaniyalar, kompaniya bo'yicha rahbar va ta'sischilar.
+- Ism qidiruvida hujjat dork'lari (PDF/Word/Excel) va qo'lda tekshirish havolalari (public.sud.uz,
+  data.egov.uz, orginfo.uz); emailda Epieos havolasi (7.3, 7.5).
+- Agent'da ish joyi va o'qish joyi; "Narrow down" maydonlari (7.6).
+- Graf eksporti: GraphML va Maltego CSV (7.8).
+
+### Tuzatildi
+- Agent parseri "Samarqanddan" kabi qo'sh harfli shahar nomlarini tanimas edi.
+
 ## [0.6.0] — 2026-11-19
 Agent rejimi (Faza 6).
 
@@ -91,7 +107,8 @@ Birinchi to'liq to'plam.
 - Digital Footprint hisoboti, entity graph, PDF eksport.
 - Lokal Qwen (Ollama) orqali AI xulosa va rasm tahlili.
 
-[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/lutfullo-hbai/osint/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/lutfullo-hbai/osint/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/lutfullo-hbai/osint/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/lutfullo-hbai/osint/compare/v0.4.0...v0.5.0

@@ -1038,3 +1038,18 @@ a.agent-source:hover { background: rgba(34, 211, 238, 0.12); }
   .agent-field-name { padding-top: 8px; }
 }
 .agent-profiles { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* Faza 7: narrow-down fields, published contacts, evidence chain */
+.agent-narrow { flex-basis: 100%; margin-top: 6px; font-size: 13px; }
+.agent-narrow summary { cursor: pointer; color: var(--muted, #8a8fa8); }
+.agent-narrow-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 8px; }
+.agent-narrow-fields label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted, #8a8fa8); }
+.agent-narrow-fields input { width: 100%; min-width: 0; flex: 0 0 auto; }
+.agent-contact-box { margin: 8px 0; }
+.agent-contacts { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.agent-contacts .tag { margin-right: 2px; }
+.agent-chain { margin: 6px 0; font-size: 13px; }
+.agent-chain summary { cursor: pointer; }
+.agent-chain ol { margin: 6px 0 0 18px; padding: 0; }
+.agent-chain li { margin: 2px 0; overflow-wrap: anywhere; }
+.agent-contact-box .agent-missing { font-size: 13px; }
