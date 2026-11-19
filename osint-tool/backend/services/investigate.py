@@ -3,7 +3,7 @@ import contextvars
 import hashlib
 import ipaddress
 import re
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import httpx
 
@@ -36,7 +36,7 @@ from tools.email_domain import (
 from tools.email_intel import lookup_breaches, lookup_emailrep
 from tools.holehe_runner import run_holehe
 from tools.domain_emails import find_domain_emails
-from tools import openinfo, passive_dns, username_canary, uz_registry
+from tools import openinfo, orginfo, passive_dns, username_canary, uz_registry
 from tools.hub_domains import is_hub_domain
 from tools.profile_history import annotate_first_archived
 from services.names import username_variants
@@ -56,7 +56,7 @@ from tools.company_intel import (
     run_company_search,
 )
 from tools.entity_intel import run_person_entity, run_sanctions_check
-from tools.name_search import run_name_search, run_username_web
+from tools.name_search import name_manual_links, run_name_search, run_username_web
 from tools.phone_intel import PhoneParseError, analyze, manual_check_links
 from tools.public_profiles import manual_links, run_name_sources, run_profile_sources
 from tools.public_search import filter_results_containing, search_public
@@ -246,6 +246,7 @@ async def _investigate_name(name: str) -> dict:
             "Knowledge base": run_person_entity(name),
             "Sanctions": run_sanctions_check(name),
             "UZ registers": asyncio.to_thread(uz_registry.search_person, name),
+            "orginfo.uz": orginfo.lookup_person(name),
         }
     )
     if not outcomes:
@@ -264,6 +265,10 @@ async def _investigate_name(name: str) -> dict:
     # people listed with a role in an official register (board, notary...)
     results.extend(uz_registry.to_result(hit, as_person=True)
                    for hit in outcomes.get("UZ registers") or [])
+    if "orginfo.uz" in outcomes:
+        # heads and founders of companies (7.4): the companies are pivots
+        results.extend(outcomes["orginfo.uz"]["results"])
+        pivots.extend(outcomes["orginfo.uz"]["pivots"])
     if "Public sources" in outcomes:
         sources = outcomes["Public sources"]
         results.extend(sources["results"])
@@ -284,6 +289,7 @@ async def _investigate_name(name: str) -> dict:
         "results": results,
         "count": len(results),
         "notice": NAME_NOTICE,
+        "links": [{**link, "checked": False} for link in name_manual_links(name)],
     }
     # handles people commonly build from a name: leads to check, never results
     ideas = username_variants(name, limit=6)
@@ -510,6 +516,9 @@ async def _investigate_email(email: str) -> dict:
         "results": results,
         "count": len(results),
         "pivots": _dedupe_pivots(email_pivots),
+        # 7.5: Epieos needs a person at the keyboard; the tool never opens it
+        "links": [{"label": "Epieos (Google account, calendars) — opens in your browser",
+                   "url": f"https://epieos.com/?q={quote(email)}&t=email", "checked": False}],
     }
     if warnings:
         response["warnings"] = warnings
@@ -838,10 +847,11 @@ async def investigate_image(raw_url: str) -> dict:
 
 async def _investigate_company(query: str) -> dict:
     # Uzbek official registers (local index) alongside the global LEI register
-    outcome, uz_hits, disclosure = await asyncio.gather(
+    outcome, uz_hits, disclosure, directory = await asyncio.gather(
         run_company_search(query),
         asyncio.to_thread(uz_registry.search_org, query),
         openinfo.lookup(query),
+        orginfo.lookup_company(query),
         return_exceptions=True,
     )
     warnings = []
@@ -854,8 +864,12 @@ async def _investigate_company(query: str) -> dict:
         warnings.append(f"openinfo.uz: {disclosure}")
         _mark_failed("openinfo.uz")
         disclosure = {"results": [], "pivots": []}
+    if isinstance(directory, BaseException):
+        warnings.append(f"orginfo.uz: {directory}")
+        _mark_failed("orginfo.uz")
+        directory = {"results": [], "pivots": []}
     if isinstance(outcome, BaseException):
-        if not uz_hits and not disclosure["results"]:
+        if not uz_hits and not disclosure["results"] and not directory["results"]:
             raise outcome
         warnings.append(f"GLEIF: {outcome}")
         _mark_failed("GLEIF")
@@ -864,8 +878,8 @@ async def _investigate_company(query: str) -> dict:
     uz_partial = [uz_registry.to_result(h) for h in uz_hits if h.get("match") == "partial"]
     # the company's own disclosure first, exact register matches, the global
     # registers, then Uzbek companies whose name merely contains the query
-    results = disclosure["results"] + uz_exact + outcome["results"] + uz_partial
-    outcome["pivots"] = list(outcome.get("pivots") or []) + disclosure["pivots"]
+    results = disclosure["results"] + uz_exact + directory["results"] + outcome["results"] + uz_partial
+    outcome["pivots"] = list(outcome.get("pivots") or []) + disclosure["pivots"] + directory["pivots"]
     if warnings:
         outcome.setdefault("warnings", []).extend(warnings)
     response = {

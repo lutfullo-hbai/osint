@@ -226,19 +226,22 @@ UI va sozlash:
       42 Sherlock + 4 Maigret sayti e'tiborsiz; bitta ishda ko'p handle'ni "topgan" sayt ham chiqariladi
 - [ ] 6.8 Haqiqiy belgilangan holatlar bilan baholash (2.7 bilan birga)
 
-## Faza 7 — Shaxs kartasi va yangi manbalar — M/L
-- [ ] 7.1 Shaxs kartasi + PDF: profillar, ochiq kontaktlar, dalillar zanjiri
-- [ ] 7.2 Ochiq sahifalardan kontakt ajratish (bio, kanal tavsifi, OLX e'lon, sayt "Kontakt"
-      sahifasi) — har biri manbasi bilan
-- [ ] 7.3 `filetype:pdf/doc/xls` dork'lari ism qidiruviga
-- [ ] 7.4 orginfo.uz: rahbar/ta'sischi → Company, Name pivot (ishonchliligi o'rta deb belgilanadi)
-- [ ] 7.5 public.sud.uz, Epieos, data.egov.uz — qo'lda tekshirish havolalari
-- [ ] 7.6 Aniqlashtiruvchi maydonlar: shahar, ish joyi, yosh, o'qish joyi
-- [ ] 7.7 Kontakt ajratuvchi (Photon g'oyasi, o'zimizning kod): sayt yoki profil sahifasidan
-      1 chuqurlikda ≤ 10 sahifa, `safe_get` orqali, robots.txt hurmat qilinadi → email, ijtimoiy
-      havolalar, telefon — har biri sahifa URL'i bilan (7.2 shu modulni ishlatadi) — M
-- [ ] 7.8 Grafni eksport qilish: GraphML va Maltego CE uchun CSV (Deep Scan node/edge,
-      dalillari bilan) — S
+## Faza 7 — Shaxs kartasi va yangi manbalar ✅
+- [x] 7.1 Shaxs kartasi + PDF: profil maydonlari manbasi bilan, e'lon qilingan kontaktlar, dalillar zanjiri
+      (qidiruvdan har bir yozuvgacha), qaroringiz (Confirm/Reject) kartada
+- [x] 7.2 Kontaktlar profil matnidan (bio, kanal tavsifi, website maydoni) va eng yaxshi nomzodlarning
+      shaxsiy saytidan (≤ 3 sayt, har biri ≤ 5 sahifa) — har biri sahifa URL'i bilan
+- [x] 7.3 `filetype:pdf/doc/docx/xls/xlsx` dork'i ism qidiruvida; natija "Document (PDF)" deb belgilanadi
+- [x] 7.4 orginfo.uz: ism → rahbar/ta'sischi bo'lgan kompaniyalar (Company pivot, STIR), kompaniya →
+      rahbar va ta'sischilar (Name pivot); "Reliability: medium" deb belgilanadi
+- [x] 7.5 Qo'lda tekshirish havolalari: public.sud.uz, data.egov.uz, orginfo.uz, Google hujjatlar (ism);
+      Epieos (email)
+- [x] 7.6 Aniqlashtiruvchi maydonlar: shahar, yosh, ish joyi, o'qish joyi (Agent formasida va erkin
+      matnda: "Artelda ishlaydi", "TATU talabasi", "works at", "работает в"); ish joyi mos kelsa +1.5
+- [x] 7.7 Kontakt ajratuvchi: sahifa + 1 chuqurlikda ≤ 10 sahifa, `safe_get`, robots.txt, pauza;
+      telefonlar `phonenumbers` bilan tekshiriladi, Message-ID va namuna manzillar tashlanadi; Contacts tab
+- [x] 7.8 Graf eksporti: GraphML (Gephi/yEd/Cytoscape) va Maltego CE CSV — dalil sahifalari bilan,
+      CSV formula injection'dan himoyalangan
 
 ## Faza 8 — Qonuniy va operatsion talablar — S/M
 - [ ] 8.1 Har bir maydon manbasi va olingan vaqti saqlanadi (ZRU-547, 30-modda)

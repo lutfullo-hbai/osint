@@ -1,4 +1,5 @@
 import re
+from urllib.parse import quote_plus
 
 from tools.public_search import platform_from_url, search_public
 
@@ -13,6 +14,11 @@ PROFESSIONAL_BATCH = (
     "(site:wikipedia.org OR site:hh.uz OR site:hh.ru OR site:researchgate.net "
     "OR site:academia.edu OR site:scholar.google.com OR site:habr.com)"
 )
+# 7.3: documents that name the person (lists, protocols, theses, price lists)
+DOCUMENT_BATCH = (
+    "(filetype:pdf OR filetype:doc OR filetype:docx OR filetype:xls OR filetype:xlsx)"
+)
+DOCUMENT_EXTENSIONS = (".pdf", ".doc", ".docx", ".xls", ".xlsx")
 NEWS_BATCH = (
     "(site:kun.uz OR site:daryo.uz OR site:gazeta.uz OR site:uza.uz "
     "OR site:qalampir.uz OR site:gov.uz)"
@@ -84,7 +90,8 @@ def name_variants(name: str) -> list[str]:
 def build_batches(variants: list[str]) -> list[str]:
     primary = f'"{variants[0]}"'
     batches = [f"{primary} {batch}" for batch in SOCIAL_BATCHES]
-    batches += [f"{primary} {PROFESSIONAL_BATCH}", f"{primary} {NEWS_BATCH}"]
+    batches += [f"{primary} {PROFESSIONAL_BATCH}", f"{primary} {NEWS_BATCH}",
+                f"{primary} {DOCUMENT_BATCH}"]
     for variant in variants[1:]:
         batches.append(f'"{variant}" {SOCIAL_BATCHES[0]}')
         batches.append(f'"{variant}" {NEWS_BATCH}')
@@ -119,10 +126,38 @@ def filter_by_name(items: list[dict], variants: list[str]) -> tuple[list[dict], 
     return kept, len(items) - len(kept)
 
 
+def mark_documents(items: list[dict]) -> list[dict]:
+    """Label results that are files (PDF, Word, Excel) rather than web pages."""
+    out = []
+    for item in items:
+        path = (item.get("url") or "").split("?")[0].split("#")[0].lower()
+        ext = next((e for e in DOCUMENT_EXTENSIONS if path.endswith(e)), None)
+        if ext:
+            item = {**item, "kind": "document",
+                    "platform": f"Document ({ext[1:].upper()}) — {item.get('platform') or 'web'}"}
+        out.append(item)
+    return out
+
+
+def name_manual_links(name: str) -> list[dict]:
+    """Sources the tool does not query itself (7.5): they need a person at the
+    keyboard (search forms, CAPTCHA) or have no stable search URL."""
+    quoted = quote_plus(f'"{name}"')
+    register_name = quote_plus(re.sub("[ʻʼ’‘'´]", "`", name).upper())
+    return [
+        {"label": "Court decisions (public.sud.uz) — type the name", "url": "https://public.sud.uz/"},
+        {"label": "Open data portal (data.egov.uz) — search the registers", "url": "https://data.egov.uz/"},
+        {"label": "orginfo.uz — company heads", "url": f"https://orginfo.uz/uz/search/managers/?q={register_name}"},
+        {"label": "orginfo.uz — company founders", "url": f"https://orginfo.uz/uz/search/founders/?q={register_name}"},
+        {"label": "Google — documents (PDF/Word/Excel)",
+         "url": f"https://www.google.com/search?q={quoted}+(filetype%3Apdf+OR+filetype%3Adocx+OR+filetype%3Axlsx)"},
+    ]
+
+
 async def run_name_search(name: str) -> dict:
     variants = name_variants(name)
     results = await search_public(build_batches(variants), max_results_per_batch=10)
-    kept, dropped = filter_by_name(results, variants)
+    kept, dropped = filter_by_name(mark_documents(results), variants)
     return {"tool": "name-search", "results": kept, "dropped": dropped, "variants": variants}
 
 

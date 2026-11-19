@@ -62,13 +62,15 @@ def _safe(text) -> str:
 
 
 class _Dossier(FPDF):
+    heading = "NEXUS  /  OSINT DOSSIER"
+
     def header(self):
         self.set_fill_color(*_VIOLET)
         self.rect(0, 0, self.w, 16, style="F")
         self.set_xy(10, 4)
         self.set_text_color(255, 255, 255)
         self.set_font(FONT, "B", 13)
-        self.cell(0, 8, "NEXUS  /  OSINT DOSSIER", align="L")
+        self.cell(0, 8, self.heading, align="L")
         self.set_font(FONT, "", 8)
         self.set_xy(10, 4)
         self.cell(
@@ -116,7 +118,8 @@ def _kv(pdf: _Dossier, label: str, value: str) -> None:
     pdf.cell(32, 5.5, _safe(label))
     pdf.set_font(FONT, "", 9)
     pdf.set_text_color(*_INK)
-    pdf.multi_cell(0, 5.5, _safe(value), new_x="LMARGIN", new_y="NEXT")
+    # left-aligned: justified lines stretch long URLs into wide gaps
+    pdf.multi_cell(0, 5.5, _safe(value), align="L", new_x="LMARGIN", new_y="NEXT")
 
 
 def _badge(pdf: _Dossier, text: str, color) -> None:

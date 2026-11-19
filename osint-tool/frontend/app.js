@@ -593,6 +593,56 @@ async function downloadDossier(data, button) {
   }
 }
 
+// fetch a file from the API and hand it to the browser as a download
+async function downloadFile(url, options, filename, button) {
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = "Preparing…";
+  try {
+    const response = await fetch(url, { ...options, headers: authHeaders(options.headers || {}) });
+    if (!response.ok) {
+      let msg = `HTTP ${response.status}`;
+      try {
+        msg = (await response.json()).message || msg;
+      } catch (e) {}
+      throw new Error(msg);
+    }
+    const blob = await response.blob();
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    button.textContent = original;
+  } catch (err) {
+    button.textContent = "failed — retry";
+    button.title = err.message || "";
+    setTimeout(() => (button.textContent = original), 3000);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function safeFileName(value) {
+  return String(value || "graph").replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 60);
+}
+
+// ROADMAP 7.8: GraphML for Gephi / yEd / Cytoscape, CSV for Maltego CE's table import
+function buildGraphExport(getRequest, name) {
+  const row = document.createElement("div");
+  row.className = "chip-row";
+  const label = document.createElement("span");
+  label.textContent = "Export graph:";
+  row.appendChild(label);
+  [["GraphML", "graphml", "graphml"], ["Maltego CSV", "maltego", "csv"]].forEach(([text, fmt, ext]) => {
+    const btn = buildActionButton(text, () =>
+      downloadFile(...getRequest(fmt), `${safeFileName(name)}.${ext}`, btn));
+    btn.title = fmt === "graphml" ? "Opens in Gephi, yEd or Cytoscape" : "Maltego CE: Import → Import Graph from Table";
+    row.appendChild(btn);
+  });
+  return row;
+}
+
 function buildActionButton(label, onClick) {
   const button = document.createElement("button");
   button.type = "button";
@@ -1232,6 +1282,13 @@ function renderDeepScan(panel, data) {
 
   // toolbar (export / AI / save) via flattened view
   panel.results.appendChild(buildToolbar(deepScanToFlat(data)));
+  const scanBody = { nodes: data.nodes || [], edges: data.edges || [], clusters: data.clusters || [],
+                     query: data.query, seed_type: data.seed_type };
+  panel.results.appendChild(buildGraphExport((fmt) => [`${API_BASE}/api/export/graph`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scan: scanBody, format: fmt }),
+  }], `deep-scan-${data.query}`));
 
   const clusters = buildClusters(data);
   if (clusters) panel.results.appendChild(clusters);
@@ -1343,6 +1400,7 @@ const AGENT_FIELDS = [
   ["name", "Name"],
   ["birth_year", "Birth year"],
   ["location", "Location"],
+  ["work", "Work / study"],
   ["emails", "E-mail"],
   ["usernames", "Username"],
   ["profiles", "Profiles"],
@@ -1483,6 +1541,9 @@ function buildAgentCandidate(c, decision) {
     card.appendChild(ai);
   }
 
+  card.appendChild(buildAgentContacts(c.contacts || []));
+  if ((c.chain || []).length) card.appendChild(buildAgentChain(c.chain));
+
   const members = document.createElement("div");
   members.className = "card-meta";
   members.textContent = "records: " + (c.members || []).map((m) =>
@@ -1507,8 +1568,72 @@ function buildAgentCandidate(c, decision) {
     if (value === "rejected") btn.classList.add("chip-danger");
     actions.appendChild(btn);
   });
+  // ROADMAP 7.1: the person card as a PDF (carries your decision)
+  const runId = agentRun && agentRun.id;
+  const pdfBtn = buildActionButton("Person card (PDF)", () =>
+    downloadFile(`${API_BASE}/api/agent/${runId}/card/${c.id}/pdf`, {},
+                 `person-card-${safeFileName(c.label)}.pdf`, pdfBtn));
+  actions.appendChild(pdfBtn);
   card.appendChild(actions);
   return card;
+}
+
+const CONTACT_KIND_TEXT = { email: "E-mail", phone: "Phone", messenger: "Messenger", social: "Profile", website: "Website" };
+
+// ROADMAP 7.2: contacts the person published, each with the page it was read on
+function buildContactRows(contacts) {
+  const list = document.createElement("div");
+  list.className = "agent-contacts";
+  contacts.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "agent-value";
+    const kind = document.createElement("span");
+    kind.className = "tag";
+    kind.textContent = CONTACT_KIND_TEXT[item.kind] || item.kind;
+    const value = document.createElement("span");
+    value.textContent = ` ${item.value} `;
+    const how = document.createElement("span");
+    how.className = "card-meta";
+    how.textContent = item.how ? `— ${item.how} ` : "";
+    row.append(kind, value, how,
+               agentSourceLinks((item.sources || []).map((u) => ({ platform: "page", url: u }))));
+    list.appendChild(row);
+  });
+  return list;
+}
+
+function buildAgentContacts(contacts) {
+  const box = document.createElement("div");
+  box.className = "agent-contact-box";
+  const head = document.createElement("div");
+  head.className = "agent-field-name";
+  head.textContent = "Published contacts";
+  box.appendChild(head);
+  if (!contacts.length) {
+    const none = document.createElement("div");
+    none.className = "agent-missing";
+    none.textContent = "none published on the pages read";
+    box.appendChild(none);
+    return box;
+  }
+  box.appendChild(buildContactRows(contacts));
+  return box;
+}
+
+function buildAgentChain(chain) {
+  const details = document.createElement("details");
+  details.className = "agent-chain";
+  const sum = document.createElement("summary");
+  sum.textContent = "Evidence chain: how each record was reached";
+  details.appendChild(sum);
+  const list = document.createElement("ol");
+  chain.forEach((link) => {
+    const li = document.createElement("li");
+    li.textContent = (link.path || []).map((s) => `${s.type} “${s.value}” (${s.via})`).join(" → ") || link.record;
+    list.appendChild(li);
+  });
+  details.appendChild(list);
+  return details;
 }
 
 function renderAgent(panel, run) {
@@ -1555,6 +1680,8 @@ function renderAgent(panel, run) {
   }
 
   if (result.scan && (result.scan.nodes || []).length) {
+    panel.results.appendChild(buildGraphExport((fmt) =>
+      [`${API_BASE}/api/agent/${run.id}/graph?format=${fmt}`, {}], `agent-${result.query}`));
     const details = document.createElement("details");
     details.className = "agent-details";
     const sum = document.createElement("summary");
@@ -1579,7 +1706,16 @@ async function handleAgent(event) {
   event.preventDefault();
   const panel = getPanel("agent");
   const steps = panel.root.querySelector(".agent-steps");
-  const text = panel.input.value.trim();
+  // ROADMAP 7.6: the optional fields become plain phrases the parser reads,
+  // so the "Understood:" step shows exactly what was used
+  const form = panel.form;
+  const extra = [];
+  const field = (name) => (form.elements[name] ? form.elements[name].value.trim() : "");
+  if (field("city")) extra.push(`from ${field("city")}`);
+  if (field("age")) extra.push(`${field("age")} years old`);
+  if (field("work")) extra.push(`works at ${field("work")}`);
+  if (field("school")) extra.push(`studies at ${field("school")}`);
+  const text = [panel.input.value.trim(), ...extra].join(", ").slice(0, 500);
   clearPanel(panel);
   steps.innerHTML = "";
   steps.classList.add("hidden");
@@ -1619,6 +1755,64 @@ async function handleAgent(event) {
       await sleep(AGENT_POLL_MS, signal);
     }
     showError(panel, "The agent is taking too long. Check again later.");
+  } catch (err) {
+    if (err.name === "AbortError") return;
+    showError(panel, err.message || `Could not reach the backend at ${API_BASE}.`);
+  } finally {
+    setLoading(panel, false);
+  }
+}
+
+// ROADMAP 7.7: read the contacts a page publishes
+async function handleContacts(event) {
+  event.preventDefault();
+  const panel = getPanel("contacts");
+  const url = panel.input.value.trim();
+  clearPanel(panel);
+  if (!url) {
+    showError(panel, "Give the page URL.");
+    return;
+  }
+  if (panel.controller) panel.controller.abort();
+  panel.controller = new AbortController();
+  setLoading(panel, true);
+  try {
+    const data = await requestJson(`${API_BASE}/api/contacts`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ url }),
+      signal: panel.controller.signal,
+    });
+    const contacts = data.contacts || [];
+    panel.summary.innerHTML =
+      `<strong>${contacts.length}</strong> contact${contacts.length === 1 ? "" : "s"} on ` +
+      `<strong>${(data.pages || []).length}</strong> page${(data.pages || []).length === 1 ? "" : "s"} read`;
+    const notice = document.createElement("div");
+    notice.className = "notice";
+    notice.textContent = data.notice || "";
+    panel.results.appendChild(notice);
+    if (contacts.length) {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.appendChild(buildContactRows(contacts));
+      panel.results.appendChild(card);
+    } else {
+      const empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.textContent = "No e-mail, phone or profile link is published on the pages read.";
+      panel.results.appendChild(empty);
+    }
+    if ((data.notes || []).length) {
+      const warnings = document.createElement("div");
+      warnings.className = "warnings";
+      data.notes.forEach((w) => {
+        const item = document.createElement("div");
+        item.className = "warning-item";
+        item.textContent = w;
+        warnings.appendChild(item);
+      });
+      panel.results.appendChild(warnings);
+    }
   } catch (err) {
     if (err.name === "AbortError") return;
     showError(panel, err.message || `Could not reach the backend at ${API_BASE}.`);
@@ -1676,13 +1870,14 @@ document.querySelectorAll(".tab").forEach((btn) => {
 });
 
 document.querySelectorAll(
-  ".search-form:not(#deep-scan-form):not(#watch-form):not(#agent-form)"
+  ".search-form:not(#deep-scan-form):not(#watch-form):not(#agent-form):not(#contacts-form)"
 ).forEach((form) => {
   form.addEventListener("submit", handleSubmit);
 });
 
 document.getElementById("deep-scan-form").addEventListener("submit", handleDeepScan);
 document.getElementById("agent-form").addEventListener("submit", handleAgent);
+document.getElementById("contacts-form").addEventListener("submit", handleContacts);
 document.getElementById("watch-form").addEventListener("submit", handleCreateWatch);
 
 let catalogItems = [];
