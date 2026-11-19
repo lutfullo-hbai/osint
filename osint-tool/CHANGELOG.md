@@ -12,6 +12,9 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 - Contacts: `file:`, `ftp:`, `javascript:` manzillariga aniq xabar; App Store va ulashish havolalari "website" emas.
 - Contacts tabi: natija kartasi to'liq kenglikda, har bir manba sahifa yo'li bilan ("/contact").
 - So'rov cheklovi (429) xabari UI'da ko'rinadi; fayl nomi "_" bilan boshlanmaydi.
+- Contacts: `#` bilan tugagan havolalar (`/contact#form`) endi o'qiladi; robots.txt 401/403 qaytarsa
+  sayt o'qilmaydi; `mycdn.uz` kabi saytlar CDN deb tashlab yuborilmaydi.
+- Graf eksporti: noto'g'ri tuzilgan `scan` (kalitsiz tugun, ro'yxat o'rniga matn) 500 xato emas, 200 beradi.
 
 ## [0.7.0] — 2026-11-19
 Shaxs kartasi va yangi manbalar (Faza 7).
