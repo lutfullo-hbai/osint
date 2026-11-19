@@ -1,13 +1,17 @@
 # O'zgarishlar tarixi
 
 Versiyalar [Semantic Versioning](https://semver.org/) bo'yicha: `MAJOR.MINOR.PATCH`.
-`1.0.0` Agent rejimi (ROADMAP Faza 6) tayyor bo'lganda qo'yiladi.
+`1.0.0` Agent rejimi haqiqiy belgilangan holatlarda baholangach (ROADMAP 6.8) qo'yiladi.
 Versiya raqami bitta joyda turadi: `backend/VERSION`.
 
 Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi teg
 (`vX.Y.Z`) va GitHub Release oladi.
 
 ## [Unreleased]
+
+## [0.6.0] — 2026-11-19
+Agent rejimi (Faza 6).
+
 ### Qo'shildi
 - **Agent rejimi (Faza 6)**: erkin matn ("lutfullo abdubaniyev 19 yosh namangandan") → jonli
   qadamlar → manbali nomzodlar; yosh va shahar saralashda; "Confirm / Reject" qarori insonda.
@@ -87,6 +91,8 @@ Birinchi to'liq to'plam.
 - Digital Footprint hisoboti, entity graph, PDF eksport.
 - Lokal Qwen (Ollama) orqali AI xulosa va rasm tahlili.
 
+[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/lutfullo-hbai/osint/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/lutfullo-hbai/osint/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/lutfullo-hbai/osint/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/lutfullo-hbai/osint/compare/v0.3.0...v0.4.0
