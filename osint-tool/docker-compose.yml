@@ -116,6 +116,10 @@ services:
       - COMPANIES_HOUSE_API_KEY=${COMPANIES_HOUSE_API_KEY:-}
       - HOLEHE_ALLOW_LOGIN=${HOLEHE_ALLOW_LOGIN:-}
       - HOLEHE_INCLUDE_ADULT=${HOLEHE_INCLUDE_ADULT:-}
+      # Agent mode runs here: the AI second opinion needs the local model too
+      - OLLAMA_BACKEND_URL=${OLLAMA_BACKEND_URL:-http://172.20.0.1:11435}
+      - OLLAMA_FAST_MODEL=${OLLAMA_FAST_MODEL:-qwen2.5:7b}
+      - OLLAMA_SMART_MODEL=${OLLAMA_SMART_MODEL:-qwen3:8b}
       - REDIS_URL=redis://redis:6379/0
       - CACHE_TTL_SECONDS=${CACHE_TTL_SECONDS:-900}
       - WORKER_MAX_JOBS=${WORKER_MAX_JOBS:-4}

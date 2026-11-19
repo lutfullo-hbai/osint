@@ -12,8 +12,10 @@ same red lines (no login-walled scraping, no leaks, no probiv) hold here too.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import os
 from collections import defaultdict
+from typing import Any, Callable
 
 from services import ai
 from services.correlate import correlate
@@ -131,7 +133,36 @@ def _node_key(ptype: str, value: str) -> str:
     return f"{bucket}:{value.strip().casefold()}"
 
 
-async def run_deep_scan(seed_query: str, seed_type: str | None = None) -> dict:
+async def _emit(progress: Callable[[dict], Any] | None, event: dict) -> None:
+    """Report a step to the caller (Agent mode shows them live). Never fails the scan."""
+    if progress is None:
+        return
+    try:
+        outcome = progress(event)
+        if inspect.isawaitable(outcome):
+            await outcome
+    except Exception:  # noqa: BLE001 - a broken progress sink must not stop the scan
+        pass
+
+
+async def run_deep_scan(
+    seed_query: str,
+    seed_type: str | None = None,
+    *,
+    extra_seeds: list[dict] | None = None,
+    progress: Callable[[dict], Any] | None = None,
+    expand: Callable[[dict], tuple[bool, str]] | None = None,
+    max_nodes: int | None = None,
+) -> dict:
+    """Breadth-first pivot following.
+
+    extra_seeds: more starting points, [{"type", "value", "parent"?, "via"?}]
+        (Agent mode: an e-mail the user gave, a handle guessed with the birth year).
+    progress: called with {"kind": "node" | "skip", ...} as each step finishes.
+    expand(node) -> (follow, reason): whether a node's pivots are worth
+        following (ROADMAP 5.4) — e.g. not a namesake born 30 years earlier.
+    """
+    node_budget = max_nodes or MAX_NODES
     seed_query = (seed_query or "").strip()
     if not seed_query:
         raise InvestigationValidationError("Deep Scan needs a query to start from.")
@@ -156,9 +187,15 @@ async def run_deep_scan(seed_query: str, seed_type: str | None = None) -> dict:
         (0, seed_type, seed_query, None, None)
     ]
     seen.add(_node_key(seed_type, seed_query))
+    for extra in extra_seeds or []:
+        etype, evalue = extra.get("type"), str(extra.get("value") or "").strip()
+        if etype not in _HANDLERS or not evalue or _node_key(etype, evalue) in seen:
+            continue
+        seen.add(_node_key(etype, evalue))
+        queue.append((1 if extra.get("parent") else 0, etype, evalue, extra.get("parent"), extra.get("via")))
 
     while queue:
-        if len(nodes) >= MAX_NODES:
+        if len(nodes) >= node_budget:
             truncated = True
             break
 
@@ -207,13 +244,21 @@ async def run_deep_scan(seed_query: str, seed_type: str | None = None) -> dict:
 
             if result.get("warnings"):
                 warnings.extend(result["warnings"])
+            await _emit(progress, {"kind": "node", "type": ptype, "query": value, "depth": depth,
+                                   "count": node["count"], "via": via})
 
-            if len(nodes) >= MAX_NODES:
+            if len(nodes) >= node_budget:
                 truncated = True
                 break
 
-            # enqueue children
-            if depth + 1 <= MAX_DEPTH:
+            # enqueue children — unless the caller judges this node not worth it
+            follow = True
+            if expand is not None and depth + 1 <= MAX_DEPTH and _node_pivots(result):
+                follow, reason = expand(node)
+                if not follow:
+                    node["not_followed"] = reason
+                    await _emit(progress, {"kind": "skip", "type": ptype, "query": value, "reason": reason})
+            if follow and depth + 1 <= MAX_DEPTH:
                 for pivot in _followable_pivots(_node_pivots(result)):
                     ctype = pivot.get("type")
                     cvalue = pivot.get("value")
@@ -228,7 +273,7 @@ async def run_deep_scan(seed_query: str, seed_type: str | None = None) -> dict:
                         (depth + 1, ctype, cvalue, node_key, pivot.get("via"))
                     )
 
-        if len(nodes) >= MAX_NODES:
+        if len(nodes) >= node_budget:
             truncated = True
             break
 
