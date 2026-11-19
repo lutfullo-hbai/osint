@@ -31,7 +31,8 @@ from services.correlate import (
 )
 from services.deep_scan import _node_key, run_deep_scan
 from services.investigate import InvestigationValidationError
-from services.names import name_bits, name_tokens, names_match, places_conflict, username_variants
+from services.names import fold, name_bits, name_tokens, names_match, places_conflict, username_variants
+from tools.contact_extract import contacts_from_text, extract_contacts
 
 AGENT_MAX_NODES = 20
 MAX_CANDIDATES = 8
@@ -48,10 +49,24 @@ B_AGE_CONFLICT = -4.0
 B_PLACE_AGREE = 1.0       # stronger than in correlate: the user named the town
 B_PLACE_CONFLICT = -1.5
 B_NAME_CONFLICT = -1.0
+B_ORG_AGREE = 1.5         # same workplace / school as described (7.6); people move, so no penalty
 STRONG_LEAD = 6.0
 POSSIBLE_LEAD = 3.0
 
-FIELDS = ("name", "birth_year", "location", "emails", "usernames", "profiles")
+FIELDS = ("name", "birth_year", "location", "work", "emails", "usernames", "profiles")
+
+# 7.2: contacts read from the candidates' own pages
+CONTACT_CANDIDATES = 3        # only the top leads get their websites read
+MAX_SITE_READS = 3            # websites read per run
+SITE_PAGES = 5                # pages per website
+# profile-text labels whose value someone wrote about themselves
+_BIO_RE = re.compile(r"\b(?:Bio|About|Description|Summary|Note|Contact|Website|Blog)s?:\s*([^;]+)", re.IGNORECASE)
+_BARE_SITE_RE = re.compile(r"(?:www\.)?[a-z0-9\-]+(?:\.[a-z0-9\-]+)*\.[a-z]{2,}(?:/\S*)?", re.IGNORECASE)
+# not "Works:" (ORCID counts publications) and never a bare number ("Organizations: 10")
+_WORK_RE = re.compile(r"\b(?:Company|Organi[sz]ation|Employer|Job|Institutions?|Education|School|"
+                      r"University|Affiliation)s?:\s*([^;]*[^\W\d_][^;]*)", re.IGNORECASE)
+_ORG_STOP = {"universiteti", "universitet", "university", "kompaniyasi", "company", "institute", "instituti",
+             "school", "maktab", "maktabi", "college", "the", "of", "and", "llc", "mchj", "inc", "ltd", "group"}
 
 NOTICE = (
     "Candidates are leads assembled from public sources, not identifications. "
@@ -82,6 +97,27 @@ class Target:
         self.name = (parsed.get("names") or [None])[0]
         self.years = sorted(parsed.get("birth_years") or [])
         self.places = parsed.get("places") or []
+        self.orgs = list(parsed.get("workplaces") or []) + list(parsed.get("schools") or [])
+
+    @staticmethod
+    def _org_keys(text: str) -> set[str]:
+        keys = set()
+        for word in re.split(r"[\s,;:/()\"'«».\-]+", str(text or "")):
+            key = fold(word)
+            if len(key) >= 3 and key not in _ORG_STOP:
+                keys.add(key[:4])               # "Yandex" / "Яндексе" fold to andeh / andekse
+        return keys
+
+    def org_check(self, works: set[str]) -> tuple[float, str] | None:
+        """7.6: the workplace or school the user named appears in the profile."""
+        if not works or not self.orgs:
+            return None
+        for org in self.orgs:
+            wanted = self._org_keys(org)
+            for work in sorted(works):
+                if wanted and wanted & self._org_keys(work):
+                    return B_ORG_AGREE, f"works/studies at '{work}', as you said ({org})"
+        return None
 
     def age_check(self, births: set[int]) -> tuple[float, str] | None:
         if not births or not self.years:
@@ -223,6 +259,8 @@ def profile_fields(members: list[dict], ignore_platforms: set[str] | None = None
                 _add(raw["birth_year"], year, source)
             for email in _EMAIL_RE.findall(info):
                 _add(raw["emails"], email.lower(), source)
+            for work in _WORK_RE.findall(info):
+                _add(raw["work"], work, source)
             if ntype in ("username", "email", "phone") and source["url"]:
                 _add(raw["profiles"], source["platform"], source)
     fields = {}
@@ -230,6 +268,93 @@ def profile_fields(members: list[dict], ignore_platforms: set[str] | None = None
         limit = MAX_PROFILES if field == "profiles" else MAX_FIELD_VALUES
         fields[field] = list(values.values())[:limit]
     return fields
+
+
+def _merge_contact(out: list[dict], item: dict) -> None:
+    for entry in out:
+        if entry["kind"] == item["kind"] and entry["value"].casefold() == item["value"].casefold():
+            for src in item.get("sources") or []:
+                if src not in entry["sources"] and len(entry["sources"]) < 3:
+                    entry["sources"].append(src)
+            return
+    out.append({"kind": item["kind"], "value": item["value"], "how": item.get("how", ""),
+                "sources": list(item.get("sources") or [])[:3]})
+
+
+def profile_contacts(members: list[dict], ignore_platforms: set[str] | None = None) -> list[dict]:
+    """7.2: e-mails, phones, messenger and social links, websites that the
+    person wrote in their own profiles (bio, channel description, website
+    field), each with the profile page it was read on."""
+    ignore_platforms = ignore_platforms or set()
+    out: list[dict] = []
+    for node in members:
+        for item in node.get("results") or []:
+            if _from_search_only(item) or item.get("source") in ("dns_contact", "run_summary"):
+                continue
+            if str(item.get("status") or "found").lower() not in ("found", "success", "registered"):
+                continue
+            if str(item.get("platform") or "").casefold() in ignore_platforms:
+                continue
+            url = str(item.get("url") or "")
+            # only the self-written parts: counters like "Followers: 901234567" are not phones
+            parts = _BIO_RE.findall(str(item.get("info") or "")) + [str(item.get("website") or "")]
+            # a website field often has no scheme: "torvalds.org"
+            text = " ; ".join(p if "://" in p or not _BARE_SITE_RE.fullmatch(p.strip()) else "https://" + p.strip()
+                              for p in parts if p)
+            if not text.strip():
+                continue
+            platform = str(item.get("platform") or "profile")[:60]
+            for found in contacts_from_text(text, url, how=f"written in the {platform} profile"):
+                _merge_contact(out, found)
+    return out[:20]
+
+
+def evidence_chain(member_keys: list[str], scan: dict) -> list[dict]:
+    """7.1: how each record was reached from what you searched, step by step."""
+    nodes = {n["key"]: n for n in scan.get("nodes") or []}
+    parent = {}
+    for edge in scan.get("edges") or []:
+        parent.setdefault(edge.get("to"), edge.get("from"))
+    chain = []
+    for key in member_keys:
+        path, seen, cur = [], set(), key
+        while cur in nodes and cur not in seen and len(path) < 6:
+            seen.add(cur)
+            node = nodes[cur]
+            path.append({"type": node.get("type"), "value": node.get("query"),
+                         "via": _VIA_LABEL.get(node.get("via"), node.get("via")) or "you searched"})
+            cur = parent.get(cur)
+        chain.append({"record": f"{nodes[key].get('type')} {nodes[key].get('query')}" if key in nodes else key,
+                      "path": list(reversed(path))})
+    return chain
+
+
+async def read_candidate_sites(candidates: list[dict], say=None) -> int:
+    """7.2/7.7: read the personal websites the top candidates link to, and add
+    the contacts published there. Bounded: MAX_SITE_READS sites per run."""
+    reads = 0
+    for candidate in candidates[:CONTACT_CANDIDATES]:
+        if candidate["level"] == "weak":
+            continue
+        sites = [c["value"] for c in candidate.get("contacts") or [] if c["kind"] == "website"]
+        for site in sites[:2]:
+            if reads >= MAX_SITE_READS:
+                return reads
+            reads += 1
+            if say:
+                await say("check", f"Reading contacts on {site} (linked by {candidate['label']})")
+            try:
+                found = await extract_contacts(site, max_pages=SITE_PAGES)
+            except Exception as exc:  # noqa: BLE001 - one site must not stop the run
+                if say:
+                    await say("skip", f"Could not read {site}: {type(exc).__name__}")
+                continue
+            for item in found.get("contacts") or []:
+                if item["kind"] != "website":
+                    _merge_contact(candidate["contacts"], {**item, "how": f"published on {site}"})
+            if say and found.get("notes"):
+                await say("skip", f"{site}: " + "; ".join(found["notes"][:2]))
+    return reads
 
 
 def _candidate_id(member_keys: list[str]) -> str:
@@ -283,7 +408,9 @@ def rank(scan: dict, target: Target, stated_keys: set[str]) -> tuple[list[dict],
         births = {int(v["value"]) for v in fields["birth_year"] if str(v["value"]).isdigit()}
         locations = {v["value"] for v in fields["location"]}
         names = {v["value"] for v in fields["name"]}
-        for check in (target.name_check(names), target.age_check(births), target.place_check(locations)):
+        works = {v["value"] for v in fields["work"]}
+        for check in (target.name_check(names), target.age_check(births), target.place_check(locations),
+                      target.org_check(works)):
             if check:
                 score += check[0]
                 (why if check[0] > 0 else conflicts).append(check[1])
@@ -304,6 +431,8 @@ def rank(scan: dict, target: Target, stated_keys: set[str]) -> tuple[list[dict],
             "missing": missing,
             "why": list(dict.fromkeys(why)),
             "contradictions": list(dict.fromkeys(conflicts)),
+            "contacts": profile_contacts(members, ignored),
+            "chain": evidence_chain([m["key"] for m in members], scan),
             "members": [{"key": m["key"], "type": m.get("type"), "query": m.get("query"),
                          "via": _VIA_LABEL.get(m.get("via"), m.get("via")), "count": m.get("count", 0),
                          "not_followed": m.get("not_followed")} for m in members],
@@ -355,6 +484,7 @@ async def run_agent(text: str, step: Step | None = None) -> dict:
     await say("link", f"Linked {scan['node_count']} record(s) into {scan['cluster_count']} identity group(s)"
               + (f"; AI gave a second opinion on {scan['ai_reviewed']}" if scan.get("ai_reviewed") else ""))
     candidates, overview = rank(scan, target, stated_keys)
+    await read_candidate_sites(candidates, say)
     strong = sum(c["level"] == "strong" for c in candidates)
     await say("rank", f"{len(candidates)} candidate(s), {strong} strong lead(s). Your decision is needed.")
 
