@@ -187,13 +187,14 @@ UI va sozlash:
       korrelatsiyada faqat zaif signal (o'zi birlashtirmaydi)
 - ~~Ignorant (telefon → Instagram/Snapchat)~~ — qo'shilmaydi (telefon bo'yicha akkaunt tekshiruvi)
 
-## Faza 5 — Backend AI qatlami (Ollama) ✅ (5.4 Agent bilan)
+## Faza 5 — Backend AI qatlami (Ollama) ✅
 - [x] 5.1 Ollama klient: JSON schema, timeout, `think: false`; qwen2.5:7b tez ishlar,
       qwen3:8b yakuniy xulosa (8 GB GPU'da birga yuklamaslik)
 - [x] 5.2 Har bir chaqiruv bitta tor vazifa, javobda `evidence_ids[]` majburiy
 - [x] 5.3 Nomzodlarni saralash: "shu odammi?" ha / yo'q / noaniq + sabab. Bu faqat zaif signal,
       birlashtirish qarorini Faza 2 modeli qiladi
-- [ ] 5.4 Pivot filtri: keyingi qadamga qaysi pivot arziydi
+- [x] 5.4 Pivot filtri: keyingi qadamga qaysi pivot arziydi (Faza 6'da: o'z ma'lumoti yosh/shahar/ismga
+      zid bo'lgan namesake kengaytirilmaydi; qoidaga asoslangan, AI'siz)
 - [x] 5.5 Uydirmaga qarshi tekshiruv: javobdagi har bir email, raqam, URL dalilda so'zma-so'z
       bo'lishi shart, aks holda olib tashlanadi
 - [x] 5.6 AI o'chirilgan yoki Ollama yo'q bo'lsa hamma narsa AI'siz ishlaydi
@@ -212,15 +213,18 @@ UI va sozlash:
       README: OSM tile'lari ko'rilayotgan hududni oshkor qiladi
 - [ ] L Klaster ichidagi bilvosita ziddiyat (A–B–C) vetosi; jarayonlararo umumiy rate-limit
 
-## Faza 6 — "Thinking / Agent" rejimi — L
-- [ ] 6.1 Erkin matn parser: ism (lotin/kirill variantlari), yosh, shahar, handle, email, telefon
-      (masalan "lutfullo abdubaniyev 19 yosh namangandan")
-- [ ] 6.2 Reja → barcha tekshiruvlar parallel + Deep Scan → saralash (Faza 2 + 5) → manbali xulosa
-- [ ] 6.3 Deep Scan va agent worker'da; qadamlar UI'da jonli (SSE yoki job polling)
-- [ ] 6.4 Yosh va shahar nomzodlarni saralashda ishlatiladi (ziddiyat → vazn tushadi)
-- [ ] 6.5 Natija: nomzodlar ro'yxati, har bir maydon yonida manba havolasi va "nima uchun bog'landi";
-      topilmagan maydon — "topilmadi"
-- [ ] 6.6 Yakuniy qaror insonda: nomzodni "tasdiqlash / rad etish" tugmalari (AI qonuni talabi)
+## Faza 6 — "Thinking / Agent" rejimi ✅
+- [x] 6.1 Erkin matn parser: ism (lotin/kirill), yosh, tug'ilgan yil, shahar (o'zbek/rus/ingliz
+      qo'shimchalari: -dan, -lik, из ...), handle, email, telefon, domen. Faqat matnda bor qiymat
+- [x] 6.2 Reja → ism + berilgan identifikatorlar + tug'ilgan yilli taxminiy handle'lar → bitta Deep Scan
+      → bog'lash (Faza 2) + AI ikkinchi fikri (Faza 5) → manbali nomzodlar
+- [x] 6.3 Agent worker'da (Redis yo'q bo'lsa backend ichida); qadamlar SQLite'da, UI polling bilan jonli
+- [x] 6.4 Yosh/shahar/ism mos kelsa ball oshadi, zid bo'lsa tushadi (−4 / −1.5 / −1)
+- [x] 6.5 Har bir maydon yonida manba havolasi, "nima uchun", ziddiyatlar, "not found"
+- [x] 6.6 "Confirm / Reject / Undo" — qaror insonda, SQLite'da saqlanadi
+- [x] 6.7 Soxta natija filtri: kunlik canary (tasodifiy username) — har qanday nomni "topadigan"
+      42 Sherlock + 4 Maigret sayti e'tiborsiz; bitta ishda ko'p handle'ni "topgan" sayt ham chiqariladi
+- [ ] 6.8 Haqiqiy belgilangan holatlar bilan baholash (2.7 bilan birga)
 
 ## Faza 7 — Shaxs kartasi va yangi manbalar — M/L
 - [ ] 7.1 Shaxs kartasi + PDF: profillar, ochiq kontaktlar, dalillar zanjiri

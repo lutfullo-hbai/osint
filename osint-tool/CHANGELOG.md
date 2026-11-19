@@ -7,6 +7,16 @@ Versiya raqami bitta joyda turadi: `backend/VERSION`.
 Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi teg
 (`vX.Y.Z`) va GitHub Release oladi.
 
+## [Unreleased]
+### Qo'shildi
+- **Agent rejimi (Faza 6)**: erkin matn ("lutfullo abdubaniyev 19 yosh namangandan") → jonli
+  qadamlar → manbali nomzodlar; yosh va shahar saralashda; "Confirm / Reject" qarori insonda.
+- Pivot filtri (5.4): ma'lumoti tavsifga zid namesake'lar kengaytirilmaydi.
+- Username soxta natija filtri: kunlik canary; holati Sources panelida.
+
+### Tuzatildi
+- Sherlock 42 ta saytda istalgan username'ni "found" derdi — endi e'tiborsiz qoldiriladi.
+
 ## [0.5.1] — 2026-11-19
 ### Qo'shildi
 - Versiyalash: `backend/VERSION`, shu CHANGELOG, eski bosqichlarga orqaga qarab teglar.

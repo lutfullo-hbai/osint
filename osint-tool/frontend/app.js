@@ -1335,6 +1335,298 @@ async function handleDeepScan(event) {
   }
 }
 
+// ---- Agent mode (Faza 6): free text -> live steps -> sourced candidates ----
+
+const AGENT_POLL_MS = 1500;
+const AGENT_MAX_POLLS = 900; // ~22 minutes, the worker's job limit
+const AGENT_FIELDS = [
+  ["name", "Name"],
+  ["birth_year", "Birth year"],
+  ["location", "Location"],
+  ["emails", "E-mail"],
+  ["usernames", "Username"],
+  ["profiles", "Profiles"],
+];
+const AGENT_STEP_ICON = { parse: "◆", plan: "▸", check: "✓", skip: "↷", link: "⛓", rank: "⚖", error: "⚠" };
+const AGENT_LEVEL_TEXT = { strong: "strong lead", possible: "possible", weak: "weak" };
+let agentRun = null; // { id, decisions }
+
+function safeHttpUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function agentAddSteps(list, steps) {
+  steps.forEach((step) => {
+    const li = document.createElement("li");
+    li.className = `agent-step step-${step.kind}`;
+    const icon = document.createElement("span");
+    icon.className = "agent-step-icon";
+    icon.textContent = AGENT_STEP_ICON[step.kind] || "•";
+    const text = document.createElement("span");
+    text.textContent = step.text;
+    li.append(icon, text);
+    list.appendChild(li);
+  });
+  list.classList.toggle("hidden", !list.children.length);
+}
+
+function agentSourceLinks(sources) {
+  const wrap = document.createElement("span");
+  wrap.className = "agent-sources";
+  (sources || []).forEach((src) => {
+    const url = safeHttpUrl(src.url);
+    const el = document.createElement(url ? "a" : "span");
+    el.className = "agent-source";
+    el.textContent = src.platform || "source";
+    if (url) {
+      el.href = url;
+      el.target = "_blank";
+      el.rel = "noopener noreferrer";
+      el.title = url;
+    }
+    wrap.appendChild(el);
+  });
+  return wrap;
+}
+
+function agentFieldRows(candidate) {
+  const table = document.createElement("div");
+  table.className = "agent-fields";
+  AGENT_FIELDS.forEach(([key, label]) => {
+    const name = document.createElement("div");
+    name.className = "agent-field-name";
+    name.textContent = label;
+    const values = document.createElement("div");
+    values.className = "agent-field-values" + (key === "profiles" ? " agent-profiles" : "");
+    const items = (candidate.fields || {})[key] || [];
+    if (!items.length) {
+      values.classList.add("agent-missing");
+      values.textContent = "not found";
+    }
+    items.forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "agent-value";
+      if (key !== "profiles") {
+        const v = document.createElement("span");
+        v.textContent = item.value;
+        row.appendChild(v);
+      }
+      row.appendChild(agentSourceLinks(item.sources));
+      values.appendChild(row);
+    });
+    table.append(name, values);
+  });
+  return table;
+}
+
+function agentDecisionBadge(decision) {
+  const badge = document.createElement("span");
+  badge.className = `badge decision-${decision || "none"}`;
+  badge.textContent = decision === "confirmed" ? "confirmed by you" : decision === "rejected" ? "rejected by you" : "needs your decision";
+  return badge;
+}
+
+async function agentDecide(candidateId, decision, card) {
+  const data = await requestJson(`${API_BASE}/api/agent/${agentRun.id}/decision`, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ candidate_id: candidateId, decision }),
+  });
+  const value = data.decision.decision === "undecided" ? null : data.decision.decision;
+  card.classList.remove("decided-confirmed", "decided-rejected");
+  if (value) card.classList.add(`decided-${value}`);
+  card.querySelector(".badge[class*='decision-']").replaceWith(agentDecisionBadge(value));
+}
+
+function buildAgentCandidate(c, decision) {
+  const card = document.createElement("div");
+  card.className = `card agent-card level-${c.level}` + (decision ? ` decided-${decision}` : "");
+
+  const head = document.createElement("div");
+  head.className = "card-head";
+  const title = document.createElement("h3");
+  title.className = "card-title";
+  title.textContent = c.label;
+  const level = document.createElement("span");
+  level.className = `badge lead-${c.level}`;
+  level.textContent = `${AGENT_LEVEL_TEXT[c.level] || c.level} · ${c.score}`;
+  head.append(title, level, agentDecisionBadge(decision));
+  card.appendChild(head);
+
+  card.appendChild(agentFieldRows(c));
+
+  if (c.why && c.why.length) {
+    const why = document.createElement("ul");
+    why.className = "agent-why";
+    c.why.forEach((w) => {
+      const li = document.createElement("li");
+      li.textContent = w;
+      why.appendChild(li);
+    });
+    card.appendChild(why);
+  }
+  (c.contradictions || []).forEach((x) => {
+    const warn = document.createElement("div");
+    warn.className = "cluster-contradiction";
+    warn.textContent = "⚠ " + x;
+    card.appendChild(warn);
+  });
+  if (c.ai_review) {
+    const ai = document.createElement("div");
+    ai.className = `card-meta ai-review ai-${c.ai_review.verdict}`;
+    ai.textContent = `AI (${c.ai_review.model}, weak signal): ${c.ai_review.verdict} — ${c.ai_review.reason}`;
+    card.appendChild(ai);
+  }
+
+  const members = document.createElement("div");
+  members.className = "card-meta";
+  members.textContent = "records: " + (c.members || []).map((m) =>
+    `${m.type} ${m.query}${m.via ? ` (${m.via})` : ""}${m.not_followed ? " — not followed further" : ""}`
+  ).join(" · ");
+  card.appendChild(members);
+
+  // ROADMAP 6.6: the final call is the human's
+  const actions = document.createElement("div");
+  actions.className = "chip-row agent-actions";
+  [["Confirm", "confirmed"], ["Reject", "rejected"], ["Undo", "undecided"]].forEach(([label, value]) => {
+    const btn = buildActionButton(label, async () => {
+      btn.disabled = true;
+      try {
+        await agentDecide(c.id, value, card);
+      } catch (err) {
+        btn.textContent = "failed — retry";
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    if (value === "rejected") btn.classList.add("chip-danger");
+    actions.appendChild(btn);
+  });
+  card.appendChild(actions);
+  return card;
+}
+
+function renderAgent(panel, run) {
+  const result = run.result || {};
+  const candidates = result.candidates || [];
+  const strong = candidates.filter((c) => c.level === "strong").length;
+  panel.summary.innerHTML =
+    `<strong>${candidates.length}</strong> candidate${candidates.length === 1 ? "" : "s"}, ` +
+    `<strong>${strong}</strong> strong · ${result.node_count || 0} records checked` +
+    (result.truncated ? ' <span class="tag">stopped at scan limit</span>' : "");
+
+  const notice = document.createElement("div");
+  notice.className = "agent-notice";
+  notice.textContent = result.notice || "";
+  panel.results.appendChild(notice);
+
+  if (!candidates.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "No candidate profiles found. Add a username, e-mail or a different spelling and try again.";
+    panel.results.appendChild(empty);
+  }
+  candidates.forEach((c) => {
+    const decision = (run.decisions || {})[c.id];
+    panel.results.appendChild(buildAgentCandidate(c, decision && decision.decision));
+  });
+
+  const official = (result.overview || {}).name_search || [];
+  if (official.length) {
+    const box = document.createElement("div");
+    box.className = "card agent-overview";
+    const h = document.createElement("h3");
+    h.className = "card-title";
+    h.textContent = "Name search: registers and knowledge bases";
+    box.appendChild(h);
+    official.forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "card-meta";
+      row.appendChild(agentSourceLinks([{ platform: item.platform, url: item.url }]));
+      row.append(" " + (item.info || ""));
+      box.appendChild(row);
+    });
+    panel.results.appendChild(box);
+  }
+
+  if (result.scan && (result.scan.nodes || []).length) {
+    const details = document.createElement("details");
+    details.className = "agent-details";
+    const sum = document.createElement("summary");
+    sum.textContent = `All checked records and the link graph (${result.scan.nodes.length})`;
+    details.appendChild(sum);
+    const inner = { summary: document.createElement("div"), results: document.createElement("div") };
+    inner.results.className = "results";
+    details.append(inner.summary, inner.results);
+    let drawn = false;
+    details.addEventListener("toggle", () => {
+      if (details.open && !drawn) {
+        drawn = true;
+        renderDeepScan(inner, { ...result.scan, node_count: result.scan.nodes.length,
+                                query: result.query, truncated: result.truncated });
+      }
+    });
+    panel.results.appendChild(details);
+  }
+}
+
+async function handleAgent(event) {
+  event.preventDefault();
+  const panel = getPanel("agent");
+  const steps = panel.root.querySelector(".agent-steps");
+  const text = panel.input.value.trim();
+  clearPanel(panel);
+  steps.innerHTML = "";
+  steps.classList.add("hidden");
+  if (!text) {
+    showError(panel, "Describe the person first.");
+    return;
+  }
+  if (panel.controller) panel.controller.abort();
+  panel.controller = new AbortController();
+  const signal = panel.controller.signal;
+  setLoading(panel, true);
+  try {
+    const started = await requestJson(`${API_BASE}/api/agent`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ text }),
+      signal,
+    });
+    agentRun = { id: started.run_id };
+    let seen = 0;
+    for (let i = 0; i < AGENT_MAX_POLLS; i++) {
+      const data = await requestJson(`${API_BASE}/api/agent/${started.run_id}?after=${seen}`, {
+        headers: authHeaders(),
+        signal,
+      });
+      const run = data.run;
+      agentAddSteps(steps, run.steps || []);
+      if ((run.steps || []).length) seen = run.steps[run.steps.length - 1].seq;
+      if (run.status === "complete") {
+        renderAgent(panel, run);
+        return;
+      }
+      if (run.status === "failed") {
+        showError(panel, run.error || "The agent run failed.");
+        return;
+      }
+      await sleep(AGENT_POLL_MS, signal);
+    }
+    showError(panel, "The agent is taking too long. Check again later.");
+  } catch (err) {
+    if (err.name === "AbortError") return;
+    showError(panel, err.message || `Could not reach the backend at ${API_BASE}.`);
+  } finally {
+    setLoading(panel, false);
+  }
+}
+
 async function checkApiStatus() {
   const el = document.getElementById("api-status");
   try {
@@ -1384,12 +1676,13 @@ document.querySelectorAll(".tab").forEach((btn) => {
 });
 
 document.querySelectorAll(
-  ".search-form:not(#deep-scan-form):not(#watch-form)"
+  ".search-form:not(#deep-scan-form):not(#watch-form):not(#agent-form)"
 ).forEach((form) => {
   form.addEventListener("submit", handleSubmit);
 });
 
 document.getElementById("deep-scan-form").addEventListener("submit", handleDeepScan);
+document.getElementById("agent-form").addEventListener("submit", handleAgent);
 document.getElementById("watch-form").addEventListener("submit", handleCreateWatch);
 
 let catalogItems = [];

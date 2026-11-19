@@ -5,9 +5,10 @@ from arq import cron
 from arq.connections import RedisSettings
 
 import store
+from services.agent import execute_run
 from services.investigate import InvestigationValidationError, investigate
 from services.monitor import check_one_watch, run_watch_cycle
-from tools import sanctions_index, uz_registry
+from tools import sanctions_index, username_canary, uz_registry
 from tools.holehe_runner import run_canary
 from tools.maigret_db import ensure_db, run_self_check
 from tools.base import ToolError
@@ -28,6 +29,11 @@ async def run_investigation(ctx, category: str, query: str) -> dict:
         return {"status": "error", "message": f"Unexpected failure: {exc}"}
 
 
+async def run_agent(ctx, run_id: str) -> dict:
+    """Agent mode: one free-text request, steps logged for the live view."""
+    return await execute_run(run_id)
+
+
 async def maigret_self_check(ctx) -> dict:
     """Weekly: rebuild our Maigret database and disable sites that broke."""
     try:
@@ -39,6 +45,11 @@ async def maigret_self_check(ctx) -> dict:
 async def holehe_canary(ctx) -> dict:
     """Daily: pause Holehe modules that call a random address "registered"."""
     return await run_canary()
+
+
+async def username_canary_check(ctx) -> dict:
+    """Daily: find Sherlock/Maigret sites that "find" any username."""
+    return await username_canary.run_canary()
 
 
 async def sanctions_refresh(ctx) -> dict:
@@ -70,6 +81,8 @@ async def _first_sanctions_build() -> None:
 async def startup(ctx) -> None:
     store.init_db()
     ensure_db()
+    if not (await username_canary.load()).get("tools"):
+        ctx["username_canary"] = asyncio.create_task(username_canary.run_canary())
     if not uz_registry.dataset_status():
         ctx["uz_registry_build"] = asyncio.create_task(uz_registry.refresh())
     if not sanctions_index.source_status():
@@ -78,7 +91,7 @@ async def startup(ctx) -> None:
 
 
 class WorkerSettings:
-    functions = [run_investigation, check_one_watch]
+    functions = [run_investigation, check_one_watch, run_agent]
     on_startup = startup
     cron_jobs = [
         cron(
@@ -90,6 +103,7 @@ class WorkerSettings:
         cron(maigret_self_check, weekday=0, hour=4, minute=30, run_at_startup=False,
              timeout=2400),
         cron(holehe_canary, hour=5, minute=15, run_at_startup=False, timeout=600),
+        cron(username_canary_check, hour=5, minute=45, run_at_startup=False, timeout=900),
         cron(sanctions_refresh, hour=3, minute=30, run_at_startup=False, timeout=1800),
         cron(pep_refresh, weekday=6, hour=3, minute=0, run_at_startup=False, timeout=1800),
         cron(uz_registry_refresh, weekday=6, hour=4, minute=0, run_at_startup=False, timeout=1800),
