@@ -62,9 +62,10 @@ _PLACES = {
     "bishkek": "Bishkek", "dushanbe": "Dushanbe", "istanbul": "Istanbul", "seul": "Seoul",
     "seoul": "Seoul", "dubai": "Dubai",
 }
-# Endings a place name takes in a sentence: Uzbek -dan/-da/-lik/-ga/-ning/-dagi,
+# Endings a place name takes in a sentence: Uzbek -dan/-da/-lik/-ga/-ning/-dagi
+# ("-an": fold() merges the double d of "Samarqanddan"),
 # Russian -a/-e/-u/-skiy, English none.
-_PLACE_SUFFIXES = ("", "dan", "tan", "da", "ta", "lik", "lig", "ga", "ka", "ning", "dagi", "liklar",
+_PLACE_SUFFIXES = ("", "dan", "an", "tan", "da", "ta", "lik", "lig", "ga", "ka", "ning", "dagi", "liklar",
                    "a", "e", "u", "i", "ski", "skii", "skai", "skoi", "ets", "tsi")
 _PLACE_WORDS = {"shahar", "shahri", "shahridan", "shahrida", "viloyat", "viloyati", "viloyatidan",
                 "tuman", "tumani", "tumanidan", "city", "region", "oblast", "город", "область",
@@ -82,6 +83,30 @@ _STOPWORDS = {
     "o'quvchi", "ishlaydi", "works", "at", "da", "dan",
 } | _PLACE_WORDS
 _PREPOSITIONS = {"from", "in", "iz", "из", "в", "во"}
+
+# 7.6: workplace and place of study. Uzbek puts the place first ("Artelda
+# ishlaydi", "TATU talabasi"), English and Russian after a verb ("works at",
+# "работает в"). The captured words are taken out of the text so they never
+# become part of the name.
+_APOS = "['ʻ’`]"
+_UZ_WORK_RE = re.compile(rf"(\S+?){_APOS}?(?:da|de|ta)\s+(?:ishla\w*|xodim\w*|faoliyat\s+yurit\w*)", re.IGNORECASE)
+_UZ_STUDY_RE = re.compile(rf"(\S+?){_APOS}?(?:da|de|ta)\s+o{_APOS}?qi(?:ydi|gan|yapti|yotgan)\b", re.IGNORECASE)
+_UZ_ROLE_RE = re.compile(rf"(\S+)\s+(talabasi|o{_APOS}?quvchisi|bitiruvchisi|xodimi)\b", re.IGNORECASE)
+_EN_WORK_RE = re.compile(r"\b(?:works?|working|worked|employed|job)\s+(?:at|for|in)\s+([^,;.!?]+)", re.IGNORECASE)
+_EN_STUDY_RE = re.compile(r"\b(?:stud(?:ies|ied|ying|ent)|graduated?|alumn(?:us|a))\s+(?:at|of|from|in)\s+([^,;.!?]+)",
+                          re.IGNORECASE)
+_RU_WORK_RE = re.compile(r"(?:работает|работал[аи]?|сотрудник(?:ца)?)\s+(?:в|во|на)\s+([^,;.!?]+)", re.IGNORECASE)
+_RU_STUDY_RE = re.compile(r"(?:учится|учился|училась|студент(?:ка)?|окончил[аи]?)\s+(?:в|во|на)?\s*([^,;.!?]+)",
+                          re.IGNORECASE)
+# words that name the kind of organisation, not which one
+_ORG_GENERIC = {"kompaniyasi", "kompaniya", "firmasi", "firma", "korxonasi", "zavodi", "banki", "bank",
+                "universiteti", "universitet", "instituti", "institut", "maktabi", "maktab", "litseyi",
+                "kolleji", "akademiyasi", "vazirligi", "hokimligi", "company", "university", "school",
+                "college", "institute", "компании", "университете", "институте", "школе", "банке"}
+# where a phrase after "works at" ends: "works at Artel from Namangan 25 years old"
+_ORG_END_WORDS = {"from", "in", "and", "aged", "age", "born", "since", "as", "в", "из", "и", "с", "dan",
+                  "va", "years", "year", "yosh", "лет"}
+MAX_ORG_WORDS = 4
 _NAME_WORD_RE = re.compile(r"^[A-Za-zÀ-ɏЀ-ӿ][A-Za-zÀ-ɏЀ-ӿʻʼ’'`\-]*$")
 
 
@@ -101,6 +126,73 @@ def _place_of(word: str) -> str | None:
     return None
 
 
+def _org_words(raw: str) -> str:
+    """The organisation name at the start of a captured phrase (≤ 4 words)."""
+    words = []
+    for word in raw.split():
+        bare = word.strip("\"'«»“”.,")
+        if not bare or bare.casefold() in _ORG_END_WORDS or re.fullmatch(r"\d+", bare):
+            break
+        words.append(bare)
+        if len(words) >= MAX_ORG_WORDS:
+            break
+    return " ".join(words)
+
+
+def _take_orgs(rest: str, out: dict) -> str:
+    """Pull workplace / place-of-study phrases out of the text (7.6)."""
+    def keep(kind: str, value: str) -> None:
+        value = value.strip(" \"'«»“”-")
+        if len(value) < 2 or _place_of(value) or value.casefold() in _STOPWORDS:
+            if _place_of(value) and _place_of(value) not in out["places"]:
+                out["places"].append(_place_of(value))      # "работает в Ташкенте"
+            return
+        if value not in out[kind]:
+            out[kind].append(value[:80])
+
+    def uz(pattern: re.Pattern, kind: str, text: str) -> str:
+        pieces, last = [], 0
+        for m in pattern.finditer(text):
+            start, word = m.start(1), m.group(1)
+            if fold(word) in {fold(g) for g in _ORG_GENERIC}:
+                # "Artel kompaniyasida ishlaydi": take the word before as well
+                before = re.search(r"(\S+)\s+$", text[last:start])
+                if before:
+                    start = last + before.start(1)
+                    word = before.group(1) + " " + word
+            keep(kind, word)
+            pieces.append(text[last:start])
+            last = m.end()
+        pieces.append(text[last:])
+        return " ".join(pieces)
+
+    def forward(pattern: re.Pattern, kind: str, text: str) -> str:
+        def repl(m: re.Match) -> str:
+            org = _org_words(m.group(1))
+            keep(kind, org)
+            tail = m.group(1)[len(org):] if m.group(1).startswith(org) else m.group(1)
+            return " " + tail.lstrip() if org else m.group(0)
+        return pattern.sub(repl, text)
+
+    rest = uz(_UZ_WORK_RE, "workplaces", rest)
+    rest = uz(_UZ_STUDY_RE, "schools", rest)
+    for m in list(_UZ_ROLE_RE.finditer(rest)):
+        kind = "workplaces" if m.group(2).casefold().startswith("xodim") else "schools"
+        word, start = m.group(1), m.start(1)
+        if fold(word) in {fold(g) for g in _ORG_GENERIC}:
+            before = re.search(r"(\S+)\s+$", rest[:start])
+            if before:
+                word = before.group(1) + " " + word
+                rest = rest[:before.start(1)] + " " * (start - before.start(1)) + rest[start:]
+        keep(kind, word)
+    rest = _UZ_ROLE_RE.sub(" ", rest)
+    rest = forward(_EN_WORK_RE, "workplaces", rest)
+    rest = forward(_EN_STUDY_RE, "schools", rest)
+    rest = forward(_RU_WORK_RE, "workplaces", rest)
+    rest = forward(_RU_STUDY_RE, "schools", rest)
+    return rest
+
+
 def _clean_phone(raw: str) -> str | None:
     digits = re.sub(r"\D", "", raw)
     if not 9 <= len(digits) <= 15:
@@ -116,7 +208,8 @@ def parse_request(text: str, today: date | None = None) -> dict:
     today = today or date.today()
     rest = original
     out: dict = {"text": original, "names": [], "age": None, "birth_years": [], "places": [],
-                 "usernames": [], "emails": [], "phones": [], "domains": []}
+                 "usernames": [], "emails": [], "phones": [], "domains": [],
+                 "workplaces": [], "schools": []}
 
     def take(pattern: re.Pattern, handler) -> None:
         nonlocal rest
@@ -138,6 +231,7 @@ def parse_request(text: str, today: date | None = None) -> dict:
             out["domains"].append(re.sub(r"^(?:https?://)?(?:www\.)?", "", raw).rstrip("/").lower())
     take(_URL_RE, on_url)
     take(_HANDLE_RE, lambda m: out["usernames"].append(m.group(1)))
+    rest = _take_orgs(rest, out)
 
     def on_age(m: re.Match) -> None:
         age = int(m.group(1))
@@ -181,7 +275,7 @@ def parse_request(text: str, today: date | None = None) -> dict:
         name = " ".join(w[:1].upper() + w[1:] for w in name_words[:MAX_NAME_TOKENS])
         out["names"].append(name)
 
-    for key in ("usernames", "emails", "phones", "domains"):
+    for key in ("usernames", "emails", "phones", "domains", "workplaces", "schools"):
         out[key] = list(dict.fromkeys(out[key]))[:3]
     return out
 
@@ -202,7 +296,8 @@ def describe(parsed: dict) -> str:
         parts.append(f"born {years[0]}" if len(years) == 1 else f"born {years[0]}–{years[-1]}")
     if parsed["places"]:
         parts.append("place " + ", ".join(parsed["places"]))
-    for key, label in (("usernames", "username"), ("emails", "email"), ("phones", "phone"), ("domains", "domain")):
-        if parsed[key]:
+    for key, label in (("workplaces", "works at"), ("schools", "studies/studied at"), ("usernames", "username"),
+                       ("emails", "email"), ("phones", "phone"), ("domains", "domain")):
+        if parsed.get(key):
             parts.append(f"{label} " + ", ".join(parsed[key]))
     return "; ".join(parts) or "nothing searchable"

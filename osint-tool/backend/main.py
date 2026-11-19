@@ -25,6 +25,7 @@ from routers import (
     deep_scan,
     domain,
     email,
+    export,
     exposure,
     footprint,
     geolocate,
@@ -172,6 +173,7 @@ app.include_router(jobs.router)
 app.include_router(sources.router)
 app.include_router(geolocate.router)
 app.include_router(agent.router)
+app.include_router(export.router)
 
 
 @app.get("/")
