@@ -26,6 +26,7 @@ COPY backend/requirements-dev.txt .
 ARG INSTALL_DEV=false
 RUN if [ "$INSTALL_DEV" = "true" ]; then pip install -r requirements-dev.txt; fi
 
+COPY backend/VERSION .
 COPY backend/main.py .
 COPY backend/security.py .
 COPY backend/cache.py .

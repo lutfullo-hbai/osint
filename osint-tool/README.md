@@ -252,3 +252,12 @@ Testlar SSRF (private IP, redirect), API key (401) va rate limit (429)ni qamrab 
 
 Faqat ochiq manbalardan va **ruxsat etilgan** tekshiruvlar uchun foydalaning.
 Truecaller/reverse-search kabi tashqi xizmatlar o'z ToS'iga ega.
+
+## Versiya va ish tartibi
+
+- Joriy versiya: `backend/VERSION`; o'zgarishlar: [CHANGELOG.md](CHANGELOG.md).
+- Branchlar: `feat/xxx → dev → stage → main`.
+  - `dev`: kundalik ishlar yig'iladi;
+  - `stage`: chiqarishdan oldin to'liq tekshiruv (Docker testlari + jonli sinov);
+  - `main`: faqat tekshirilgan, barqaror versiya (himoyalangan, `stage`'dan PR orqali).
+- Har bir `main` chiqarilishi `vX.Y.Z` tegi va GitHub Release oladi. CI (GitHub Actions) har push'da testlarni ishlatadi.

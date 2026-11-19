@@ -5,6 +5,7 @@ import os
 import time
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -36,13 +37,24 @@ from routers import (
 import store
 from security import limiter
 
+
+def _read_version() -> str:
+    """Single source of truth: backend/VERSION (bumped on every release)."""
+    try:
+        return Path(__file__).with_name("VERSION").read_text(encoding="utf-8").strip() or "0.0.0"
+    except OSError:
+        return "0.0.0"
+
+
+APP_VERSION = _read_version()
+
 app = FastAPI(
     title="OSINT Investigation Tool",
     description=(
         "Local OSINT helper aggregating Sherlock, Maigret, Holehe and public "
         "Truecaller page lookups."
     ),
-    version="1.0.0",
+    version=APP_VERSION,
 )
 
 app.state.limiter = limiter
@@ -164,7 +176,7 @@ app.include_router(geolocate.router)
 async def root():
     return {
         "name": "OSINT Investigation Tool",
-        "version": "1.0.0",
+        "version": APP_VERSION,
         "endpoints": [
             "/api/name",
             "/api/company",
