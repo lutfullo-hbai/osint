@@ -40,7 +40,7 @@ MAX_BYTES = 2 * 1024 * 1024
 MAX_PER_KIND = 15
 DEFAULT_REGION = "UZ"           # "90 123 45 67" written without +998
 
-_HREF_RE = re.compile(r"""<a\b[^>]*href=["']([^"'#]+)["'][^>]*>(.*?)</a>""", re.IGNORECASE | re.DOTALL)
+_HREF_RE = re.compile(r"""<a\b[^>]*href=["']([^"']+)["'][^>]*>(.*?)</a>""", re.IGNORECASE | re.DOTALL)
 _URL_RE = re.compile(r"https?://[^\s<>\"'()\[\]]+", re.IGNORECASE)
 _TEL_RE = re.compile(r"""href=["']tel:([^"']+)["']""", re.IGNORECASE)
 _MAILTO_RE = re.compile(r"""mailto:([^"'?\s>]+)""", re.IGNORECASE)
@@ -48,10 +48,15 @@ _SKIP_TAGS_RE = re.compile(r"<(script|style|noscript|svg)\b[^>]*>.*?</\1>", re.I
 # messenger links that carry a handle or a number in the path
 _MESSENGER_RE = re.compile(r"^https?://(?:www\.)?(t\.me|telegram\.me|wa\.me|api\.whatsapp\.com)/", re.IGNORECASE)
 _SKIP_SITES = ("schema.org", "w3.org", "googleapis.com", "gstatic.com", "googletagmanager.com",
-               "google-analytics.com", "cloudflare.com", "jsdelivr.net", "fonts.", "cdn.",
+               "google-analytics.com", "cloudflare.com", "jsdelivr.net",
                # app-store and share links are not the person's own site
                "apps.apple.com", "itunes.apple.com", "play.google.com", "appgallery.huawei.com",
                "addtoany.com", "sharethis.com")
+_SKIP_PREFIXES = ("fonts.", "cdn.")     # fonts.example.com, cdn.example.uz - but not mycdn.uz
+
+
+def _skipped_site(host: str) -> bool:
+    return host.startswith(_SKIP_PREFIXES) or any(host == s or host.endswith("." + s) for s in _SKIP_SITES)
 
 
 def _strip_html(html: str) -> str:
@@ -80,7 +85,7 @@ def _link_kind(url: str, page_host: str) -> tuple[str, str] | None:
     """('social', 'platform:handle') / ('messenger', url) / ('website', host) or None."""
     parsed = urlparse(url)
     host = (parsed.hostname or "").lower().removeprefix("www.")
-    if not host or any(s in host for s in _SKIP_SITES):
+    if not host or _skipped_site(host):
         return None
     if _MESSENGER_RE.match(url):
         # also on t.me itself: a channel description pointing at its owner
@@ -204,7 +209,10 @@ async def extract_contacts(url: str, max_pages: int = MAX_PAGES) -> dict:
             if r.status_code >= 500:
                 return {"url": start, "contacts": [], "pages": [],
                         "notes": ["robots.txt unavailable (server error): not reading the site"]}
-            robots.parse(r.text.splitlines() if r.status_code == 200 else [])
+            if r.status_code in (401, 403):
+                robots.disallow_all = True      # same rule as urllib's RobotFileParser.read()
+            else:
+                robots.parse(r.text.splitlines() if r.status_code == 200 else [])
         except UnsafeURLError as exc:
             return {"url": start, "contacts": [], "pages": [], "notes": [str(exc)]}
         except httpx.HTTPError as exc:
