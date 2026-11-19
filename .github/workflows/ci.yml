@@ -22,7 +22,7 @@ jobs:
       run:
         working-directory: osint-tool
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Frontend syntax check
         run: node --check frontend/app.js
