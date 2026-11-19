@@ -54,6 +54,9 @@ async def contacts(request: Request, response: Response, payload: ContactsReques
     url = payload.url.strip()
     if not url or len(url) > 2000:
         return _error(400, "Give the page URL.")
+    scheme = re.match(r"^([a-z][a-z0-9+.\-]*):", url, re.IGNORECASE)
+    if scheme and not url.lower().startswith(("http://", "https://")) and "." not in scheme.group(1):
+        return _error(400, "Only http and https pages can be read.")      # file:, ftp:, javascript:
     if not re.match(r"^https?://", url, re.IGNORECASE):
         url = "https://" + url
     try:

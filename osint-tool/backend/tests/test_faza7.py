@@ -198,13 +198,14 @@ def test_phones_are_validated_not_just_digit_runs():
 def test_contacts_from_text_reads_email_phone_and_links():
     found = contact_extract.contacts_from_text(
         "Contact: ali [at] example [dot] uz | +998 93 555 11 22 | https://t.me/ali_dev "
-        "https://github.com/alidev https://ali.uz/blog https://youtube.com/watch?v=1",
+        "https://github.com/alidev https://ali.uz/blog https://youtube.com/watch?v=1 "
+        "https://apps.apple.com/uz/app/x/id1 https://play.google.com/store/apps/details?id=x",
         "https://t.me/s/channel")
     pairs = {(c["kind"], c["value"]) for c in found}
     assert ("email", "ali@example.uz") in pairs and ("phone", "+998935551122") in pairs
     assert ("messenger", "https://t.me/ali_dev") in pairs
     assert ("social", "github.com/alidev") in pairs and ("website", "ali.uz") in pairs
-    assert not any("youtube" in v for _, v in pairs)                       # a video is not a contact
+    assert not any("youtube" in v or "apple" in v or "google" in v for _, v in pairs)   # video, app stores
     assert all(c["sources"] == ["https://t.me/s/channel"] for c in found)
 
 
@@ -428,7 +429,11 @@ async def test_contacts_endpoint_rejects_private_addresses(api, monkeypatch):
     async with AsyncClient(transport=ASGITransport(app=main.app), base_url="http://test") as client:
         bad = await client.post("/api/contacts", json={"url": "http://127.0.0.1/admin"})
         assert bad.status_code == 400
+        for url in ("file:///etc/passwd", "javascript:alert(1)", "ftp://site.uz/x"):
+            other = await client.post("/api/contacts", json={"url": url})
+            assert other.status_code == 400 and "http and https" in other.json()["message"]
         monkeypatch.setattr(export, "ensure_safe_url", safe)
+        limiter.reset()                         # the checks above used up the heavy limit
         ok = await client.post("/api/contacts", json={"url": "site.uz"})
         body = ok.json()
         assert ok.status_code == 200 and body["url"] == "https://site.uz" and body["contacts"][0]["value"] == "a@b.uz"

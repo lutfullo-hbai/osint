@@ -1053,3 +1053,8 @@ a.agent-source:hover { background: rgba(34, 211, 238, 0.12); }
 .agent-chain ol { margin: 6px 0 0 18px; padding: 0; }
 .agent-chain li { margin: 2px 0; overflow-wrap: anywhere; }
 .agent-contact-box .agent-missing { font-size: 13px; }
+#panel-contacts .results > .notice,
+#panel-contacts .results > .contacts-card,
+#panel-contacts .results > .warnings,
+#panel-contacts .results > .empty-state { grid-column: 1 / -1; }
+.agent-contacts .agent-value { align-items: center; }

@@ -624,7 +624,7 @@ async function downloadFile(url, options, filename, button) {
 }
 
 function safeFileName(value) {
-  return String(value || "graph").replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 60);
+  return String(value || "graph").replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "graph";
 }
 
 // ROADMAP 7.8: GraphML for Gephi / yEd / Cytoscape, CSV for Maltego CE's table import
@@ -951,7 +951,7 @@ async function requestJson(url, options) {
   }
   if (!response.ok) {
     const error = new Error(
-      data.message || data.detail || `Request failed with HTTP ${response.status}.`
+      data.message || data.detail || data.error || `Request failed with HTTP ${response.status}.`
     );
     error.jobsUnavailable = response.status === 503 || response.status === 404;
     throw error;
@@ -1595,8 +1595,17 @@ function buildContactRows(contacts) {
     const how = document.createElement("span");
     how.className = "card-meta";
     how.textContent = item.how ? `— ${item.how} ` : "";
+    // label each page by its path ("/contact"), so several sources are told apart
+    const pageLabel = (u) => {
+      try {
+        const url = new URL(u);
+        return url.pathname === "/" ? url.hostname : url.pathname.slice(0, 40);
+      } catch (e) {
+        return "page";
+      }
+    };
     row.append(kind, value, how,
-               agentSourceLinks((item.sources || []).map((u) => ({ platform: "page", url: u }))));
+               agentSourceLinks((item.sources || []).map((u) => ({ platform: pageLabel(u), url: u }))));
     list.appendChild(row);
   });
   return list;
@@ -1793,7 +1802,7 @@ async function handleContacts(event) {
     panel.results.appendChild(notice);
     if (contacts.length) {
       const card = document.createElement("div");
-      card.className = "card";
+      card.className = "card contacts-card";
       card.appendChild(buildContactRows(contacts));
       panel.results.appendChild(card);
     } else {
