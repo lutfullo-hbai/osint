@@ -74,7 +74,8 @@ def _sources_text(sources: list) -> str:
     out = []
     for src in sources or []:
         if isinstance(src, dict):
-            out.append(f"{src.get('platform') or 'source'}" + (f" <{src['url']}>" if src.get("url") else ""))
+            out.append(f"{src.get('platform') or 'source'}" + (f" <{src['url']}>" if src.get("url") else "")
+                       + (f" ({str(src['retrieved_at'])[:16].replace('T', ' ')} UTC)" if src.get("retrieved_at") else ""))
         else:
             out.append(str(src))
     return "; ".join(out)

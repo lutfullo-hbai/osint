@@ -8,6 +8,19 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 (`vX.Y.Z`) va GitHub Release oladi.
 
 ## [Unreleased]
+Qonuniy va operatsion talablar (Faza 8).
+
+### Qo'shildi
+- **Manba vaqti (8.1)**: har bir natijada `retrieved_at`; keshdan kelgan javob asl vaqtni saqlaydi;
+  Agent maydon manbalari, PDF karta, Markdown hisobot va case topilmalarida ko'rinadi.
+- **To'liq o'chirish (8.2)**: Agent run'ni o'chirish; `DELETE /api/data` — case, topilma, watch,
+  Agent run, Redis kesh va job natijalari; `secure_delete` va `VACUUM`.
+- **Audit log (8.3)**: kim, qachon, nima — lokal SQLite, Data tabida ko'rish va filtr,
+  `AUDIT_RETENTION_DAYS`, `AUDIT_LOG_QUERIES=0` (faqat hash).
+- **Kirish (8.4)**: nomli kalitlar `OSINT_USERS`, admin huquqlari, `hmac.compare_digest`;
+  kalitsiz rejimda ommaviy IP'dan so'rov 403 (`ALLOW_OPEN_ACCESS=1` bilan ochiladi);
+  qisqa kalit haqida ogohlantirish. Yangi **Data** tabi: kalit, Agent run'lar, audit, o'chirish.
+- **Foydalanish shartlari (8.5)** README'da.
 
 ## [0.7.1] — 2026-11-19
 Faza 7 sinovi tuzatishlari.

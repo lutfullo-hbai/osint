@@ -237,6 +237,9 @@ function activateTab(name) {
   if (name === "watch") {
     loadWatches();
   }
+  if (name === "data") {
+    loadDataPanel();
+  }
 }
 
 // ---- Watch (scheduled monitoring) ----
@@ -493,6 +496,9 @@ function buildCard(item) {
   if (item.query) {
     metaParts.push(`query: ${escapeHtml(item.query)}`);
   }
+  if (item.retrieved_at) {
+    metaParts.push(`<span class="retrieved">retrieved ${escapeHtml(formatRetrieved(item.retrieved_at))}</span>`);
+  }
   if (metaParts.length) {
     const meta = document.createElement("div");
     meta.className = "card-meta";
@@ -501,6 +507,11 @@ function buildCard(item) {
   }
 
   return card;
+}
+
+// 8.1: when the source was asked (UTC), as "2026-11-19 14:05 UTC"
+function formatRetrieved(value) {
+  return String(value || "").slice(0, 16).replace("T", " ") + " UTC";
 }
 
 function reportMarkdown(data) {
@@ -528,6 +539,7 @@ function reportMarkdown(data) {
     if (item.confidence) lines.push(`- Account exists: ${item.confidence} confidence`);
     if (item.match) lines.push(`- Name match: ${item.match}`);
     if (item.info) lines.push(`- ${item.info}`);
+    if (item.retrieved_at) lines.push(`- Retrieved: ${formatRetrieved(item.retrieved_at)}`);
     lines.push("");
   });
   if (Array.isArray(data.warnings) && data.warnings.length) {
@@ -950,9 +962,9 @@ async function requestJson(url, options) {
     throw new Error(`Backend returned a non-JSON response (HTTP ${response.status}).`);
   }
   if (!response.ok) {
-    const error = new Error(
-      data.message || data.detail || data.error || `Request failed with HTTP ${response.status}.`
-    );
+    let message = data.message || data.detail || data.error || `Request failed with HTTP ${response.status}.`;
+    if (response.status === 401) message += " Enter the key in the Data tab.";
+    const error = new Error(message);
     error.jobsUnavailable = response.status === 503 || response.status === 404;
     throw error;
   }
@@ -1445,7 +1457,7 @@ function agentSourceLinks(sources) {
       el.href = url;
       el.target = "_blank";
       el.rel = "noopener noreferrer";
-      el.title = url;
+      el.title = url + (src.retrieved_at ? ` — retrieved ${formatRetrieved(src.retrieved_at)}` : "");
     }
     wrap.appendChild(el);
   });
@@ -2422,3 +2434,172 @@ async function geolocateRun(form) {
   }));
   drop.addEventListener("drop", (e) => runFile(e.dataTransfer.files[0]));
 })();
+
+
+// ---- Data: access, Agent runs, audit log, full deletion (ROADMAP 8.2-8.4) ----
+
+const dataEls = {
+  whoami: document.getElementById("data-whoami"),
+  key: document.getElementById("data-key"),
+  runs: document.getElementById("data-runs"),
+  auditUser: document.getElementById("data-audit-user"),
+  auditQ: document.getElementById("data-audit-q"),
+  audit: document.getElementById("data-audit"),
+  auditError: document.getElementById("data-audit-error"),
+  auditHint: document.getElementById("data-audit-hint"),
+  auditMore: document.getElementById("data-audit-more"),
+  wipeConfirm: document.getElementById("data-wipe-confirm"),
+  wipeAudit: document.getElementById("data-wipe-audit"),
+  wipeBtn: document.getElementById("data-wipe-btn"),
+  wipeResult: document.getElementById("data-wipe-result"),
+};
+let auditOldestId = 0;
+
+function dataApi(path, options = {}) {
+  return requestJson(`${API_BASE}${path}`, {
+    ...options,
+    headers: authHeaders({ "Content-Type": "application/json" }),
+  });
+}
+
+async function loadDataPanel() {
+  let me = null;
+  try {
+    me = await dataApi("/api/whoami");
+    dataEls.whoami.textContent = me.keys_configured
+      ? `Signed in as ${me.user}${me.admin ? " (admin)" : ""}.`
+      : "No API keys are set on the server: open to this machine and the local network only.";
+  } catch (err) {
+    dataEls.whoami.textContent = err.message;
+  }
+  loadDataRuns();
+  if (me && me.admin) {
+    dataEls.auditHint.textContent =
+      `Who searched what and when. Stored only on this server, kept ${me.audit_retention_days} days.`;
+    loadAudit(false);
+  } else if (me) {
+    dataEls.auditHint.textContent = "Only the admin key can read the audit log and delete all data.";
+    dataEls.audit.replaceChildren();
+  }
+}
+
+async function loadDataRuns() {
+  dataEls.runs.replaceChildren();
+  let runs = [];
+  try {
+    runs = (await dataApi("/api/agent?limit=50")).runs || [];
+  } catch (err) {
+    dataEls.runs.textContent = err.message;
+    return;
+  }
+  if (!runs.length) {
+    dataEls.runs.innerHTML = '<div class="empty-state">No Agent runs stored.</div>';
+    return;
+  }
+  runs.forEach((run) => {
+    const row = document.createElement("div");
+    row.className = "data-row";
+    const text = document.createElement("span");
+    text.className = "data-row-text";
+    text.textContent = run.text;
+    const meta = document.createElement("span");
+    meta.className = "data-row-meta";
+    meta.textContent = `${formatRetrieved(run.created_at)} · ${run.status}`;
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "ghost";
+    del.textContent = "Delete";
+    del.addEventListener("click", async () => {
+      del.disabled = true;
+      try {
+        await dataApi(`/api/agent/${encodeURIComponent(run.id)}`, { method: "DELETE" });
+        row.remove();
+      } catch (err) {
+        del.disabled = false;
+        meta.textContent = err.message;
+      }
+    });
+    row.append(text, meta, del);
+    dataEls.runs.appendChild(row);
+  });
+}
+
+async function loadAudit(older) {
+  const params = new URLSearchParams({ limit: "100" });
+  if (dataEls.auditUser.value.trim()) params.set("user", dataEls.auditUser.value.trim());
+  if (dataEls.auditQ.value.trim()) params.set("q", dataEls.auditQ.value.trim());
+  if (older && auditOldestId) params.set("before", String(auditOldestId));
+  dataEls.auditError.classList.add("hidden");
+  let entries = [];
+  try {
+    entries = (await dataApi(`/api/audit?${params}`)).entries || [];
+  } catch (err) {
+    dataEls.auditError.textContent = `[ERROR] ${err.message}`;
+    dataEls.auditError.classList.remove("hidden");
+    return;
+  }
+  if (!older) {
+    dataEls.audit.innerHTML =
+      "<thead><tr><th>When (UTC)</th><th>User</th><th>Action</th><th>What</th><th>Status</th></tr></thead><tbody></tbody>";
+  }
+  const body = dataEls.audit.querySelector("tbody");
+  entries.forEach((e) => {
+    const tr = document.createElement("tr");
+    [formatRetrieved(e.at).replace(" UTC", ""), e.user, `${e.method} ${e.path}${e.action ? " · " + e.action : ""}`,
+     e.query || "", String(e.status ?? "")].forEach((value, i) => {
+      const td = document.createElement("td");
+      td.textContent = value;
+      if (i === 4 && Number(value) >= 400) td.className = "bad";
+      tr.appendChild(td);
+    });
+    body.appendChild(tr);
+  });
+  if (entries.length) auditOldestId = entries[entries.length - 1].id;
+  if (!older && !entries.length) {
+    body.innerHTML = '<tr><td colspan="5">No entries.</td></tr>';
+  }
+  dataEls.auditMore.classList.toggle("hidden", entries.length < 100);
+}
+
+document.getElementById("data-key-save").addEventListener("click", () => {
+  try {
+    localStorage.setItem(API_KEY_STORAGE, dataEls.key.value.trim());
+  } catch (err) {
+    /* storage blocked: the key lasts until reload */
+  }
+  dataEls.key.value = "";
+  loadDataPanel();
+});
+document.getElementById("data-key-clear").addEventListener("click", () => {
+  try {
+    localStorage.removeItem(API_KEY_STORAGE);
+  } catch (err) {
+    /* nothing stored */
+  }
+  loadDataPanel();
+});
+document.getElementById("data-audit-load").addEventListener("click", () => loadAudit(false));
+dataEls.auditMore.addEventListener("click", () => loadAudit(true));
+dataEls.wipeConfirm.addEventListener("input", () => {
+  dataEls.wipeBtn.disabled = dataEls.wipeConfirm.value.trim() !== "DELETE ALL";
+});
+dataEls.wipeBtn.addEventListener("click", async () => {
+  dataEls.wipeBtn.disabled = true;
+  try {
+    const res = await dataApi("/api/data", {
+      method: "DELETE",
+      body: JSON.stringify({ confirm: dataEls.wipeConfirm.value.trim(), include_audit: dataEls.wipeAudit.checked }),
+    });
+    const d = res.deleted || {};
+    dataEls.wipeResult.textContent =
+      `Deleted: ${d.cases || 0} cases, ${d.findings || 0} findings, ${d.watches || 0} watches, ` +
+      `${d.agent_runs || 0} Agent runs, ${res.cache_keys || 0} cached answers` +
+      (d.audit_log != null ? `, ${d.audit_log} audit entries` : "") + "." +
+      (res.warning ? ` ${res.warning}` : "");
+    dataEls.wipeConfirm.value = "";
+    loadDataPanel();
+  } catch (err) {
+    dataEls.wipeResult.textContent = err.message;
+    dataEls.wipeBtn.disabled = false;
+  }
+});
