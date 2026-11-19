@@ -8,7 +8,7 @@ import httpx
 from fastapi import APIRouter, Depends, Request, Response
 
 from security import general_limit, limiter, verify_api_key
-from tools import holehe_runner, maigret_db, public_search, sanctions_index, truecaller, uz_registry
+from tools import holehe_runner, maigret_db, public_search, sanctions_index, truecaller, username_canary, uz_registry
 
 router = APIRouter(tags=["sources"], dependencies=[Depends(verify_api_key)])
 
@@ -109,6 +109,16 @@ async def _holehe() -> dict:
     return {"ok": active > 0, "detail": detail, "paused": h["paused"]}
 
 
+async def _username_filter() -> dict:
+    data = await username_canary.load()
+    if not data.get("tools"):
+        return {"ok": False, "detail": "not checked yet (the worker runs it at start and daily)"}
+    tools = data["tools"]
+    age_h = int((time.time() - data.get("at", 0)) // 3600)
+    return {"ok": True, "detail": f"ignoring {len(tools.get('sherlock') or [])} Sherlock and "
+            f"{len(tools.get('maigret') or [])} Maigret site(s) that 'find' any username; checked {age_h} h ago"}
+
+
 @router.get("/api/sources/health")
 @limiter.limit(general_limit)
 async def sources_health(request: Request, response: Response):
@@ -126,6 +136,7 @@ async def sources_health(request: Request, response: Response):
         "Subfinder": {"ok": shutil.which("subfinder") is not None,
                       "detail": "installed" if shutil.which("subfinder") else "binary missing"},
         "Holehe": await _holehe(),
+        "Username false-positive filter": await _username_filter(),
         "Sanctions index": await asyncio.to_thread(_sanctions),
         "UZ registers": await asyncio.to_thread(_uz_registry),
         "Truecaller": {"ok": tc_until <= 0,

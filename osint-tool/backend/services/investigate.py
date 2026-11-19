@@ -36,7 +36,7 @@ from tools.email_domain import (
 from tools.email_intel import lookup_breaches, lookup_emailrep
 from tools.holehe_runner import run_holehe
 from tools.domain_emails import find_domain_emails
-from tools import openinfo, passive_dns, uz_registry
+from tools import openinfo, passive_dns, username_canary, uz_registry
 from tools.hub_domains import is_hub_domain
 from tools.profile_history import annotate_first_archived
 from services.names import username_variants
@@ -375,6 +375,18 @@ async def _investigate_username(username: str) -> dict:
         }
     )
     failed = list(warnings)
+
+    # sites that also "find" a random, never-used handle are ignored
+    false_sites = await username_canary.false_positive_sites()
+    ignored = 0
+    for label, tool in (("Sherlock", "sherlock"), ("Maigret", "maigret")):
+        if label in outcomes:
+            kept, dropped = username_canary.drop_false_positives(outcomes[label]["results"], false_sites[tool])
+            outcomes[label] = {**outcomes[label], "results": kept}
+            ignored += dropped
+    if ignored:
+        warnings.append(f"{ignored} site hit(s) ignored: those sites also report a random, "
+                        "never-used username as existing.")
 
     def results_of(label: str) -> list[dict]:
         return outcomes[label]["results"] if label in outcomes else []

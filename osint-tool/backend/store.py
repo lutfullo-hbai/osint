@@ -60,6 +60,24 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_events_watch ON watch_events(watch_id)"
         )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS agent_runs ("
+            "id TEXT PRIMARY KEY, text TEXT NOT NULL, status TEXT NOT NULL, "
+            "parsed TEXT, result TEXT, error TEXT, "
+            "created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS agent_steps ("
+            "run_id TEXT NOT NULL, seq INTEGER NOT NULL, kind TEXT NOT NULL, "
+            "text TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (run_id, seq), "
+            "FOREIGN KEY(run_id) REFERENCES agent_runs(id) ON DELETE CASCADE)"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS agent_decisions ("
+            "run_id TEXT NOT NULL, candidate_id TEXT NOT NULL, decision TEXT NOT NULL, "
+            "note TEXT, at TEXT NOT NULL, PRIMARY KEY (run_id, candidate_id), "
+            "FOREIGN KEY(run_id) REFERENCES agent_runs(id) ON DELETE CASCADE)"
+        )
 
 
 def create_case(name: str) -> dict:
@@ -312,3 +330,96 @@ def record_watch_check(watch_id: str, new_hash: str, status: str,
                 (uuid.uuid4().hex, watch_id, change_summary, now),
             )
     return True
+
+
+# ---------------- Agent mode runs (ROADMAP Faza 6) ----------------
+
+AGENT_DECISIONS = ("confirmed", "rejected", "undecided")
+MAX_AGENT_TEXT = 500
+MAX_AGENT_STEPS = 300
+MAX_AGENT_RUNS = int(os.environ.get("MAX_AGENT_RUNS", "200"))
+
+
+def create_agent_run(text: str) -> dict:
+    text = " ".join(str(text or "").split())
+    if not text:
+        raise CaseError("Describe the person to look for.")
+    if len(text) > MAX_AGENT_TEXT:
+        raise CaseError(f"Keep the description under {MAX_AGENT_TEXT} characters.")
+    run_id, now = uuid.uuid4().hex, _now()
+    with _connect() as conn:
+        conn.execute("PRAGMA foreign_keys=ON")     # the cap below cascades to steps/decisions
+        conn.execute("INSERT INTO agent_runs (id, text, status, created_at, updated_at) "
+                     "VALUES (?, ?, 'queued', ?, ?)", (run_id, text, now, now))
+        # keep the table bounded: drop the oldest runs beyond the cap
+        conn.execute("DELETE FROM agent_runs WHERE id IN (SELECT id FROM agent_runs "
+                     "ORDER BY created_at DESC LIMIT -1 OFFSET ?)", (MAX_AGENT_RUNS,))
+    return {"id": run_id, "text": text, "status": "queued", "created_at": now}
+
+
+def update_agent_run(run_id: str, **fields) -> None:
+    allowed = {"status", "parsed", "result", "error"}
+    sets, values = [], []
+    for key, value in fields.items():
+        if key not in allowed:
+            raise ValueError(key)
+        sets.append(f"{key} = ?")
+        values.append(json.dumps(value) if key in ("parsed", "result") and value is not None else value)
+    sets.append("updated_at = ?")
+    values += [_now(), run_id]
+    with _connect() as conn:
+        conn.execute(f"UPDATE agent_runs SET {', '.join(sets)} WHERE id = ?", values)
+
+
+def add_agent_step(run_id: str, kind: str, text: str) -> None:
+    with _connect() as conn:
+        seq = conn.execute("SELECT COALESCE(MAX(seq), 0) + 1 FROM agent_steps WHERE run_id = ?",
+                           (run_id,)).fetchone()[0]
+        if seq > MAX_AGENT_STEPS:
+            return
+        conn.execute("INSERT INTO agent_steps VALUES (?, ?, ?, ?, ?)",
+                     (run_id, seq, kind[:20], str(text)[:400], _now()))
+        conn.execute("UPDATE agent_runs SET updated_at = ? WHERE id = ?", (_now(), run_id))
+
+
+def get_agent_run(run_id: str, after_step: int = 0) -> dict:
+    with _connect() as conn:
+        row = conn.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,)).fetchone()
+        if row is None:
+            raise CaseError("Agent run not found.")
+        steps = conn.execute("SELECT seq, kind, text, at FROM agent_steps WHERE run_id = ? AND seq > ? "
+                             "ORDER BY seq", (run_id, after_step)).fetchall()
+        decisions = conn.execute("SELECT candidate_id, decision, note, at FROM agent_decisions "
+                                 "WHERE run_id = ?", (run_id,)).fetchall()
+    run = dict(row)
+    for key in ("parsed", "result"):
+        run[key] = json.loads(run[key]) if run[key] else None
+    run["steps"] = [dict(s) for s in steps]
+    run["decisions"] = {d["candidate_id"]: dict(d) for d in decisions}
+    return run
+
+
+def list_agent_runs(limit: int = 20) -> list[dict]:
+    with _connect() as conn:
+        rows = conn.execute("SELECT id, text, status, created_at, updated_at FROM agent_runs "
+                            "ORDER BY created_at DESC LIMIT ?", (max(1, min(limit, 100)),)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def set_agent_decision(run_id: str, candidate_id: str, decision: str, note: str = "") -> dict:
+    """The human's final call on a candidate (the agent never decides)."""
+    if decision not in AGENT_DECISIONS:
+        raise CaseError("Decision must be one of: " + ", ".join(AGENT_DECISIONS) + ".")
+    run = get_agent_run(run_id)
+    known = {c.get("id") for c in ((run.get("result") or {}).get("candidates") or [])}
+    if candidate_id not in known:
+        raise CaseError("No such candidate in this run.")
+    now = _now()
+    with _connect() as conn:
+        if decision == "undecided":
+            conn.execute("DELETE FROM agent_decisions WHERE run_id = ? AND candidate_id = ?",
+                         (run_id, candidate_id))
+        else:
+            conn.execute("INSERT OR REPLACE INTO agent_decisions VALUES (?, ?, ?, ?, ?)",
+                         (run_id, candidate_id, decision, str(note or "")[:300], now))
+    return {"candidate_id": candidate_id, "decision": decision, "note": str(note or "")[:300], "at": now}
