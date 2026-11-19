@@ -39,9 +39,40 @@ _VIA_LABEL = {
 }
 
 
+def _normalise(scan) -> dict:
+    """The POSTed scan comes from the browser: keep only well-formed nodes
+    (dicts with a key), edges and clusters, so junk gives a 200, never a 500."""
+    scan = scan if isinstance(scan, dict) else {}
+    as_list = lambda v: v if isinstance(v, list) else []  # noqa: E731
+    nodes, seen = [], set()
+    for node in as_list(scan.get("nodes")):
+        if isinstance(node, dict) and node.get("key") not in (None, "") and str(node["key"]) not in seen:
+            seen.add(str(node["key"]))
+            via = node.get("via")
+            nodes.append({**node, "key": str(node["key"]),
+                          "via": via if via is None or isinstance(via, str) else str(via)})
+    return {
+        "query": str(scan.get("query") or ""),
+        "nodes": nodes,
+        "edges": [e for e in as_list(scan.get("edges"))
+                  if isinstance(e, dict) and isinstance(e.get("from"), str) and isinstance(e.get("to"), str)],
+        "clusters": [c for c in as_list(scan.get("clusters")) if isinstance(c, dict)],
+    }
+
+
+def _int(value) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _evidence(node: dict) -> list[dict]:
     out = []
-    for item in node.get("results") or []:
+    results = node.get("results")
+    for item in results if isinstance(results, list) else []:
+        if not isinstance(item, dict):
+            continue
         url = str(item.get("url") or "")
         if not url.startswith(("http://", "https://")):
             continue
@@ -54,7 +85,8 @@ def _evidence(node: dict) -> list[dict]:
 
 def _cluster_of(scan: dict) -> dict[str, str]:
     return {key: str(i) for i, cl in enumerate(scan.get("clusters") or [])
-            for key in cl.get("members") or []}
+            for key in (cl.get("members") if isinstance(cl.get("members"), list) else [])
+            if isinstance(key, str)}
 
 
 def _clean(text) -> str:
@@ -63,7 +95,8 @@ def _clean(text) -> str:
 
 
 def to_graphml(scan: dict) -> str:
-    nodes = scan.get("nodes") or []
+    scan = _normalise(scan)
+    nodes = scan["nodes"]
     keys = {n.get("key") for n in nodes}
     cluster = _cluster_of(scan)
     attrs = [("type", "node"), ("value", "node"), ("depth", "node"), ("via", "node"),
@@ -84,8 +117,8 @@ def to_graphml(scan: dict) -> str:
     for node in nodes:
         evidence = _evidence(node)
         fields = [data("type", node.get("type")), data("value", node.get("query")),
-                  data("depth", int(node.get("depth") or 0)), data("via", _VIA_LABEL.get(node.get("via"), node.get("via"))),
-                  data("results", int(node.get("count") or 0))]
+                  data("depth", _int(node.get("depth"))), data("via", _VIA_LABEL.get(node.get("via"), node.get("via"))),
+                  data("results", _int(node.get("count")))]
         if node.get("key") in cluster:
             fields.append(data("cluster", cluster[node["key"]]))
         if node.get("not_followed"):
@@ -99,7 +132,7 @@ def to_graphml(scan: dict) -> str:
     for url, uid in url_nodes.items():
         out.append(f'    <node id="{uid}">{data("type", "url")}{data("value", url)}{data("url", url)}</node>')
     by_key = {n.get("key"): n for n in nodes}
-    for i, edge in enumerate(scan.get("edges") or []):
+    for i, edge in enumerate(scan["edges"]):
         src, dst = edge.get("from"), edge.get("to")
         if src in keys and dst in keys:
             via = (by_key.get(dst) or {}).get("via")
@@ -127,7 +160,8 @@ def _cell(value) -> str:
 def to_maltego_csv(scan: dict) -> str:
     """One row per link. In Maltego CE: Import → Import Graph from Table, then
     map source_* and target_* columns to the entity types they name."""
-    nodes = scan.get("nodes") or []
+    scan = _normalise(scan)
+    nodes = scan["nodes"]
     by_key = {n.get("key"): n for n in nodes}
     buf = io.StringIO()
     raw_writer = csv.writer(buf)
@@ -143,7 +177,7 @@ def to_maltego_csv(scan: dict) -> str:
         return MALTEGO_TYPES.get(node.get("type"), "maltego.Phrase"), str(node.get("query") or "")
 
     linked = set()
-    for edge in scan.get("edges") or []:
+    for edge in scan["edges"]:
         src, dst = by_key.get(edge.get("from")), by_key.get(edge.get("to"))
         if not src or not dst:
             continue
