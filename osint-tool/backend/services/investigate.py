@@ -8,6 +8,7 @@ from urllib.parse import quote, urlparse
 import httpx
 
 from cache import DEFAULT_TTL_SECONDS, get_cached_json, set_cached_json
+from services.provenance import stamp
 from tools.base import NotConfigured, ToolError
 from tools.domain_enrich import (
     audit_security_headers,
@@ -197,6 +198,7 @@ async def _cached(key: str, producer, *args) -> dict:
         result = await producer(*args)
     finally:
         _failed_sources.reset(token)
+    stamp(result)                               # 8.1: when each source answered
     if failed and isinstance(result, dict):
         # watches use this to tell "source down" from "account gone"
         result["failed_sources"] = sorted(set(failed))

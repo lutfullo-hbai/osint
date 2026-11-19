@@ -203,7 +203,8 @@ def _add(field: dict, value: str, source: dict) -> None:
         return
     key = value.casefold()
     entry = field.setdefault(key, {"value": value, "sources": []})
-    if source and source not in entry["sources"] and len(entry["sources"]) < 4:
+    same = lambda a, b: (a.get("platform"), a.get("url")) == (b.get("platform"), b.get("url"))  # noqa: E731
+    if source and not any(same(source, s) for s in entry["sources"]) and len(entry["sources"]) < 4:
         entry["sources"].append(source)
 
 
@@ -249,6 +250,8 @@ def profile_fields(members: list[dict], ignore_platforms: set[str] | None = None
             if str(item.get("platform") or "").casefold() in ignore_platforms:
                 continue
             source = {"platform": str(item.get("platform") or "source")[:60], "url": item.get("url") or ""}
+            if item.get("retrieved_at"):
+                source["retrieved_at"] = item["retrieved_at"]      # 8.1
             info = str(item.get("info") or "")
             for name in _NAME_RE.findall(info) + ([item["name"]] if item.get("name") else []):
                 if len(str(name).split()) >= 2:

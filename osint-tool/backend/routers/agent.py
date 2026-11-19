@@ -3,6 +3,7 @@
 POST /api/agent                      {text} -> run id; work runs in the worker
 GET  /api/agent/{id}?after=N         status, steps after N (live view), result
 POST /api/agent/{id}/decision        {candidate_id, decision, note} — the human's call
+DELETE /api/agent/{id}                the run with its steps and decisions (8.2)
 GET  /api/agent                      recent runs
 GET  /api/agent/{id}/card/{cid}[/pdf] person card of one candidate (7.1)
 GET  /api/agent/{id}/graph?format=    GraphML or Maltego CSV of the run's graph (7.8)
@@ -90,6 +91,17 @@ async def get_run(request: Request, response: Response, run_id: str, after: int 
     if after and run["status"] != "complete":
         run["result"] = None            # polling: only the new steps until it is done
     return {"status": "success", "run": run}
+
+
+@router.delete("/api/agent/{run_id}")
+@limiter.limit(general_limit)
+async def delete_run(request: Request, response: Response, run_id: str):
+    """ROADMAP 8.2: the run, its steps, candidates and decisions."""
+    try:
+        await asyncio.to_thread(store.delete_agent_run, run_id)
+    except store.CaseError as exc:
+        return _error(404, str(exc))
+    return {"status": "deleted"}
 
 
 @router.post("/api/agent/{run_id}/decision")
