@@ -250,8 +250,8 @@ UI va sozlash:
 - [x] 8.4 Kirish: kamida oddiy autentifikatsiya, agar tool tarmoqqa ochilsa — nomli kalitlar (`OSINT_USERS`), admin huquqlari, kalitsiz ommaviy IP → 403
 - [x] 8.5 README'da foydalanish shartlari (himoya, tadqiqot, jurnalistika; doxxing emas)
 
-## Faza 9 — O'quv kursi
-- [ ] 9-modul: yakuniy loyiha (self-OSINT, manbalarni hujjatlashtirish)
+## Faza 9 — O'quv kursi ✅
+- [x] 9-modul: yakuniy loyiha (self-OSINT, manbalarni hujjatlashtirish) — `09-yakuniy-loyiha/`: nazariya, 8 bosqichli loyiha va baholash mezonlari, hisobot va rozilik shablonlari, `evidence_log.py` (URL, UTC vaqt, SHA-256, Admiralty bahosi, NEXUS JSON importi)
 
 ---
 
