@@ -52,6 +52,7 @@
     <button class="tab" data-tab="cases" role="tab" aria-selected="false">Cases</button>
     <button class="tab" data-tab="watch" role="tab" aria-selected="false">Watch</button>
     <button class="tab" data-tab="catalog" role="tab" aria-selected="false">Catalog</button>
+    <button class="tab" data-tab="data" role="tab" aria-selected="false">Data</button>
   </nav>
 
   <main>
@@ -339,6 +340,49 @@
       <p class="deep-hint">Re-runs a public-source scan on a schedule and logs what changed. No new source, no stored credentials — just a timed refresh of a public surface.</p>
       <div class="error-box hidden"></div>
       <div id="watch-list" class="results"></div>
+    </section>
+
+    <section class="panel" id="panel-data" role="tabpanel">
+      <div class="data-block">
+        <h3 class="data-title">Access</h3>
+        <p class="deep-hint" id="data-whoami">Checking access…</p>
+        <div class="case-new">
+          <input type="password" id="data-key" placeholder="API key (if the server has OSINT_API_KEY / OSINT_USERS)" autocomplete="off" spellcheck="false" />
+          <button type="button" id="data-key-save">Save key</button>
+          <button type="button" id="data-key-clear" class="ghost">Forget key</button>
+        </div>
+        <p class="deep-hint">The key is kept only in this browser and sent as X-API-Key.</p>
+      </div>
+
+      <div class="data-block">
+        <h3 class="data-title">Agent runs</h3>
+        <p class="deep-hint">Each run keeps the request, the steps, the candidates and your decisions. Cases are deleted in the Cases tab.</p>
+        <div id="data-runs" class="data-list"></div>
+      </div>
+
+      <div class="data-block">
+        <h3 class="data-title">Audit log</h3>
+        <p class="deep-hint" id="data-audit-hint">Who searched what and when. Stored only on this server.</p>
+        <div class="case-new">
+          <input type="text" id="data-audit-user" placeholder="user" autocomplete="off" spellcheck="false" />
+          <input type="text" id="data-audit-q" placeholder="search query or path" autocomplete="off" spellcheck="false" />
+          <button type="button" id="data-audit-load">Show</button>
+        </div>
+        <div class="error-box hidden" id="data-audit-error"></div>
+        <div class="data-table-wrap"><table class="data-table" id="data-audit"></table></div>
+        <button type="button" id="data-audit-more" class="ghost hidden">Older entries</button>
+      </div>
+
+      <div class="data-block data-danger">
+        <h3 class="data-title">Delete everything</h3>
+        <p class="deep-hint">Deletes every case, finding, watch and Agent run, and the cached search answers and job results. The file is compacted so nothing stays on disk. Public datasets (sanctions, registers) are kept. This cannot be undone.</p>
+        <label class="data-check"><input type="checkbox" id="data-wipe-audit" /> also delete the audit log</label>
+        <div class="case-new">
+          <input type="text" id="data-wipe-confirm" placeholder='Type DELETE ALL' autocomplete="off" spellcheck="false" />
+          <button type="button" id="data-wipe-btn" class="danger" disabled>Delete all data</button>
+        </div>
+        <div class="summary" id="data-wipe-result"></div>
+      </div>
     </section>
 
     <section class="panel" id="panel-catalog" role="tabpanel">

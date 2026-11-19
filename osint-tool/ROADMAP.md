@@ -243,12 +243,12 @@ UI va sozlash:
 - [x] 7.8 Graf eksporti: GraphML (Gephi/yEd/Cytoscape) va Maltego CE CSV — dalil sahifalari bilan,
       CSV formula injection'dan himoyalangan
 
-## Faza 8 — Qonuniy va operatsion talablar — S/M
-- [ ] 8.1 Har bir maydon manbasi va olingan vaqti saqlanadi (ZRU-547, 30-modda)
-- [ ] 8.2 Case va natijalarni to'liq o'chirish funksiyasi
-- [ ] 8.3 Audit log: kim, qachon, nimani qidirdi (lokal)
-- [ ] 8.4 Kirish: kamida oddiy autentifikatsiya, agar tool tarmoqqa ochilsa
-- [ ] 8.5 README'da foydalanish shartlari (himoya, tadqiqot, jurnalistika; doxxing emas)
+## Faza 8 — Qonuniy va operatsion talablar — S/M ✅
+- [x] 8.1 Har bir maydon manbasi va olingan vaqti saqlanadi (ZRU-547, 30-modda) — `retrieved_at` har bir natijada, kesh asl vaqtni saqlaydi; Agent maydonlari, PDF karta, case topilmalari
+- [x] 8.2 Case va natijalarni to'liq o'chirish funksiyasi — Agent run o'chirish, `DELETE /api/data` (SQLite + Redis kesh/job), `secure_delete` + `VACUUM`
+- [x] 8.3 Audit log: kim, qachon, nimani qidirdi (lokal) — SQLite `audit_log`, Data tabi, 90 kun saqlash, ixtiyoriy faqat hash
+- [x] 8.4 Kirish: kamida oddiy autentifikatsiya, agar tool tarmoqqa ochilsa — nomli kalitlar (`OSINT_USERS`), admin huquqlari, kalitsiz ommaviy IP → 403
+- [x] 8.5 README'da foydalanish shartlari (himoya, tadqiqot, jurnalistika; doxxing emas)
 
 ## Faza 9 — O'quv kursi
 - [ ] 9-modul: yakuniy loyiha (self-OSINT, manbalarni hujjatlashtirish)
