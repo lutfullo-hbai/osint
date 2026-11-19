@@ -14,6 +14,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from routers import (
+    agent,
     cases,
     catalog,
     company,
@@ -170,6 +171,7 @@ app.include_router(watches.router)
 app.include_router(jobs.router)
 app.include_router(sources.router)
 app.include_router(geolocate.router)
+app.include_router(agent.router)
 
 
 @app.get("/")
