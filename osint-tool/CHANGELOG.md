@@ -9,6 +9,20 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 
 ## [Unreleased]
 
+## [0.12.0] — 2026-11-21
+Alohida heretic vositasi va review tuzatishlari.
+
+### Qo'shildi
+- **heretic (alohida vosita)**: `tools/heretic/run.sh` — modelni qayta o'qitmasdan o'zgartirish
+  (heretic 2.1.0, AGPL; o'z virtualenv'ida, NEXUS uni chaqirmaydi). Faqat `nosyco` (xushomad kamayadi),
+  `noslop`, `terse`; rad etishni olib tashlash ataylab qo'shilmagan. Paketlar hash bilan qotirilgan,
+  konfiguratsiya aniq commit'dan olinib sha256 bilan tekshiriladi. `check_refusals.py` — o'zgartirilgan
+  modelni NEXUS'ga ulashdan oldin rad etish testi.
+
+### Tuzatildi
+- **Globe**: konsoldagi havola ARIA tab ro'yxatidan chiqarildi (ekran o'qiydigan dasturlar uchun);
+  README'da Globe'ga kiritilgan kalitlar konteyner qayta build qilinganda yo'qolishi yozildi.
+
 ## [0.11.0] — 2026-11-21
 Ixtiyoriy Globe servisi (gods-eye-view).
 
@@ -200,7 +214,8 @@ Birinchi to'liq to'plam.
 - Digital Footprint hisoboti, entity graph, PDF eksport.
 - Lokal Qwen (Ollama) orqali AI xulosa va rasm tahlili.
 
-[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/lutfullo-hbai/osint/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/lutfullo-hbai/osint/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/lutfullo-hbai/osint/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/lutfullo-hbai/osint/compare/v0.8.1...v0.9.0
