@@ -38,6 +38,7 @@ AGENT_MAX_NODES = 20
 MAX_CANDIDATES = 8
 MAX_FIELD_VALUES = 5
 MAX_PROFILES = 12
+MAX_SET_ASIDE = 10
 YEAR_HANDLE_SEEDS = 2
 CATCH_ALL_MIN_HANDLES = 3
 CATCH_ALL_SHARE = 0.75
@@ -150,6 +151,65 @@ class Target:
         if not any(name_tokens(self.name) & name_tokens(n) for n in names):
             return B_NAME_CONFLICT, f"different name: {', '.join(sorted(names)[:2])}"
         return None
+
+    # ---- 10.1: same handle, different person ----
+
+    @staticmethod
+    def _item_ids(item: dict) -> dict:
+        info = str(item.get("info") or "")
+        names = {n.strip() for n in _NAME_RE.findall(info) + ([item["name"]] if item.get("name") else [])
+                 if len(str(n).split()) >= 2}
+        return {"names": names,
+                "locations": {loc.strip() for loc in _LOC_RE.findall(info)
+                              if loc.strip() and loc.strip().casefold() not in _PLACEHOLDERS},
+                "births": {int(y) for y in _BORN_RE.findall(info)}}
+
+    def _profile_conflict(self, ids: dict, anchor_places: list[str], anchor_years: list[int]) -> str | None:
+        if self.name and ids["names"] and not any(name_tokens(self.name) & name_tokens(n) for n in ids["names"]):
+            return f"name '{sorted(ids['names'])[0]}' is not {self.name}"
+        if ids["births"] and anchor_years and not any(abs(b - y) <= 1 for b in ids["births"] for y in anchor_years):
+            return f"born {sorted(ids['births'])[0]}, not ~{anchor_years[-1]}"
+        if ids["locations"] and anchor_places and all(
+                places_conflict(loc, place) for loc in ids["locations"] for place in anchor_places):
+            return f"location '{sorted(ids['locations'])[0]}', not {', '.join(anchor_places[:2])}"
+        return None
+
+    def split_profiles(self, nodes: list[dict]) -> int:
+        """10.1: a handle like "torvalds" exists on dozens of sites and only
+        some of those accounts belong to the person. Within each username
+        record, a profile whose own name, birth year or town contradicts the
+        description, or the profiles there that do match the name, is set
+        aside (node["set_aside"], with the reason) before linking, so it adds
+        neither fields nor contradictions to the candidate. Returns how many."""
+        moved = 0
+        for node in nodes:
+            if node.get("type") != "username":
+                continue
+            items = [i for i in node.get("results") or [] if isinstance(i, dict)]
+            ids = {id(i): self._item_ids(i) for i in items}
+            anchors = [i for i in items if self.name and any(
+                names_match(self.name, n) for n in ids[id(i)]["names"])]
+            anchor_places = list(self.places) or sorted({loc for a in anchors for loc in ids[id(a)]["locations"]})
+            anchor_years = list(self.years) or sorted({y for a in anchors for y in ids[id(a)]["births"]})
+            kept, aside = [], []
+            for item in node.get("results") or []:
+                reason = None
+                if isinstance(item, dict) and item not in anchors and not _from_search_only(item):
+                    reason = self._profile_conflict(ids[id(item)], anchor_places, anchor_years)
+                if reason:
+                    aside.append({"platform": str(item.get("platform") or "")[:60], "url": item.get("url") or "",
+                                  "reason": reason, "info": " ".join(str(item.get("info") or "").split())[:200]})
+                else:
+                    kept.append(item)
+            if aside:
+                node["results"] = kept
+                node["count"] = len(kept)
+                node["set_aside"] = aside
+                node["anchored"] = sorted({str(a.get("url") or "") for a in anchors} - {""})
+                moved += len(aside)
+            elif anchors:
+                node["anchored"] = sorted({str(a.get("url") or "") for a in anchors} - {""})
+        return moved
 
     def expand(self, node: dict) -> tuple[bool, str]:
         """ROADMAP 5.4: is this node worth following further?
@@ -279,9 +339,20 @@ def _merge_contact(out: list[dict], item: dict) -> None:
             for src in item.get("sources") or []:
                 if src not in entry["sources"] and len(entry["sources"]) < 3:
                     entry["sources"].append(src)
+            if item.get("confirmed"):
+                entry["confirmed"] = True
             return
     out.append({"kind": item["kind"], "value": item["value"], "how": item.get("how", ""),
-                "sources": list(item.get("sources") or [])[:3]})
+                "sources": list(item.get("sources") or [])[:3], "confirmed": bool(item.get("confirmed"))})
+
+
+def _confirmed_profile(node: dict, item: dict) -> bool:
+    """10.1: the profile is known to be this person's: the identifier was
+    given by the user or is unique (e-mail, phone), or the profile itself
+    carries the person's name."""
+    if node.get("via") == "stated" or node.get("type") in ("email", "phone"):
+        return True
+    return str(item.get("url") or "") in set(node.get("anchored") or [])
 
 
 def profile_contacts(members: list[dict], ignore_platforms: set[str] | None = None) -> list[dict]:
@@ -307,8 +378,10 @@ def profile_contacts(members: list[dict], ignore_platforms: set[str] | None = No
             if not text.strip():
                 continue
             platform = str(item.get("platform") or "profile")[:60]
-            for found in contacts_from_text(text, url, how=f"written in the {platform} profile"):
-                _merge_contact(out, found)
+            confirmed = _confirmed_profile(node, item)
+            how = f"written in the {platform} profile" + ("" if confirmed else " (profile not confirmed as this person)")
+            for found in contacts_from_text(text, url, how=how):
+                _merge_contact(out, {**found, "confirmed": confirmed})
     return out[:20]
 
 
@@ -339,13 +412,14 @@ async def read_candidate_sites(candidates: list[dict], say=None) -> int:
     for candidate in candidates[:CONTACT_CANDIDATES]:
         if candidate["level"] == "weak":
             continue
-        sites = [c["value"] for c in candidate.get("contacts") or [] if c["kind"] == "website"]
+        # 10.1: a site in the bio of an unconfirmed same-handle profile may be a stranger's
+        sites = [c["value"] for c in candidate.get("contacts") or [] if c["kind"] == "website" and c.get("confirmed")]
         for site in sites[:2]:
             if reads >= MAX_SITE_READS:
                 return reads
             reads += 1
             if say:
-                await say("check", f"Reading contacts on {site} (linked by {candidate['label']})")
+                await say("check", f"Reading contacts on {site} (linked from a profile of {candidate['label']})")
             try:
                 found = await extract_contacts(site, max_pages=SITE_PAGES)
             except Exception as exc:  # noqa: BLE001 - one site must not stop the run
@@ -354,7 +428,7 @@ async def read_candidate_sites(candidates: list[dict], say=None) -> int:
                 continue
             for item in found.get("contacts") or []:
                 if item["kind"] != "website":
-                    _merge_contact(candidate["contacts"], {**item, "how": f"published on {site}"})
+                    _merge_contact(candidate["contacts"], {**item, "how": f"published on {site}", "confirmed": True})
             if say and found.get("notes"):
                 await say("skip", f"{site}: " + "; ".join(found["notes"][:2]))
     return reads
@@ -421,6 +495,8 @@ def rank(scan: dict, target: Target, stated_keys: set[str]) -> tuple[list[dict],
         if not stated and vias <= {"name_match", "name_variant", None} and len(members) == 1:
             why.append("found only through the name — may be a namesake")
         missing = [f for f in FIELDS if not fields[f]]
+        set_aside = [a for m in members for a in m.get("set_aside") or []][:MAX_SET_ASIDE]
+        unchecked = sorted({s for m in members for s in m.get("unchecked") or []})
         label = (fields["name"][0]["value"] if fields["name"]
                  else ("@" + fields["usernames"][0]["value"]) if fields["usernames"]
                  else fields["emails"][0]["value"] if fields["emails"]
@@ -435,6 +511,10 @@ def rank(scan: dict, target: Target, stated_keys: set[str]) -> tuple[list[dict],
             "why": list(dict.fromkeys(why)),
             "contradictions": list(dict.fromkeys(conflicts)),
             "contacts": profile_contacts(members, ignored),
+            # 10.1: same handle, other person - shown, never merged
+            "set_aside": set_aside,
+            # 10.2: sources that did not answer; the score may be too low because of them
+            "unchecked": unchecked,
             "chain": evidence_chain([m["key"] for m in members], scan),
             "members": [{"key": m["key"], "type": m.get("type"), "query": m.get("query"),
                          "via": _VIA_LABEL.get(m.get("via"), m.get("via")), "count": m.get("count", 0),
@@ -479,7 +559,16 @@ async def run_agent(text: str, step: Step | None = None) -> dict:
             await say("skip", f"Not following {event['type']} '{event['query']}': {event['reason']}")
 
     scan = await run_deep_scan(primary["value"], primary["type"], extra_seeds=extras,
-                               progress=on_progress, expand=target.expand, max_nodes=AGENT_MAX_NODES)
+                               progress=on_progress, expand=target.expand, max_nodes=AGENT_MAX_NODES,
+                               prepare=target.split_profiles)
+    set_aside = sum(len(n.get("set_aside") or []) for n in scan["nodes"])
+    if set_aside:
+        await say("skip", f"Set aside {set_aside} same-username profile(s) that describe someone else "
+                          "(other name, age or town)")
+    unchecked = sorted({s for n in scan["nodes"] for s in n.get("unchecked") or []})
+    if unchecked:
+        await say("skip", "Not checked this time: " + ", ".join(unchecked[:5])
+                  + " — scores can be lower than on a run where they answer")
     # the user's own identifiers are stated, not found by a pivot
     for node in scan["nodes"]:
         if node["key"] in stated_keys:

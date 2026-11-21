@@ -19,3 +19,12 @@ def _offline_orginfo(monkeypatch):
 def _test_hosts(monkeypatch):
     """The API refuses unknown Host names (8b.1); test clients use these."""
     monkeypatch.setenv("ALLOWED_HOSTS", "localhost,127.0.0.1,::1,test,testserver")
+
+
+@pytest.fixture(autouse=True)
+def _fresh_memory_cache():
+    """Cached answers (GitHub profiles are kept a day, 10.2) must not leak between tests."""
+    from cache import clear_memory_cache
+    clear_memory_cache()
+    yield
+    clear_memory_cache()

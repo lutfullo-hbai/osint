@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import os
+import re
 from collections import defaultdict
 from typing import Any, Callable
 
@@ -145,6 +146,21 @@ async def _emit(progress: Callable[[dict], Any] | None, event: dict) -> None:
         pass
 
 
+# "GitHub: GitHub API rate limit reached." - a source that did not answer
+_FAILED_SOURCE_RE = re.compile(r"^([^:]{2,40}): .*(rate limit|HTTP 5\d\d|HTTP 429|unreachable|Timeout|"
+                               r"timed out|ConnectError|ReadError)", re.IGNORECASE)
+
+
+def unchecked_sources(result: dict) -> list[str]:
+    """Sources that failed for this record: missing results there mean nothing."""
+    names = set(result.get("failed_sources") or [])
+    for warning in result.get("warnings") or []:
+        match = _FAILED_SOURCE_RE.match(str(warning))
+        if match:
+            names.add(match.group(1).strip())
+    return sorted(names)
+
+
 async def run_deep_scan(
     seed_query: str,
     seed_type: str | None = None,
@@ -153,6 +169,7 @@ async def run_deep_scan(
     progress: Callable[[dict], Any] | None = None,
     expand: Callable[[dict], tuple[bool, str]] | None = None,
     max_nodes: int | None = None,
+    prepare: Callable[[list[dict]], Any] | None = None,
 ) -> dict:
     """Breadth-first pivot following.
 
@@ -240,6 +257,9 @@ async def run_deep_scan(
                 node["via"] = via
             if result.get("message"):
                 node["message"] = result["message"]
+            unchecked = unchecked_sources(result)
+            if unchecked:
+                node["unchecked"] = unchecked              # 10.2: not "absent", just not asked
             nodes.append(node)
 
             if result.get("warnings"):
@@ -292,6 +312,8 @@ async def run_deep_scan(
             edge_seen.add(ek)
             uniq_edges.append(e)
 
+    if prepare is not None:
+        prepare(nodes)          # Agent: set aside profiles that describe someone else (10.1)
     correlation = correlate(nodes)
     # a weak, cited second opinion on unmerged candidates (never merges)
     reviewed = 0
