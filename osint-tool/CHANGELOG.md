@@ -8,6 +8,8 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 (`vX.Y.Z`) va GitHub Release oladi.
 
 ## [Unreleased]
+
+## [0.10.0] — 2026-11-21
 Aniqlik (Faza 10.1–10.3, 10.5).
 
 ### Qo'shildi
@@ -190,7 +192,8 @@ Birinchi to'liq to'plam.
 - Digital Footprint hisoboti, entity graph, PDF eksport.
 - Lokal Qwen (Ollama) orqali AI xulosa va rasm tahlili.
 
-[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/lutfullo-hbai/osint/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/lutfullo-hbai/osint/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/lutfullo-hbai/osint/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/lutfullo-hbai/osint/compare/v0.7.1...v0.8.0
