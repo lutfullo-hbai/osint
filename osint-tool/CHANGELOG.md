@@ -9,6 +9,22 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-11-21
+O'quv kursining yakuniy moduli (Faza 9). Reja yangilandi: Faza 8b (review tuzatishlari), Faza 10 (aniqlik va 1.0.0).
+
+### Qo'shildi
+- **9-modul: yakuniy loyiha** (`09-yakuniy-loyiha/`): self-OSINT metodologiyasi, dalillarni
+  hujjatlashtirish, Admiralty bahosi, 8 bosqichli loyiha va baholash mezonlari,
+  hisobot va rozilik shablonlari.
+- `evidence_log.py`: dalil jurnali — URL, UTC vaqt, SHA-256, nusxa va `verify`, NEXUS JSON
+  eksportidan import (`retrieved_at` bilan), Markdown ilova.
+- `evidence_log.py` uchun 7 ta avtomatik test; CI ularni ham ishga tushiradi.
+
+### Tuzatildi (review 8b.11–8b.14)
+- `evidence_log.py`: nusxa yo'li jurnal papkasiga nisbiy (`verify` istalgan papkadan ishlaydi);
+  5 MB dan katta sahifa `truncated` deb belgilanadi; buzilgan qatorlar dasturni to'xtatmaydi;
+  hisobotda URL va nomlar escape qilinadi; HTTP ulanish yopiladi.
+
 ## [0.8.1] — 2026-11-21
 Xavfsizlik tuzatishlari (uchinchi review, Faza 8b).
 
@@ -149,7 +165,8 @@ Birinchi to'liq to'plam.
 - Digital Footprint hisoboti, entity graph, PDF eksport.
 - Lokal Qwen (Ollama) orqali AI xulosa va rasm tahlili.
 
-[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/lutfullo-hbai/osint/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/lutfullo-hbai/osint/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/lutfullo-hbai/osint/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/lutfullo-hbai/osint/compare/v0.7.0...v0.7.1

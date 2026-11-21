@@ -32,3 +32,13 @@ jobs:
 
       - name: Backend tests (Docker, same as local)
         run: docker compose --profile test run --rm --build tests python -m pytest -q tests -p no:warnings
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Course tool tests (09-yakuniy-loyiha)
+        working-directory: .
+        run: |
+          python -m pip install --quiet pytest requests
+          python -m pytest -q 09-yakuniy-loyiha/kod -p no:cacheprovider

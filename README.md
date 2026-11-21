@@ -20,7 +20,7 @@
 | 6 | [Ijtimoiy tarmoqlar razvedkasi (SOCMINT)](06-socmint/nazariya.md) | ✅ Tayyor |
 | 7 | [Metaqidalar (metadata) va fayllar](07-metadata-fayllar/nazariya.md) | ✅ Tayyor |
 | 8 | [Anonimlik va o'z himoyangiz](08-anonimlik/nazariya.md) | ✅ Tayyor |
-| 9 | Yakuniy loyiha: to'liq profil tekshiruvi | ⬜ |
+| 9 | [Yakuniy loyiha: to'liq profil tekshiruvi (self-OSINT)](09-yakuniy-loyiha/nazariya.md) | ✅ Tayyor |
 
 ## 📋 Qanday ishlaymiz
 1. Modulning `nazariya.md` faylini o'qiysiz (~10-15 daqiqa)
