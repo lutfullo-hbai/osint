@@ -1,4 +1,5 @@
 import asyncio
+import time
 import contextvars
 import hashlib
 import ipaddress
@@ -8,6 +9,7 @@ from urllib.parse import quote, urlparse
 import httpx
 
 from cache import DEFAULT_TTL_SECONDS, get_cached_json, set_cached_json
+from services.data_wipe import was_wiped_since
 from services.provenance import stamp
 from tools.base import NotConfigured, ToolError
 from tools.domain_enrich import (
@@ -194,11 +196,14 @@ async def _cached(key: str, producer, *args) -> dict:
 
     failed: list[str] = []
     token = _failed_sources.set(failed)
+    started = time.time()
     try:
         result = await producer(*args)
     finally:
         _failed_sources.reset(token)
     stamp(result)                               # 8.1: when each source answered
+    if await was_wiped_since(started):
+        return result                           # 8b.6: all data was deleted meanwhile; do not cache it
     if failed and isinstance(result, dict):
         # watches use this to tell "source down" from "account gone"
         result["failed_sources"] = sorted(set(failed))

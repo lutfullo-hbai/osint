@@ -13,3 +13,9 @@ def _offline_orginfo(monkeypatch):
         return ""
 
     monkeypatch.setattr(orginfo, "_get_page", empty_page)
+
+
+@pytest.fixture(autouse=True)
+def _test_hosts(monkeypatch):
+    """The API refuses unknown Host names (8b.1); test clients use these."""
+    monkeypatch.setenv("ALLOWED_HOSTS", "localhost,127.0.0.1,::1,test,testserver")

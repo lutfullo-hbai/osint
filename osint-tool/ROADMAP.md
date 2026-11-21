@@ -256,23 +256,23 @@ UI va sozlash:
 
 ---
 
-## Faza 8b — Uchinchi review tuzatishlari (2026-11-21, reviewer: `v0.7.1..dev`) — v0.8.1 hotfix
+## Faza 8b — Uchinchi review tuzatishlari (2026-11-21, reviewer: `v0.7.1..dev`) — 8b.1–8b.6 ✅ (keyingi release'da)
 Reviewer xulosasi: o'zgartirish kerak (3 ta jiddiy). Faza 9'da jiddiy muammo yo'q; XSS topilmadi.
 
 Jiddiy (v0.8.1, har biri test bilan):
-- [ ] 8b.1 DNS rebinding: `Host` tekshiruvi yo'q — kalitsiz rejimda begona sayt `DELETE /api/data`
+- [x] 8b.1 DNS rebinding: `Host` tekshiruvi yo'q — kalitsiz rejimda begona sayt `DELETE /api/data`
   yoki `GET /api/audit` chaqira oladi. `TrustedHostMiddleware` (localhost, 127.0.0.1 + env),
   kalitsiz rejimda o'chirish uchun `Origin` ham `ALLOWED_ORIGINS` bilan solishtiriladi — S
-- [ ] 8b.2 Audit'ni cheksiz to'ldirish: rad etilgan (401/403) va mavjud bo'lmagan yo'llar ham
+- [x] 8b.2 Audit'ni cheksiz to'ldirish: rad etilgan (401/403) va mavjud bo'lmagan yo'llar ham
   limitsiz yoziladi. Faqat mavjud route'lar; `refused` yozuvlari IP bo'yicha cheklanadi — S
-- [ ] 8b.3 "Hammasini o'chirish" xato holatida yarim ishlaydi: `wal_checkpoint` natijasi
+- [x] 8b.3 "Hammasini o'chirish" xato holatida yarim ishlaydi: `wal_checkpoint` natijasi
   tekshirilmaydi, `VACUUM` xatosida Redis tozalanmaydi. Tartib: VACUUM → checkpoint, natija
   tekshiriladi, ogohlantirish qaytariladi, Redis baribir tozalanadi — S
 
 Kichikroq (v0.8.1 ga qo'shiladi):
-- [ ] 8b.4 `OSINT_USERS`'da `admin`/`local`/`refused` nomlari rad etiladi (admin huquqini olib qo'yadi)
-- [ ] 8b.5 Noto'g'ri `AUDIT_RETENTION_DAYS` backend'ni yiqitmaydi (standart qiymat + ogohlantirish)
-- [ ] 8b.6 To'liq o'chirish to'liqroq: passiv DNS bazasidagi qidirilgan domenlar, `arq:in-progress`,
+- [x] 8b.4 `OSINT_USERS`'da `admin`/`local`/`refused` nomlari rad etiladi (admin huquqini olib qo'yadi)
+- [x] 8b.5 Noto'g'ri `AUDIT_RETENTION_DAYS` backend'ni yiqitmaydi (standart qiymat + ogohlantirish)
+- [x] 8b.6 To'liq o'chirish to'liqroq: passiv DNS bazasidagi qidirilgan domenlar, `arq:in-progress`,
   `arq:retry`, navbat; ishlayotgan job keyin keshni qayta to'ldirmasligi; "bir soatda eskiradi"
   xabari to'g'rilanadi (qidiruv keshi 24 soat); Data tabida audit'da qidiruv matni qolishi aytiladi
 

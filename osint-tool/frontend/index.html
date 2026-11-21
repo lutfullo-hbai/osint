@@ -375,7 +375,8 @@
 
       <div class="data-block data-danger">
         <h3 class="data-title">Delete everything</h3>
-        <p class="deep-hint">Deletes every case, finding, watch and Agent run, and the cached search answers and job results. The file is compacted so nothing stays on disk. Public datasets (sanctions, registers) are kept. This cannot be undone.</p>
+        <p class="deep-hint">Deletes every case, finding, watch and Agent run, the cached search answers, job results and the stored DNS history of searched domains. The file is compacted so nothing stays on disk. Public datasets (sanctions, registers) are kept. This cannot be undone.</p>
+        <p class="deep-hint">The audit log keeps what was searched (names, e-mails…) unless you tick the box below; the server can keep only a hash instead (AUDIT_LOG_QUERIES=0).</p>
         <label class="data-check"><input type="checkbox" id="data-wipe-audit" /> also delete the audit log</label>
         <div class="case-new">
           <input type="text" id="data-wipe-confirm" placeholder='Type DELETE ALL' autocomplete="off" spellcheck="false" />

@@ -457,20 +457,42 @@ USER_TABLES = ("findings", "cases", "watch_events", "watches",
 def wipe_all(include_audit: bool = False) -> dict:
     """Delete every case, finding, watch and Agent run, then compact the file
     so nothing is left in free pages or the WAL. The public datasets
-    (sanctions, registers) are not user data and stay."""
-    counts = {}
+    (sanctions, registers) are not user data and stay.
+
+    Returns {"deleted": {table: rows}, "warnings": [...]}. The rows are gone
+    once this returns; a warning means a copy may still sit in the WAL or in
+    free pages because another connection held the database (8b.3)."""
+    counts, warnings = {}, []
     with _connect() as conn:
         for table in USER_TABLES + (("audit_log",) if include_audit else ()):
             counts[table] = conn.execute(f"DELETE FROM {table}").rowcount   # noqa: S608 - fixed names
-    with _connect() as conn:
-        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        conn.execute("VACUUM")
-    return counts
+    try:
+        with _connect() as conn:
+            conn.execute("VACUUM")                                   # rewrites the file without free pages
+            busy, _log, _done = conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+        if busy:
+            warnings.append("the database was busy: old copies may remain in the write-ahead log "
+                            "until the next restart; run the deletion again later")
+    except sqlite3.Error as exc:
+        warnings.append(f"compaction failed ({exc}); deleted rows may remain in free pages until "
+                        "the next deletion")
+    return {"deleted": counts, "warnings": warnings}
 
 
 # ---- Audit log (8.3) ----
 
-AUDIT_RETENTION_DAYS = int(os.environ.get("AUDIT_RETENTION_DAYS", "90"))
+def _retention_days() -> int:
+    """A typo in AUDIT_RETENTION_DAYS must not stop the backend (8b.5)."""
+    raw = os.environ.get("AUDIT_RETENTION_DAYS", "90").strip()
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        import logging
+        logging.getLogger("osint.audit").warning("AUDIT_RETENTION_DAYS=%r is not a number; using 90", raw)
+        return 90
+
+
+AUDIT_RETENTION_DAYS = _retention_days()
 MAX_AUDIT_QUERY = 200
 AUDIT_PAGE = 200
 
