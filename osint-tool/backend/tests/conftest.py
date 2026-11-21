@@ -28,3 +28,12 @@ def _fresh_memory_cache():
     clear_memory_cache()
     yield
     clear_memory_cache()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_pacing():
+    """Call slots for paced APIs (dev.to, 10.5f) must not carry over between tests."""
+    from tools import public_profiles
+    public_profiles._next_slot.clear()
+    yield
+    public_profiles._next_slot.clear()
