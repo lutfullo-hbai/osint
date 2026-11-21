@@ -32,7 +32,8 @@ from services.correlate import (
 )
 from services.deep_scan import _node_key, run_deep_scan
 from services.investigate import InvestigationValidationError
-from services.names import fold, name_bits, name_tokens, names_match, places_conflict, username_variants
+from services.names import (fold, name_bits, name_tokens, names_match, place_relation, places_conflict,
+                            username_variants)
 from tools.contact_extract import contacts_from_text, extract_contacts
 
 AGENT_MAX_NODES = 20
@@ -161,11 +162,14 @@ class Target:
     def place_check(self, locations: set[str]) -> tuple[float, str] | None:
         if not locations or not self.places:
             return None
-        matching = sorted(loc for loc in locations if any(not places_conflict(loc, p) for p in self.places))
+        matching = sorted(loc for loc in locations if any(place_relation(loc, p) == "agree" for p in self.places))
         if matching:
             return B_PLACE_AGREE, f"location '{matching[0]}' matches {', '.join(self.places)}"
-        return B_PLACE_CONFLICT, (f"stated location '{'; '.join(sorted(locations))}', not "
-                                  f"{', '.join(self.places)}")
+        # 10.5b: only places that clearly differ count against; a town vs a country is unknown
+        if all(places_conflict(loc, p) for loc in locations for p in self.places):
+            return B_PLACE_CONFLICT, (f"stated location '{'; '.join(sorted(locations))}', not "
+                                      f"{', '.join(self.places)}")
+        return None
 
     def name_check(self, names: set[str]) -> tuple[float, str] | None:
         if not names or not self.name:
@@ -564,8 +568,17 @@ def _candidate_id(member_keys: list[str]) -> str:
     return hashlib.sha256("|".join(sorted(member_keys)).encode()).hexdigest()[:12]
 
 
+# 10.5b: a different town is soft (people move, profiles go stale): it lowers the
+# score but does not by itself make a lead weak. A different birth year or name does.
+_SOFT_CONFLICT_PREFIXES = ("different stated locations", "stated location ")
+
+
+def _hard(conflicts: list[str]) -> list[str]:
+    return [c for c in conflicts if not c.startswith(_SOFT_CONFLICT_PREFIXES)]
+
+
 def _level(score: float, conflicts: list[str]) -> str:
-    if conflicts and score < STRONG_LEAD:
+    if _hard(conflicts) and score < STRONG_LEAD:
         return "weak"
     if score >= STRONG_LEAD:
         return "strong"
