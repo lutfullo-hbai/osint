@@ -324,3 +324,62 @@ def test_failure_labels_are_clean():
                            "Keybase: malformed JSON.", "GitLab: HTTP 404.",
                            "45 site hit(s) ignored: those sites also report a random username"]}
     assert unchecked_sources(result) == ["Bluesky", "GitHub", "Keybase", "Truecaller", "Web search"]
+
+
+# ---------------- 10.5: what the first evaluation found ----------------
+
+@pytest.mark.parametrize("text,name,places", [
+    ("Terence Tao, 51 years old, from United States", "Terence Tao", ["United States"]),
+    ("Ian Goodfellow, 39 years old, from San Francisco", "Ian Goodfellow", ["San Francisco"]),
+    ("ian goodfellow 39 years old from san francisco", "Ian Goodfellow", ["San Francisco"]),
+    ("Tim Berners-Lee, 71 years old, from Concord", "Tim Berners-Lee", ["Concord"]),
+    ("Ali Valiyev from Ann Arbor", "Ali Valiyev", ["Ann Arbor"]),
+    ("from Namangan Ali Valiyev", "Ali Valiyev", ["Namangan"]),        # a known town first: rest is the name
+    ("Linus Torvalds, 56 years old, from Portland", "Linus Torvalds", ["Portland"]),
+    ("Иван Петров из Санкт-Петербурга", "Иван Петров", None),
+])
+def test_places_of_several_words_stay_out_of_the_name(text, name, places):
+    parsed = parse_request(text, TODAY)
+    assert parsed["names"] == [name]
+    if places is not None:
+        assert parsed["places"] == places
+
+
+@pytest.mark.asyncio
+async def test_gitlab_answers_are_cached_too():
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        return httpx.Response(200, json=[{"web_url": "https://gitlab.com/ali", "name": "Ali"}])
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        for _ in range(3):
+            assert (await public_profiles.gitlab_profile(client, "ali"))["url"] == "https://gitlab.com/ali"
+    assert len(calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_hacker_news_is_not_asked_for_impossible_ids():
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        return httpx.Response(400)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        assert await public_profiles.hackernews_profile(client, "linus.torvalds") is None
+    assert calls == []                         # no request, so no "Hacker News: HTTP 400" warning
+
+
+def test_domain_failures_do_not_mark_the_person_unchecked():
+    target = _target()
+    nodes = _nodes(GITHUB)
+    nodes[1]["unchecked"] = ["GitLab"]
+    nodes.append({"key": "host:torvalds.org", "type": "domain", "query": "torvalds.org", "depth": 2,
+                  "via": "profile_link", "parent": "username:torvalds", "count": 1,
+                  "results": [{"platform": "DNS", "info": "A 1.2.3.4"}], "unchecked": ["Subdomains", "Reverse IP"]})
+    scan = {"nodes": nodes, "edges": [{"from": "username:torvalds", "to": "host:torvalds.org"}],
+            "clusters": [{"members": ["name:linus torvalds", "username:torvalds", "host:torvalds.org"], "score": 5}]}
+    candidates, _ = agent.rank(scan, target, set())
+    assert candidates[0]["unchecked"] == ["GitLab"]

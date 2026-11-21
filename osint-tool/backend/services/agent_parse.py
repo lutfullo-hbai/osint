@@ -110,6 +110,24 @@ MAX_ORG_WORDS = 4
 _NAME_WORD_RE = re.compile(r"^[A-Za-zÀ-ɏЀ-ӿ][A-Za-zÀ-ɏЀ-ӿʻʼ’'`\-]*$")
 
 
+# 10.5: places of two or more words; one word at a time, "from United States"
+# became the place "United" and the name "Terence Tao States"
+_MULTI_PLACES = (
+    "united states of america", "united states", "united kingdom", "united arab emirates", "new york city",
+    "new york", "san francisco", "los angeles", "san diego", "san jose", "santa clara", "palo alto",
+    "mountain view", "silicon valley", "bay area", "las vegas", "salt lake city", "new jersey",
+    "north carolina", "south carolina", "rhode island", "new zealand", "south korea", "north korea",
+    "saudi arabia", "south africa", "hong kong", "sri lanka", "costa rica", "czech republic", "new delhi",
+    "abu dhabi", "tel aviv", "rio de janeiro", "buenos aires", "kuala lumpur", "cape town", "mexico city",
+    "saint petersburg", "st petersburg", "st. petersburg", "sankt peterburg", "nizhny novgorod",
+)
+_MULTI_PLACE_RE = re.compile(
+    r"(?<![\w-])(" + "|".join(re.escape(p) for p in sorted(_MULTI_PLACES, key=len, reverse=True)) + r")(?![\w-])",
+    re.IGNORECASE)
+# "from Ann Arbor", "in Santa Monica": capitalised words right after a preposition
+_CAP_PLACE_RE = re.compile(
+    r"(?<![\w-])(?:from|in|из|в|во)\s+((?:[A-ZА-ЯЁ][\w'’\-]*)(?:\s+(?:[A-ZА-ЯЁ][\w'’\-]*)){1,3})(?=\s*(?:[,;.!?]|$))")
+
 _PLACE_STEMS = sorted(((fold(k), v) for k, v in _PLACES.items()), key=lambda kv: len(kv[0]), reverse=True)
 _STOP_KEYS = {fold(s) for s in _STOPWORDS}
 
@@ -251,6 +269,20 @@ def parse_request(text: str, today: date | None = None) -> dict:
     if out["age"] is not None and not out["birth_years"]:
         # a 19-year-old was born this year minus 19, or a year earlier
         out["birth_years"] = [today.year - out["age"] - 1, today.year - out["age"]]
+
+    def on_multi_place(m: re.Match) -> None:
+        place = " ".join(w[:1].upper() + w[1:] for w in m.group(1).split())
+        if place not in out["places"]:
+            out["places"].append(place)
+    take(_MULTI_PLACE_RE, on_multi_place)
+
+    def cap_place(m: re.Match) -> str:
+        # "from Namangan Ali Valiyev": a known town first means the rest is a name
+        if _place_of(m.group(1).split()[0]):
+            return m.group(0)
+        on_multi_place(m)
+        return " "
+    rest = _CAP_PLACE_RE.sub(cap_place, rest)
 
     name_words = []
     previous = ""
