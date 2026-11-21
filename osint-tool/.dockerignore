@@ -9,3 +9,6 @@ __pycache__/
 # Agent evaluation: private cases and reports never go into an image
 backend/eval/*.private.jsonl
 backend/eval/reports/
+
+# offline tools with their own virtualenvs (tools/heretic/.venv is GBs)
+tools/

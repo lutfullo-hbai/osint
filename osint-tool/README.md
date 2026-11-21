@@ -162,6 +162,8 @@ Odam qidirmaydi va NEXUS backend'iga ulanmaydi: alohida servis.
 - Ko'rilgan hududlar tashqi provayderlarga (OSM, OpenSky va boshqalar) ma'lum bo'ladi.
 
 ### Lokal AI (server tomonda)
+Modelni o'zgartirish (xushomadni kamaytirish, qisqa javob) uchun alohida vosita:
+`tools/heretic/` (NEXUS'ga ulanmagan, GPU kerak).
 Ollama kompyuterda faqat `127.0.0.1`da tinglaydi; `ollama-proxy` konteyneri (socat,
 host tarmog'ida) uni faqat compose tarmog'i shlyuziga (`172.20.0.1:11435`) uzatadi —
 Ollama LAN'ga ochilmaydi, tizim sozlamasi o'zgarmaydi. AI: Deep Scan nomzodlariga
