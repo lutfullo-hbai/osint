@@ -316,7 +316,8 @@ async def _investigate_name(name: str) -> dict:
 
 async def investigate_name(raw_name: str) -> dict:
     name = normalize_name(raw_name)
-    return await _cached(f"osint:name:{name.casefold()}", _investigate_name, name)
+    # v2 (10.5b): knowledge-base pivots carry birth years; results cached before that lack them
+    return await _cached(f"osint:name:v2:{name.casefold()}", _investigate_name, name)
 
 
 def _describe(tool_name: str, exc: BaseException) -> str:

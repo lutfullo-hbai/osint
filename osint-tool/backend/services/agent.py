@@ -244,6 +244,39 @@ class Target:
             return False                                 # a namesake in another town
         return True
 
+    def confirm_by_age(self, nodes: list[dict]) -> int:
+        """10.5b: a knowledge base lists several people with this name; if exactly
+        one of them was born when the person you describe was (+-1 year) and no
+        namesake with a recorded birth year fits too, that person's accounts are
+        knowledge-base evidence, like those of a name nobody else has. A namesake
+        whose birth year is not recorded does not block this (the same trade-off
+        as the "only one person with this name" rule). The pivots are replaced,
+        not edited: the name lookup's cached result is shared by other runs."""
+        if not self.years:
+            return 0
+
+        def fits(year) -> bool:
+            return isinstance(year, int) and any(abs(year - y) <= 1 for y in self.years)
+
+        confirmed = 0
+        for node in nodes:
+            if node.get("type") != "name" or not node.get("pivots"):
+                continue
+            pivots = []
+            for pivot in node["pivots"]:
+                if (pivot.get("via") == "name_match" and fits(pivot.get("born"))
+                        and not any(fits(b) for b in pivot.get("namesake_births") or [])):
+                    pivot = {**pivot, "via": "knowledge_base", "age_confirmed": pivot["born"]}
+                    confirmed += 1
+                pivots.append(pivot)
+            node["pivots"] = pivots
+        return confirmed
+
+    def prepare(self, nodes: list[dict]) -> int:
+        """Called by the deep scan for each record before its pivots are followed."""
+        self.confirm_by_age(nodes)
+        return self.split_profiles(nodes)
+
     def split_profiles(self, nodes: list[dict]) -> int:
         """Set aside (node["set_aside"], with the reason) the profiles of a
         username record that describe someone else, and drop the pivots only
@@ -658,7 +691,7 @@ async def run_agent(text: str, step: Step | None = None) -> dict:
 
     scan = await run_deep_scan(primary["value"], primary["type"], extra_seeds=extras,
                                progress=on_progress, expand=target.expand, max_nodes=AGENT_MAX_NODES,
-                               prepare=target.split_profiles)
+                               prepare=target.prepare)
     unchecked = sorted({s for n in scan["nodes"] if n.get("type") in PROFILE_TYPES for s in n.get("unchecked") or []})
     if unchecked:
         await say("skip", "Not checked this time: " + ", ".join(unchecked[:5])
