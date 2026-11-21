@@ -9,6 +9,11 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 
 ## [Unreleased]
 
+### Tuzatildi
+- **DEV Community javob bermasdi (10.5f)**: u bir vaqtda kelgan so'rovlarni rad etardi (HTTP 429).
+  Endi so'rovlar orasida 1 soniya pauza, qisqa rad etishdan keyin bitta qayta urinish, javoblar keshlanadi.
+  Uch holatli qayta o'lchovda "tekshirilmadi" ro'yxatidan butunlay chiqdi.
+
 ## [0.12.0] — 2026-11-21
 Alohida heretic vositasi va review tuzatishlari.
 

@@ -317,7 +317,9 @@ Kurs (`evidence_log.py`, v0.9.0 ✅):
   - Qayta o'lchov (7 holat, 2026-11-21): goodfeli —→1, teorth —→2, ken 2→1, paulbuchheit 3,
     matz 1 (mumkin), timbl/torvalds 1 (kuchli); hit@3 7/7, noto'g'ri kuchli 0, xato chetga olingan 0
   - [ ] (b) To'g'ri topilgan, lekin "zaif" (goodfeli, ken, teorth, paulbuchheit): ball qoidalari
-  - [ ] (f) DEV Community deyarli har holatda javob bermaydi — kesh yoki so'rovlar orasida pauza
+  - [x] (f) DEV Community deyarli har holatda javob bermasdi — sabab: parallel so'rovlarga 429
+    (`Retry-After: 1`). So'rovlar 1 soniya oraliq bilan, qisqa 429 bir marta qayta urinadi, javoblar
+    keshlanadi. Qayta o'lchov (ken, matz, paulbuchheit): "tekshirilmadi" 3/3 → 0/3
   - [ ] 30 holatni to'liq qayta o'lchash
 - [ ] 10.4 1.0.0 release: CHANGELOG, README'da aniqlik natijalari
 
