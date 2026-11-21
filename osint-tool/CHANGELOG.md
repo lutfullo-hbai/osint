@@ -8,7 +8,13 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 (`vX.Y.Z`) va GitHub Release oladi.
 
 ## [Unreleased]
-Aniqlik (Faza 10.1–10.2).
+Aniqlik (Faza 10.1–10.3).
+
+### Qo'shildi
+- **Aniqlikni o'lchash (10.3)**: `scripts/eval_agent.py` — javobi ma'lum holatlarda hit@1/3, MRR,
+  noto'g'ri "kuchli" nomzodlar, xato chetga olingan profillar; `scripts/eval_cases_wikidata.py` —
+  30 ta ochiq holat (Wikidata). Birinchi o'lchov: hit@1 87%, hit@3 93%, xato chetga olingan 0.
+  Shaxsiy holatlar (`*.private.jsonl`) git'ga ham, Docker image'ga ham tushmaydi.
 
 ### Tuzatildi
 - **Bir xil username, boshqa odam (10.1)**: bitta username ostida bir nechta odamning profillari

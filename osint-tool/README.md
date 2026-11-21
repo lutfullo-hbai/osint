@@ -276,6 +276,24 @@ topilmalar ham shu vaqtni ko'rsatadi.
   Audit log faqat `include_audit: true` bo'lsa o'chadi (unda qidirilgan matnlar bor,
   agar `AUDIT_LOG_QUERIES=0` bo'lmasa); o'chirish so'rovining o'zi audit'ga yoziladi.
 
+## Agent aniqligini o'lchash (ROADMAP 10.3)
+
+Javobi oldindan ma'lum holatlar bo'yicha: to'g'ri profil nechanchi nomzodda chiqdi (hit@1,
+hit@3, MRR), qanday darajada (kuchli/mumkin/zaif), nechta "kuchli" nomzod noto'g'ri, to'g'ri
+profil "boshqa odam" deb chetga olindimi, qaysi manbalar javob bermadi.
+
+```bash
+# ochiq jamoat shaxslari (Wikidata: GitHub username, tug'ilgan yil, yashash joyi)
+docker compose exec backend python scripts/eval_cases_wikidata.py > backend/eval/agent_cases.public.jsonl
+# o'lchash: har bir holat ~1–2 daqiqa; GITHUB_TOKEN bo'lmasa soatiga ~6 holat
+docker compose exec backend python scripts/eval_agent.py eval/agent_cases.public.jsonl --out /tmp/report
+```
+
+Holat formati (`*.jsonl`, har qatorda bitta):
+`{"id": "...", "text": "Ism Familiya, 30 years old, from Toshkent", "expect": ["https://github.com/..."], "source": "...", "kind": "public|consented"}`.
+Oddiy odamlar haqidagi holatlar **faqat o'zlarining roziligi bilan** va `*.private.jsonl`
+faylida (git'ga ham, Docker image'ga ham tushmaydi).
+
 ## Testlar
 
 ```bash

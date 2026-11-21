@@ -10,3 +10,7 @@ session-*.md
 # 9-modul: dalil jurnali (shaxsiy ma'lumot, git'ga joylanmaydi)
 dalillar.jsonl
 dalillar/
+
+# Agent baholash: shaxsiy holatlar va hisobotlar git'ga joylanmaydi
+osint-tool/backend/eval/*.private.jsonl
+osint-tool/backend/eval/reports/
