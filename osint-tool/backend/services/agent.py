@@ -40,6 +40,7 @@ MAX_CANDIDATES = 8
 MAX_FIELD_VALUES = 5
 MAX_PROFILES = 12
 MAX_SET_ASIDE = 10
+PROFILE_TYPES = ("username", "email", "phone", "name")
 NAME_SAME_RATIO = 0.7      # folded tokens this similar are one name in two spellings (Yakubjon / Yoqubjon)
 
 # "Name: Linus; Location: Portland, OR; Bio: ..." - exact labels only, so a bio
@@ -588,7 +589,9 @@ def rank(scan: dict, target: Target, stated_keys: set[str]) -> tuple[list[dict],
             why.append("found only through the name — may be a namesake")
         missing = [f for f in FIELDS if not fields[f]]
         set_aside = [a for m in members for a in m.get("set_aside") or []][:MAX_SET_ASIDE]
-        unchecked = sorted({s for m in members for s in m.get("unchecked") or []})
+        # only sources that look for this person's accounts; a domain record's
+        # failed subdomain or reverse-IP lookup says nothing about the person (10.5)
+        unchecked = sorted({s for m in members if m.get("type") in PROFILE_TYPES for s in m.get("unchecked") or []})
         label = (fields["name"][0]["value"] if fields["name"]
                  else ("@" + fields["usernames"][0]["value"]) if fields["usernames"]
                  else fields["emails"][0]["value"] if fields["emails"]
@@ -656,7 +659,7 @@ async def run_agent(text: str, step: Step | None = None) -> dict:
     scan = await run_deep_scan(primary["value"], primary["type"], extra_seeds=extras,
                                progress=on_progress, expand=target.expand, max_nodes=AGENT_MAX_NODES,
                                prepare=target.split_profiles)
-    unchecked = sorted({s for n in scan["nodes"] for s in n.get("unchecked") or []})
+    unchecked = sorted({s for n in scan["nodes"] if n.get("type") in PROFILE_TYPES for s in n.get("unchecked") or []})
     if unchecked:
         await say("skip", "Not checked this time: " + ", ".join(unchecked[:5])
                   + " — scores can be lower than on a run where they answer")

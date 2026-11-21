@@ -309,11 +309,16 @@ Kurs (`evidence_log.py`, v0.9.0 ✅):
   o'rtacha 4.8 daqiqa/holat. Topilmadi: `goodfeli`, `teorth`; past o'rin: `ken` (2, zaif),
   `paulbuchheit` (3, zaif); `matz` 1-o'rin, lekin "mumkin". Cheklov: holatlar Wikidata'dan,
   Agent ham Wikidata'ni so'raydi — oddiy odamlar uchun rozilik bilan `*.private.jsonl` kerak
-- [ ] 10.5 O'lchov topgan ishlar: (a) `goodfeli`/`teorth` nima uchun topilmadi (Wikidata yo'li?);
-  (b) `ken`, `paulbuchheit` past o'rin sababi; (c) GitLab API kalitsiz rate limit — 30 holatdan
-  24 tasida javob bermadi (GitHub kabi kesh); (d) Hacker News nuqtali username'ga HTTP 400
-  qaytaradi — bu "yo'q", "tekshirilmadi" emas; (e) shovqin: domen manbalari (Subdomains,
-  Reverse IP, urlscan) nomzodning "tekshirilmadi" ro'yxatini to'ldiradi
+- [~] 10.5 O'lchov topgan ishlar:
+  - [x] (a) `goodfeli`/`teorth` topilmadi — sabab parser: "from United States" ismga qo'shilib
+    "Terence Tao States" bo'lardi. Ko'p so'zli joy nomlari tuzatildi
+  - [x] (c) GitLab API javoblari keshlanadi; (d) Hacker News'ga yaroqsiz username yuborilmaydi;
+    (e) nomzodning "tekshirilmadi" ro'yxati faqat profil manbalaridan
+  - Qayta o'lchov (7 holat, 2026-11-21): goodfeli —→1, teorth —→2, ken 2→1, paulbuchheit 3,
+    matz 1 (mumkin), timbl/torvalds 1 (kuchli); hit@3 7/7, noto'g'ri kuchli 0, xato chetga olingan 0
+  - [ ] (b) To'g'ri topilgan, lekin "zaif" (goodfeli, ken, teorth, paulbuchheit): ball qoidalari
+  - [ ] (f) DEV Community deyarli har holatda javob bermaydi — kesh yoki so'rovlar orasida pauza
+  - [ ] 30 holatni to'liq qayta o'lchash
 - [ ] 10.4 1.0.0 release: CHANGELOG, README'da aniqlik natijalari
 
 ## Tashqi OSINT loyihalari tahlili (2026-11-16, GitHub ma'lumotlari bo'yicha)

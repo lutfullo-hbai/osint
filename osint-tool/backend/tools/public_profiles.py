@@ -84,15 +84,22 @@ GITHUB_SEARCH_TTL = 3600
 _MISSING = {"__missing__": True}
 
 
-def _github_cache_key(url: str, params, missing) -> str:
+GITLAB_API = "https://gitlab.com/api/"
+# 10.5: without a key GitLab's users endpoint answered "rate limit" in 24 of 30
+# evaluation runs; its answers are cached like GitHub's
+_CACHED_APIS = {GITHUB_API: "github", GITLAB_API: "gitlab"}
+
+
+def _github_cache_key(url: str, params, missing, prefix: str = "github") -> str:
     raw = url + "?" + urlencode(sorted((params or {}).items())) + "#" + ",".join(map(str, sorted(missing)))
-    return "osint:github:" + hashlib.sha256(raw.encode()).hexdigest()
+    return f"osint:{prefix}:" + hashlib.sha256(raw.encode()).hexdigest()
 
 
 async def fetch_json(client: httpx.AsyncClient, url: str, missing=(404,), **kwargs):
-    if not url.startswith(GITHUB_API):
+    api = next((name for base, name in _CACHED_APIS.items() if url.startswith(base)), None)
+    if api is None:
         return await _fetch_json(client, url, missing, **kwargs)
-    key = _github_cache_key(url, kwargs.get("params"), missing)
+    key = _github_cache_key(url, kwargs.get("params"), missing, api)
     cached = await get_cached_json(key)
     if cached is not None:
         return None if cached == _MISSING else cached
@@ -103,7 +110,7 @@ async def fetch_json(client: httpx.AsyncClient, url: str, missing=(404,), **kwar
     from services.data_wipe import was_wiped_since   # late import: services import this module
     if await was_wiped_since(started):
         return data                    # everything was deleted while this ran (8b.6)
-    ttl = GITHUB_SEARCH_TTL if "/search/" in url else GITHUB_CACHE_TTL
+    ttl = GITHUB_SEARCH_TTL if "/search/" in url or "?search=" in url else GITHUB_CACHE_TTL
     await set_cached_json(key, _MISSING if data is None else data, GITHUB_MISSING_TTL if data is None else ttl)
     return data
 
@@ -206,7 +213,14 @@ async def gitlab_profile(client, username):
     )
 
 
+# Hacker News user ids: 2-15 letters, digits, "-" or "_"; anything else (a dot)
+# gets HTTP 400 - that means "no such user here", not "the site failed" (10.5)
+_HN_USER_RE = re.compile(r"^[A-Za-z0-9_-]{2,15}$")
+
+
 async def hackernews_profile(client, username):
+    if not _HN_USER_RE.match(username):
+        return None
     data = await fetch_json(
         client, f"https://hacker-news.firebaseio.com/v0/user/{username}.json"
     )

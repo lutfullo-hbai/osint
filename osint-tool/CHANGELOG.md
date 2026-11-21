@@ -8,7 +8,7 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 (`vX.Y.Z`) va GitHub Release oladi.
 
 ## [Unreleased]
-Aniqlik (Faza 10.1–10.3).
+Aniqlik (Faza 10.1–10.3, 10.5).
 
 ### Qo'shildi
 - **Aniqlikni o'lchash (10.3)**: `scripts/eval_agent.py` — javobi ma'lum holatlarda hit@1/3, MRR,
@@ -25,6 +25,11 @@ Aniqlik (Faza 10.1–10.3).
   kuzatilishidan oldin bajariladi; chetga olingan profilning havolalari kuzatilmaydi.
   Tasdiqlanmagan profil bio'sidagi sayt avtomatik o'qilmaydi. Bio ichidagi "Company name:",
   "Previous location:" endi ism yoki manzil deb o'qilmaydi.
+- **Ko'p so'zli joy nomlari (10.5)**: "from United States", "from San Francisco" endi ismga qo'shilib
+  ketmaydi (birinchi o'lchovda Terence Tao va Ian Goodfellow shu sababli topilmagan edi).
+- **"Tekshirilmadi" shovqini (10.5)**: GitLab javoblari keshlanadi (kalitsiz limit 30 holatdan 24 tasida
+  tugagan); Hacker News'ga u qabul qilmaydigan username yuborilmaydi; nomzodning ro'yxatiga faqat
+  profil qidiradigan manbalar kiradi (domen tekshiruvlari emas).
 - **Ball o'zgaruvchanligi (10.2)**: GitHub javoblari keshlanadi (profil 24 soat, "yo'q" 1 soat;
   qisman qidiruv natijasi va o'chirish paytida kelgan javob keshlanmaydi); javob bermagan
   manbalar nomzodda "tekshirilmadi" deb yoziladi.
