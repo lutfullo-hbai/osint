@@ -39,6 +39,7 @@ COPY backend/tools ./tools
 COPY backend/assets ./assets
 COPY backend/scripts ./scripts
 COPY backend/tests ./tests
+COPY backend/eval ./eval
 
 RUN useradd --create-home --shell /bin/bash osint \
     && mkdir -p /app/data \

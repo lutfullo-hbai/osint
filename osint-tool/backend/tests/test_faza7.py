@@ -258,7 +258,8 @@ async def test_extract_contacts_stops_when_robots_unavailable(monkeypatch):
 
 
 def test_profile_contacts_read_only_self_written_text():
-    members = [{"key": "username:ali", "type": "username", "query": "ali", "results": [
+    # a handle the user gave: its profiles are theirs (10.1)
+    members = [{"key": "username:ali", "type": "username", "query": "ali", "via": "stated", "results": [
         {"platform": "GitHub", "url": "https://github.com/ali", "status": "found",
          "info": "Name: Ali; Followers: 901234567; Bio: write me +998 90 765 43 21; Website: ali.uz",
          "website": "ali.uz"},
@@ -269,6 +270,7 @@ def test_profile_contacts_read_only_self_written_text():
     assert pairs == {("phone", "+998907654321"), ("website", "ali.uz")}
     assert contacts[0]["sources"] == ["https://github.com/ali"]
     assert contacts[0]["how"] == "written in the GitHub profile"
+    assert all(c["confirmed"] for c in contacts)
 
 
 @pytest.mark.asyncio
@@ -282,8 +284,10 @@ async def test_top_candidate_websites_are_read(monkeypatch):
 
     monkeypatch.setattr(agent, "extract_contacts", fake_extract)
     candidates = [
-        {"label": "Ali", "level": "strong", "contacts": [{"kind": "website", "value": "ali.uz", "sources": []}]},
-        {"label": "Weak", "level": "weak", "contacts": [{"kind": "website", "value": "weak.uz", "sources": []}]},
+        {"label": "Ali", "level": "strong", "contacts": [{"kind": "website", "value": "ali.uz", "sources": [],
+                                                          "confirmed": True}]},
+        {"label": "Weak", "level": "weak", "contacts": [{"kind": "website", "value": "weak.uz", "sources": [],
+                                                         "confirmed": True}]},
     ]
     steps = []
 
@@ -293,8 +297,8 @@ async def test_top_candidate_websites_are_read(monkeypatch):
     assert await agent.read_candidate_sites(candidates, say) == 1
     assert calls == [("ali.uz", agent.SITE_PAGES)]
     assert {"kind": "email", "value": "me@ali.uz", "how": "published on ali.uz",
-            "sources": ["https://ali.uz/contact"]} in candidates[0]["contacts"]
-    assert steps == ["Reading contacts on ali.uz (linked by Ali)"]
+            "sources": ["https://ali.uz/contact"], "confirmed": True} in candidates[0]["contacts"]
+    assert steps == ["Reading contacts on ali.uz (linked from a profile of Ali)"]
 
 
 # ---------------- 7.1 person card ----------------

@@ -6,13 +6,16 @@ X, Facebook, Reddit, Wikimedia) are not fetched here: they are covered through
 search-engine indexes and manual-check links. Do not work around those blocks.
 """
 import asyncio
+import hashlib
 import html
 import os
 import re
-from urllib.parse import quote, urlparse
+import time
+from urllib.parse import quote, urlencode, urlparse
 
 import httpx
 
+from cache import get_cached_json, set_cached_json
 from tools.base import ToolError
 from tools.domain_intel import DomainValidationError, normalize_domain
 from tools.hub_domains import is_hub_domain
@@ -72,7 +75,47 @@ def _github_headers() -> dict:
     return {"Authorization": f"Bearer {token}"} if token else {}
 
 
+# 10.2: without a token GitHub allows 60 calls an hour and one Agent run makes
+# ~10, so the 6th run in an hour lost the GitHub profile and its score dropped.
+# Answers are cached: profiles for a day, "no such user" for 6 hours.
+GITHUB_CACHE_TTL = 24 * 3600
+GITHUB_MISSING_TTL = 3600          # a new account shows up within the hour
+GITHUB_SEARCH_TTL = 3600
+_MISSING = {"__missing__": True}
+
+
+GITLAB_API = "https://gitlab.com/api/"
+# 10.5: without a key GitLab's users endpoint answered "rate limit" in 24 of 30
+# evaluation runs; its answers are cached like GitHub's
+_CACHED_APIS = {GITHUB_API: "github", GITLAB_API: "gitlab"}
+
+
+def _github_cache_key(url: str, params, missing, prefix: str = "github") -> str:
+    raw = url + "?" + urlencode(sorted((params or {}).items())) + "#" + ",".join(map(str, sorted(missing)))
+    return f"osint:{prefix}:" + hashlib.sha256(raw.encode()).hexdigest()
+
+
 async def fetch_json(client: httpx.AsyncClient, url: str, missing=(404,), **kwargs):
+    api = next((name for base, name in _CACHED_APIS.items() if url.startswith(base)), None)
+    if api is None:
+        return await _fetch_json(client, url, missing, **kwargs)
+    key = _github_cache_key(url, kwargs.get("params"), missing, api)
+    cached = await get_cached_json(key)
+    if cached is not None:
+        return None if cached == _MISSING else cached
+    started = time.time()
+    data = await _fetch_json(client, url, missing, **kwargs)
+    if isinstance(data, dict) and data.get("incomplete_results"):
+        return data                    # a search that timed out on GitHub's side: not an answer to keep
+    from services.data_wipe import was_wiped_since   # late import: services import this module
+    if await was_wiped_since(started):
+        return data                    # everything was deleted while this ran (8b.6)
+    ttl = GITHUB_SEARCH_TTL if "/search/" in url or "?search=" in url else GITHUB_CACHE_TTL
+    await set_cached_json(key, _MISSING if data is None else data, GITHUB_MISSING_TTL if data is None else ttl)
+    return data
+
+
+async def _fetch_json(client: httpx.AsyncClient, url: str, missing=(404,), **kwargs):
     if url.startswith(GITHUB_API):
         kwargs["headers"] = {**kwargs.get("headers", {}), **_github_headers()}
     response = await client.get(url, **kwargs)
@@ -170,7 +213,14 @@ async def gitlab_profile(client, username):
     )
 
 
+# Hacker News user ids: 2-15 letters, digits, "-" or "_"; anything else (a dot)
+# gets HTTP 400 - that means "no such user here", not "the site failed" (10.5)
+_HN_USER_RE = re.compile(r"^[A-Za-z0-9_-]{2,15}$")
+
+
 async def hackernews_profile(client, username):
+    if not _HN_USER_RE.match(username):
+        return None
     data = await fetch_json(
         client, f"https://hacker-news.firebaseio.com/v0/user/{username}.json"
     )

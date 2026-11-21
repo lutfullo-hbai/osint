@@ -66,7 +66,7 @@ def build_card(run: dict, candidate_id: str) -> dict:
         "notice": NOTICE,
         "candidate": {k: candidate.get(k) for k in
                       ("id", "label", "level", "score", "fields", "missing", "contacts", "chain",
-                       "why", "contradictions", "members", "ai_review")},
+                       "why", "contradictions", "members", "ai_review", "set_aside", "unchecked")},
     }
 
 
@@ -143,9 +143,18 @@ def card_pdf(card: dict) -> bytes:
         pdf.set_text_color(*_INK)
     if c.get("missing"):
         _kv(pdf, "Not found", ", ".join(FIELD_LABELS.get(m, m) for m in c["missing"]))
+    if c.get("unchecked"):
+        pdf.set_text_color(*_AMBER)
+        _kv(pdf, "Not checked", ", ".join(c["unchecked"]) + " did not answer; the score may be too low")
+        pdf.set_text_color(*_INK)
     review = c.get("ai_review") or {}
     if review:
         _kv(pdf, "AI (weak signal)", f"{review.get('verdict')} — {review.get('reason')}")
+
+    if c.get("set_aside"):
+        _section(pdf, "Same username, probably another person (not used)")
+        for item in c["set_aside"]:
+            _kv(pdf, item.get("platform") or "", f"{item.get('reason')}   <{item.get('url') or ''}>")
 
     pdf.ln(4)
     pdf.set_font(FONT, "I", 8)

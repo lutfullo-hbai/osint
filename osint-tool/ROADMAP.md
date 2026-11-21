@@ -293,13 +293,32 @@ Kurs (`evidence_log.py`, v0.9.0 ✅):
 - [x] 8b.15 `evidence_log.py` uchun avtomatik testlar
 
 ## Faza 10 — Aniqlik va 1.0.0
-- [ ] 10.1 Boshqa odamning profili nomzodga noto'g'ri qo'shilishi (misol: `torvalds.bsky.social`
-  Linus Torvalds klasteriga tushgan) — korrelyatsiya qoidasini tuzatish, test bilan — S/M
-- [ ] 10.2 Bir xil qidiruvda ball o'zgaruvchanligi (9.25 va 15.75): sababini aniqlash
-  (GitHub so'rov cheklovi?), manba ishlamasa ball "noma'lum" deb belgilanadi — S/M
-- [ ] 10.3 = 6.8 Belgilangan holatlar bilan baholash: 20–30 ta javobi ma'lum holat (o'zingiz va
-  roziligi bor shaxslar), top-1/top-3 aniqlik, ball chegaralarini sozlash — M.
-  Siz kerak: holatlar ro'yxati va to'g'ri javoblar
+- [x] 10.1 Boshqa odamning profili nomzodga noto'g'ri qo'shilishi — bitta username ostidagi aralash
+  profillardan boshqa odamniki chetga olinadi (`set_aside`, sababi bilan, UI va PDF'da), faqat
+  ishonchli belgilar bilan: ism aniq boshqa (imlo/translit/laqab bir xil hisoblanadi), tug'ilgan yil
+  zid, yoki shahar VA ish joyi birga zid (bittasi foydalanuvchi aytganiga). Tekshiruv har bir tugun
+  yaratilganda, pivotlar kuzatilishidan oldin; chetga olingan profil pivotlari tashlanadi.
+  QA review (2026-11-21) topgan 12 ta holat testlarda. Jonli: Docker Hub `torvalds` chetga olindi
+- [x] 10.2 Ball o'zgaruvchanligi — sabab: GitHub API kalitsiz limiti (60/soat, bitta run ~10 so'rov).
+  GitHub javoblari keshlanadi; javob bermagan manbalar nomzodda "tekshirilmadi" (`unchecked`)
+- [~] 10.3 = 6.8 Belgilangan holatlar bilan baholash — `scripts/eval_agent.py` (hit@1/3, MRR, daraja,
+  noto'g'ri "kuchli" nomzodlar, xato chetga olingan profillar, javob bermagan manbalar) va
+  `scripts/eval_cases_wikidata.py` (30 ta ochiq holat, Wikidata P2037). **Birinchi o'lchov
+  (2026-11-21, GITHUB_TOKEN bilan):** hit@1 87% (26/30), hit@3 93%, MRR 0.894, to'g'ri javob
+  "kuchli" 83%, noto'g'ri kuchli nomzod 0.03/holat, xato chetga olingan haqiqiy profil 0,
+  o'rtacha 4.8 daqiqa/holat. Topilmadi: `goodfeli`, `teorth`; past o'rin: `ken` (2, zaif),
+  `paulbuchheit` (3, zaif); `matz` 1-o'rin, lekin "mumkin". Cheklov: holatlar Wikidata'dan,
+  Agent ham Wikidata'ni so'raydi — oddiy odamlar uchun rozilik bilan `*.private.jsonl` kerak
+- [~] 10.5 O'lchov topgan ishlar:
+  - [x] (a) `goodfeli`/`teorth` topilmadi — sabab parser: "from United States" ismga qo'shilib
+    "Terence Tao States" bo'lardi. Ko'p so'zli joy nomlari tuzatildi
+  - [x] (c) GitLab API javoblari keshlanadi; (d) Hacker News'ga yaroqsiz username yuborilmaydi;
+    (e) nomzodning "tekshirilmadi" ro'yxati faqat profil manbalaridan
+  - Qayta o'lchov (7 holat, 2026-11-21): goodfeli —→1, teorth —→2, ken 2→1, paulbuchheit 3,
+    matz 1 (mumkin), timbl/torvalds 1 (kuchli); hit@3 7/7, noto'g'ri kuchli 0, xato chetga olingan 0
+  - [ ] (b) To'g'ri topilgan, lekin "zaif" (goodfeli, ken, teorth, paulbuchheit): ball qoidalari
+  - [ ] (f) DEV Community deyarli har holatda javob bermaydi — kesh yoki so'rovlar orasida pauza
+  - [ ] 30 holatni to'liq qayta o'lchash
 - [ ] 10.4 1.0.0 release: CHANGELOG, README'da aniqlik natijalari
 
 ## Tashqi OSINT loyihalari tahlili (2026-11-16, GitHub ma'lumotlari bo'yicha)

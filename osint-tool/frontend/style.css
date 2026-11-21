@@ -1099,3 +1099,13 @@ a.agent-source:hover { background: rgba(34, 211, 238, 0.12); }
 }
 .case-new button.danger { background: var(--red); color: #160309; }
 .case-new button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ---- Agent: not checked / set aside (10.1, 10.2) ---- */
+.agent-unchecked {
+  margin-top: 8px; padding: 6px 10px; border-radius: 10px;
+  border: 1px dashed rgba(251, 191, 36, 0.45); color: var(--amber); font-size: 0.82rem;
+}
+.agent-set-aside { margin-top: 10px; color: var(--muted); font-size: 0.82rem; }
+.agent-set-aside summary { cursor: pointer; }
+.agent-set-aside ul { margin: 6px 0 0; padding-left: 18px; }
+.agent-set-aside a { color: var(--text); }

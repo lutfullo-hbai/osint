@@ -6,3 +6,6 @@ __pycache__/
 *.egg-info/
 .git/
 .env
+# Agent evaluation: private cases and reports never go into an image
+backend/eval/*.private.jsonl
+backend/eval/reports/
