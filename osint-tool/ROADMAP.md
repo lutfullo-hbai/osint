@@ -4,7 +4,7 @@ Holat va to'liq reja (2026-11-16). Manba: o'zimizning sinovlar, reviewer va rese
 Bajarilganlari `[x]`, qisman bajarilganlari `[~]` bilan belgilanadi. Hajm: S = kichik (≤ yarim kun),
 M = o'rta (1–2 kun), L = katta (3+ kun).
 
-Ish tartibi (2026-11-21 dan): Faza 8b (v0.8.1 ✅) → **v0.9.0 (Faza 9 + 8b-kurs)** →
+Ish tartibi (2026-11-21 dan): Faza 8b (v0.8.1 ✅) → v0.9.0 (Faza 9 + 8b-kurs) ✅ →
 **Faza 10** (aniqlik: ma'lum xatolar + 6.8) → **1.0.0** → optimallashtirish.
 Har bir ish `feat/*` branch'da: testlar o'tadi → dev → stage → main (PR, CI, teg, release).
 
@@ -285,12 +285,12 @@ Keyinroq (S, Faza 10 bilan):
 - [ ] 8b.10 Savol (siz hal qilasiz): oddiy foydalanuvchi boshqalarning case/run'larini ko'rishi va
   o'chirishi — umumiy jamoa ish joyimi yoki har kim faqat o'zinikini? Javobga qarab README yoki egalik
 
-Kurs (`evidence_log.py`, v0.9.0 bilan):
-- [ ] 8b.11 Nusxa yo'li jurnal papkasiga nisbiy (boshqa papkadan `verify` ishlasin)
-- [ ] 8b.12 5 MB dan katta sahifa: `truncated: true` belgisi (hash qisman kontentdan)
-- [ ] 8b.13 Buzilgan yoki `id`/`url`siz qator dasturni to'xtatmaydi
-- [ ] 8b.14 Hisobot jadvalida URL escape qilinadi; HTTP ulanish yopiladi
-- [ ] 8b.15 `evidence_log.py` uchun avtomatik testlar
+Kurs (`evidence_log.py`, v0.9.0 ✅):
+- [x] 8b.11 Nusxa yo'li jurnal papkasiga nisbiy (boshqa papkadan `verify` ishlasin)
+- [x] 8b.12 5 MB dan katta sahifa: `truncated: true` belgisi (hash qisman kontentdan)
+- [x] 8b.13 Buzilgan yoki `id`/`url`siz qator dasturni to'xtatmaydi
+- [x] 8b.14 Hisobot jadvalida URL escape qilinadi; HTTP ulanish yopiladi
+- [x] 8b.15 `evidence_log.py` uchun avtomatik testlar
 
 ## Faza 10 — Aniqlik va 1.0.0
 - [ ] 10.1 Boshqa odamning profili nomzodga noto'g'ri qo'shilishi (misol: `torvalds.bsky.social`

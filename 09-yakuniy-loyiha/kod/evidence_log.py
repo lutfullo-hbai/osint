@@ -65,11 +65,18 @@ def load(log: Path) -> list[dict]:
         return []
     entries = []
     for n, line in enumerate(log.read_text(encoding="utf-8").splitlines(), 1):
-        if line.strip():
-            try:
-                entries.append(json.loads(line))
-            except ValueError:
-                print(f"[!] {log}:{n} — buzilgan qator o'tkazib yuborildi", file=sys.stderr)
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            entry = None
+        if not isinstance(entry, dict) or not entry.get("id") or not is_http(entry.get("url")):
+            # buzilgan yoki qo'lda noto'g'ri tahrirlangan qator dasturni to'xtatmaydi
+            print(f"[!] {log}:{n} — buzilgan qator o'tkazib yuborildi", file=sys.stderr)
+            continue
+        entry["id"] = str(entry["id"])
+        entries.append(entry)
     return entries
 
 
@@ -86,26 +93,48 @@ def next_id(entries: list[dict]) -> str:
 
 # ---- sahifani o'qish ----
 
-def fetch(url: str, copy_to: Path | None) -> dict:
-    """Sahifani o'qiydi: status, hajm, SHA-256; --save bo'lsa nusxasini yozadi."""
+def fetch(url: str, copy_to: Path | None, log_dir: Path | None = None) -> dict:
+    """Sahifani o'qiydi: status, hajm, SHA-256; --save bo'lsa nusxasini yozadi.
+
+    Nusxa yo'li jurnal papkasiga nisbatan saqlanadi, shuning uchun `verify`
+    istalgan papkadan ishlaydi. MAX_BYTES dan katta sahifa kesiladi va
+    `truncated: true` belgisi qo'yiladi: hash faqat saqlangan qismniki."""
+    truncated = False
     try:
-        r = requests.get(url, headers=HEADERS, timeout=15, stream=True)
-        body = b""
-        for chunk in r.iter_content(64 * 1024):
-            body += chunk
-            if len(body) > MAX_BYTES:
-                body = body[:MAX_BYTES]
-                break
+        with requests.get(url, headers=HEADERS, timeout=15, stream=True) as r:
+            body = b""
+            for chunk in r.iter_content(64 * 1024):
+                body += chunk
+                if len(body) > MAX_BYTES:
+                    body, truncated = body[:MAX_BYTES], True
+                    break
+            status, final_url = r.status_code, r.url
+            content_type = r.headers.get("content-type", "").split(";")[0]
     except requests.RequestException as exc:
         return {"fetch_error": type(exc).__name__}
-    info = {"http_status": r.status_code, "final_url": r.url, "bytes": len(body),
-            "sha256": hashlib.sha256(body).hexdigest(),
-            "content_type": r.headers.get("content-type", "").split(";")[0]}
+    info = {"http_status": status, "final_url": final_url, "bytes": len(body),
+            "sha256": hashlib.sha256(body).hexdigest(), "content_type": content_type}
+    if truncated:
+        info["truncated"] = True
+        print(f"    [!] sahifa {MAX_BYTES // (1024 * 1024)} MB dan katta: faqat boshi saqlandi, "
+              "hash shu qismniki", file=sys.stderr)
     if copy_to is not None:
         copy_to.parent.mkdir(parents=True, exist_ok=True)
         copy_to.write_bytes(body)
-        info["copy"] = str(copy_to)
+        try:
+            info["copy"] = str(copy_to.relative_to(log_dir)) if log_dir else str(copy_to)
+        except ValueError:
+            info["copy"] = str(copy_to.resolve())
     return info
+
+
+def copy_path(entry: dict, log: Path) -> Path:
+    """Nusxa fayli: jurnal papkasiga nisbatan (eski yozuvlar: joriy papkaga nisbatan)."""
+    path = Path(entry["copy"])
+    if path.is_absolute():
+        return path
+    beside_log = log.parent / path
+    return beside_log if beside_log.exists() or not path.exists() else path
 
 
 # ---- buyruqlar ----
@@ -121,7 +150,7 @@ def cmd_add(args) -> None:
     if args.fetch or args.save:
         ext = ".html" if not args.url.lower().endswith(".pdf") else ".pdf"
         copy = log.parent / COPIES_DIR / f"{entry['id']}{ext}" if args.save else None
-        entry.update(fetch(args.url, copy))
+        entry.update(fetch(args.url, copy, log.parent))
     entries.append(entry)
     save(log, entries)
     print(f"[+] {entry['id']} qo'shildi: {args.url}")
@@ -242,13 +271,14 @@ def cmd_list(args) -> None:
 
 
 def cmd_verify(args) -> None:
-    entries = load(Path(args.log))
+    log = Path(args.log)
+    entries = load(log)
     bad = checked = 0
     for e in entries:
         if not e.get("copy"):
             continue
         checked += 1
-        path = Path(e["copy"])
+        path = copy_path(e, log)
         if not path.exists():
             print(f"[!] {e['id']}: nusxa yo'q ({path})")
             bad += 1
@@ -264,14 +294,24 @@ def _cell(text) -> str:
     return str(text or "").replace("|", "\\|").replace("\n", " ")
 
 
+_MD_URL_UNSAFE = {" ": "%20", "|": "%7C", "(": "%28", ")": "%29", "<": "%3C", ">": "%3E",
+                  "[": "%5B", "]": "%5D", "\n": "", "\r": ""}
+
+
+def _md_url(url: str) -> str:
+    """Import qilingan URL ishonchsiz: jadval va havolani buzadigan belgilar kodlanadi."""
+    return "".join(_MD_URL_UNSAFE.get(ch, ch) for ch in str(url))
+
+
 def report(entries: list[dict]) -> str:
     lines = ["# Ilova: dalil jurnali", "",
              f"Tuzilgan: {now_utc()} · dalillar: {len(entries)}", "",
              "| ID | Baho | Ko'rilgan (UTC) | Manba | Izoh | SHA-256 |",
              "|----|------|-----------------|-------|------|---------|"]
     for e in entries:
-        link = f"[{_cell(e.get('platform') or urlparse(e['url']).hostname)}]({e['url']})"
-        sha = (e.get("sha256") or "")[:12]
+        label = _cell(e.get("platform") or urlparse(e["url"]).hostname).replace("[", "(").replace("]", ")")
+        link = f"[{label}]({_md_url(e['url'])})"
+        sha = (e.get("sha256") or "")[:12] + (" (kesilgan)" if e.get("truncated") else "")
         lines.append(f"| {e['id']} | {e.get('grade') or '—'} | {_cell(e.get('seen_at', '')[:16]).replace('T', ' ')} "
                      f"| {link} | {_cell(e.get('note'))[:160]} | {sha} |")
     ungraded = [e["id"] for e in entries if not e.get("grade")]
