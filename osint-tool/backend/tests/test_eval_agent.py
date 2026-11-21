@@ -32,6 +32,17 @@ def test_rank_level_false_strong_and_wrong_set_aside():
     assert row["false_strong"] == ["Namesake"]
     assert row["wrongly_set_aside"] == ["github.com/torvalds"]
     assert row["unchecked"] == ["GitHub"]
+    assert row["detail"]["match"]["label"] == "Linus" and row["detail"]["top"]["label"] == "Namesake"
+
+
+def test_detail_explains_the_level():
+    case = {"id": "t", "expect": ["https://github.com/torvalds"]}
+    linus = cand("Linus", "weak", ["https://github.com/torvalds"])
+    linus.update(score=2.5, why=["same name"], contradictions=["age differs"], missing=["work"])
+    row = ev.score_case(case, {"candidates": [linus]})
+    assert row["detail"] == {"match": {"label": "Linus", "score": 2.5, "level": "weak", "why": ["same name"],
+                                       "contradictions": ["age differs"], "missing": ["work"]}}
+    assert "detail" not in ev.score_case(case, {"candidates": []})
 
 
 def test_summary():

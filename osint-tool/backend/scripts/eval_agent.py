@@ -94,8 +94,23 @@ def score_case(case: dict, result: dict) -> dict:
     wrongly_set_aside += sorted({norm_url(a.get("url")) for n in nodes for a in n.get("set_aside") or []
                                  if norm_url(a.get("url")) in expected} - set(wrongly_set_aside))
     unchecked = sorted({s for n in nodes for s in n.get("unchecked") or []})
-    return {"id": case.get("id"), "rank": rank, "level": level, "candidates": len(candidates),
-            "false_strong": false_strong, "wrongly_set_aside": wrongly_set_aside, "unchecked": unchecked}
+    row = {"id": case.get("id"), "rank": rank, "level": level, "candidates": len(candidates),
+           "false_strong": false_strong, "wrongly_set_aside": wrongly_set_aside, "unchecked": unchecked}
+    # why the right candidate got its level, and what beat it (10.5b); JSON report only
+    detail = {}
+    if rank:
+        detail["match"] = explain(candidates[rank - 1])
+    if rank != 1 and candidates:
+        detail["top"] = explain(candidates[0])
+    if detail:
+        row["detail"] = detail
+    return row
+
+
+def explain(candidate: dict) -> dict:
+    return {"label": candidate.get("label"), "score": candidate.get("score"), "level": candidate.get("level"),
+            "why": candidate.get("why") or [], "contradictions": candidate.get("contradictions") or [],
+            "missing": candidate.get("missing") or []}
 
 
 def summarize(rows: list[dict]) -> dict:
