@@ -1,0 +1,30 @@
+{"id": "acton", "text": "Brian Acton, 54 years old", "expect": ["https://github.com/acton"], "source": "https://www.wikidata.org/wiki/Q15778935", "kind": "public"}
+{"id": "ahejlsberg", "text": "Anders Hejlsberg, 66 years old", "expect": ["https://github.com/ahejlsberg"], "source": "https://www.wikidata.org/wiki/Q316544", "kind": "public"}
+{"id": "bjarnestroustrup", "text": "Bjarne Stroustrup, 76 years old", "expect": ["https://github.com/BjarneStroustrup"], "source": "https://www.wikidata.org/wiki/Q92620", "kind": "public"}
+{"id": "brendaneich", "text": "Brendan Eich, 65 years old", "expect": ["https://github.com/BrendanEich"], "source": "https://www.wikidata.org/wiki/Q92648", "kind": "public"}
+{"id": "dhh", "text": "David Heinemeier Hansson, 47 years old, from Malibu", "expect": ["https://github.com/dhh"], "source": "https://www.wikidata.org/wiki/Q719413", "kind": "public"}
+{"id": "douglascrockford", "text": "Douglas Crockford, 71 years old", "expect": ["https://github.com/douglascrockford"], "source": "https://www.wikidata.org/wiki/Q3037998", "kind": "public"}
+{"id": "egamma", "text": "Erich Gamma, 65 years old", "expect": ["https://github.com/egamma"], "source": "https://www.wikidata.org/wiki/Q92838", "kind": "public"}
+{"id": "gdb", "text": "Greg Brockman, 39 years old", "expect": ["https://github.com/gdb"], "source": "https://www.wikidata.org/wiki/Q100604534", "kind": "public"}
+{"id": "geohot", "text": "George Hotz, 37 years old", "expect": ["https://github.com/geohot"], "source": "https://www.wikidata.org/wiki/Q370733", "kind": "public"}
+{"id": "goodfeli", "text": "Ian Goodfellow, 39 years old, from San Francisco", "expect": ["https://github.com/goodfeli"], "source": "https://www.wikidata.org/wiki/Q26703063", "kind": "public"}
+{"id": "gvanrossum", "text": "Guido van Rossum, 70 years old", "expect": ["https://github.com/gvanrossum"], "source": "https://www.wikidata.org/wiki/Q30942", "kind": "public"}
+{"id": "jmechner", "text": "Jordan Mechner, 62 years old", "expect": ["https://github.com/jmechner"], "source": "https://www.wikidata.org/wiki/Q263175", "kind": "public"}
+{"id": "jspolsky", "text": "Joel Spolsky, 61 years old", "expect": ["https://github.com/jspolsky"], "source": "https://www.wikidata.org/wiki/Q2387083", "kind": "public"}
+{"id": "karpathy", "text": "Andrej Karpathy, 40 years old", "expect": ["https://github.com/karpathy"], "source": "https://www.wikidata.org/wiki/Q56037405", "kind": "public"}
+{"id": "ken", "text": "Ken Thompson, 83 years old", "expect": ["https://github.com/ken"], "source": "https://www.wikidata.org/wiki/Q1107006", "kind": "public"}
+{"id": "lexfridman", "text": "Lex Fridman, 43 years old", "expect": ["https://github.com/lexfridman"], "source": "https://www.wikidata.org/wiki/Q76448707", "kind": "public"}
+{"id": "matz", "text": "Yukihiro Matsumoto, 61 years old, from Japan", "expect": ["https://github.com/matz"], "source": "https://www.wikidata.org/wiki/Q92748", "kind": "public"}
+{"id": "migueldeicaza", "text": "Miguel de Icaza, 54 years old", "expect": ["https://github.com/migueldeicaza"], "source": "https://www.wikidata.org/wiki/Q62849", "kind": "public"}
+{"id": "montywi", "text": "Michael Widenius, 64 years old", "expect": ["https://github.com/montywi"], "source": "https://www.wikidata.org/wiki/Q1362152", "kind": "public"}
+{"id": "nat", "text": "Nat Friedman, 49 years old", "expect": ["https://github.com/nat"], "source": "https://www.wikidata.org/wiki/Q92955", "kind": "public"}
+{"id": "paulbuchheit", "text": "Paul Buchheit, 49 years old", "expect": ["https://github.com/paulbuchheit"], "source": "https://www.wikidata.org/wiki/Q3299582", "kind": "public"}
+{"id": "robpike", "text": "Rob Pike, 70 years old", "expect": ["https://github.com/robpike"], "source": "https://www.wikidata.org/wiki/Q517764", "kind": "public"}
+{"id": "stevec", "text": "Steve Coast, 46 years old", "expect": ["https://github.com/SteveC"], "source": "https://www.wikidata.org/wiki/Q56200", "kind": "public"}
+{"id": "teorth", "text": "Terence Tao, 51 years old, from United States", "expect": ["https://github.com/teorth"], "source": "https://www.wikidata.org/wiki/Q295981", "kind": "public"}
+{"id": "timbl", "text": "Tim Berners-Lee, 71 years old, from Concord", "expect": ["https://github.com/timbl"], "source": "https://www.wikidata.org/wiki/Q80", "kind": "public"}
+{"id": "torvalds", "text": "Linus Torvalds, 57 years old", "expect": ["https://github.com/torvalds"], "source": "https://www.wikidata.org/wiki/Q34253", "kind": "public"}
+{"id": "unclebob", "text": "Robert Cecil Martin, 74 years old", "expect": ["https://github.com/unclebob"], "source": "https://www.wikidata.org/wiki/Q93010", "kind": "public"}
+{"id": "vbuterin", "text": "Vitalik Buterin, 32 years old, from Zug", "expect": ["https://github.com/vbuterin"], "source": "https://www.wikidata.org/wiki/Q16197959", "kind": "public"}
+{"id": "vrandezo", "text": "Denny Vrandečić, 48 years old", "expect": ["https://github.com/vrandezo"], "source": "https://www.wikidata.org/wiki/Q18618629", "kind": "public"}
+{"id": "yesthatjwz", "text": "Jamie Zawinski, 58 years old", "expect": ["https://github.com/yesthatjwz"], "source": "https://www.wikidata.org/wiki/Q92958", "kind": "public"}

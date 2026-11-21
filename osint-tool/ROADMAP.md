@@ -301,9 +301,19 @@ Kurs (`evidence_log.py`, v0.9.0 ✅):
   QA review (2026-11-21) topgan 12 ta holat testlarda. Jonli: Docker Hub `torvalds` chetga olindi
 - [x] 10.2 Ball o'zgaruvchanligi — sabab: GitHub API kalitsiz limiti (60/soat, bitta run ~10 so'rov).
   GitHub javoblari keshlanadi; javob bermagan manbalar nomzodda "tekshirilmadi" (`unchecked`)
-- [ ] 10.3 = 6.8 Belgilangan holatlar bilan baholash: 20–30 ta javobi ma'lum holat (o'zingiz va
-  roziligi bor shaxslar), top-1/top-3 aniqlik, ball chegaralarini sozlash — M.
-  Siz kerak: holatlar ro'yxati va to'g'ri javoblar
+- [~] 10.3 = 6.8 Belgilangan holatlar bilan baholash — `scripts/eval_agent.py` (hit@1/3, MRR, daraja,
+  noto'g'ri "kuchli" nomzodlar, xato chetga olingan profillar, javob bermagan manbalar) va
+  `scripts/eval_cases_wikidata.py` (30 ta ochiq holat, Wikidata P2037). **Birinchi o'lchov
+  (2026-11-21, GITHUB_TOKEN bilan):** hit@1 87% (26/30), hit@3 93%, MRR 0.894, to'g'ri javob
+  "kuchli" 83%, noto'g'ri kuchli nomzod 0.03/holat, xato chetga olingan haqiqiy profil 0,
+  o'rtacha 4.8 daqiqa/holat. Topilmadi: `goodfeli`, `teorth`; past o'rin: `ken` (2, zaif),
+  `paulbuchheit` (3, zaif); `matz` 1-o'rin, lekin "mumkin". Cheklov: holatlar Wikidata'dan,
+  Agent ham Wikidata'ni so'raydi — oddiy odamlar uchun rozilik bilan `*.private.jsonl` kerak
+- [ ] 10.5 O'lchov topgan ishlar: (a) `goodfeli`/`teorth` nima uchun topilmadi (Wikidata yo'li?);
+  (b) `ken`, `paulbuchheit` past o'rin sababi; (c) GitLab API kalitsiz rate limit — 30 holatdan
+  24 tasida javob bermadi (GitHub kabi kesh); (d) Hacker News nuqtali username'ga HTTP 400
+  qaytaradi — bu "yo'q", "tekshirilmadi" emas; (e) shovqin: domen manbalari (Subdomains,
+  Reverse IP, urlscan) nomzodning "tekshirilmadi" ro'yxatini to'ldiradi
 - [ ] 10.4 1.0.0 release: CHANGELOG, README'da aniqlik natijalari
 
 ## Tashqi OSINT loyihalari tahlili (2026-11-16, GitHub ma'lumotlari bo'yicha)
