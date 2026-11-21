@@ -9,6 +9,22 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-11-21
+Xavfsizlik tuzatishlari (uchinchi review, Faza 8b).
+
+### Xavfsizlik
+- **DNS rebinding**: kalitsiz rejimda API faqat `localhost`, `127.0.0.1`, `::1` nomlariga javob beradi
+  (`ALLOWED_HOSTS` bilan kengaytiriladi); "hammasini o'chirish" faqat konsol `Origin`'idan.
+- **Audit log'ni to'ldirish**: mavjud bo'lmagan yo'llar yozilmaydi; rad etilgan so'rovlar bitta IP'dan
+  daqiqasiga 20 tagacha, qolgani bitta yig'ma yozuvga.
+- `OSINT_USERS`'da `admin`, `local`, `refused` nomlari band (admin huquqini olib qo'ymasin).
+
+### Tuzatildi
+- "Hammasini o'chirish": baza band bo'lsa ogohlantiradi; xato bo'lsa ham Redis tozalanadi;
+  qidirilgan domenlarning DNS tarixi va `arq:retry` ham o'chadi; o'chirish paytida tugagan
+  qidiruv natijasi saqlanmaydi; xabarda kesh muddati to'g'rilandi (24 soat).
+- Noto'g'ri `AUDIT_RETENTION_DAYS` backend'ni to'xtatmaydi.
+
 ## [0.8.0] — 2026-11-19
 Qonuniy va operatsion talablar (Faza 8).
 
@@ -133,7 +149,8 @@ Birinchi to'liq to'plam.
 - Digital Footprint hisoboti, entity graph, PDF eksport.
 - Lokal Qwen (Ollama) orqali AI xulosa va rasm tahlili.
 
-[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/lutfullo-hbai/osint/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/lutfullo-hbai/osint/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/lutfullo-hbai/osint/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/lutfullo-hbai/osint/compare/v0.6.0...v0.7.0

@@ -1,11 +1,13 @@
 import asyncio
 import os
+import time
 
 from arq import cron
 from arq.connections import RedisSettings
 
 import store
 from services.agent import execute_run
+from services.data_wipe import was_wiped_since
 from services.investigate import InvestigationValidationError, investigate
 from services.monitor import check_one_watch, run_watch_cycle
 from tools import sanctions_index, username_canary, uz_registry
@@ -19,8 +21,13 @@ WATCH_POLL_MINUTES = int(os.environ.get("WATCH_POLL_MINUTES", "5"))
 
 
 async def run_investigation(ctx, category: str, query: str) -> dict:
+    started = time.time()
     try:
-        return await investigate(category, query)
+        result = await investigate(category, query)
+        if await was_wiped_since(started):
+            # 8b.6: everything was deleted while this ran; do not keep the answer as a job result
+            return {"status": "error", "message": "All stored data was deleted while this search ran."}
+        return result
     except InvestigationValidationError as exc:
         return {"status": "error", "message": str(exc)}
     except ToolError as exc:
