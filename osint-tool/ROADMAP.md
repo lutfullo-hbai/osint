@@ -4,9 +4,71 @@ Holat va to'liq reja (2026-11-16). Manba: o'zimizning sinovlar, reviewer va rese
 Bajarilganlari `[x]`, qisman bajarilganlari `[~]` bilan belgilanadi. Hajm: S = kichik (≤ yarim kun),
 M = o'rta (1–2 kun), L = katta (3+ kun).
 
-Ish tartibi (2026-11-21 dan): Faza 8b (v0.8.1 ✅) → v0.9.0 (Faza 9 + 8b-kurs) ✅ →
-**Faza 10** (aniqlik: ma'lum xatolar + 6.8) → **1.0.0** → optimallashtirish.
+Ish tartibi: pastdagi **"Ish rejasi — bosqichma-bosqich"** (Bosqich 1 → 5). Bajarilgan: Faza 8b
+(v0.8.1), Faza 9 (v0.9.0), Faza 10.1–10.3 (v0.10.0), Globe (v0.11.0), heretic (v0.12.0).
 Har bir ish `feat/*` branch'da: testlar o'tadi → dev → stage → main (PR, CI, teg, release).
+
+---
+
+## Ish rejasi — bosqichma-bosqich (2026-11-21 dan)
+
+Bir vaqtda bitta qadam. Har bir qadam bir xil tartibda yopiladi:
+
+1. **Tahlil** — sabab dalil bilan topiladi (o'lchov, log, kod), taxmin bilan emas
+2. **Test avval** — xatoni ko'rsatadigan test yoziladi
+3. **Kod** — eng kichik o'zgarish, `feat/*` branch'da
+4. **Tekshiruv** — barcha Docker testlari; natijaga ta'sir qilsa jonli o'lchov (faqat commit qilingan kodda)
+5. **Review** — ball qoidalari, xavfsizlik yoki ma'lumotlarga tegsa reviewer/QA agent
+6. **dev** — `--no-ff` merge, CI yashil, ROADMAP va CHANGELOG yangilanadi
+7. **Reliz** — bosqich tugaganda taklif qilinadi: stage (testlar + jonli sinov) → PR → main → teg →
+   GitHub Release. stage va main faqat sizning ruxsatingiz bilan
+
+### Bosqich 1 — Aniqlik va 1.0.0 (Faza 10)
+- [~] 1.1 10.5b-A: adashlar aytilgan yosh bo'yicha ajratiladi. Jonli: goodfeli, ken, paulbuchheit
+  "zaif" → "kuchli", matz "mumkin" → "kuchli"
+- [ ] 1.2 10.5b-B: joylar mos / zid / noma'lum, yumshoq ziddiyat darajani tushirmaydi — alohida o'lchov
+- [ ] 1.3 Salbiy holatlar: mashhur ism + boshqa yosh yoki shahar ("Ken Thompson, 30 years old") —
+  hech kim "kuchli" bo'lmasligi kerak. `eval_agent.py`'ga `expect: []` holat turi; 1.1–1.2 xato
+  "kuchli"ni ko'paytirmaganini shu ko'rsatadi
+- [ ] 1.4 QA agent: 10.5b ball qoidalari → tuzatishlar → dev
+- [ ] 1.5 30 holat + salbiy holatlar to'liq qayta o'lchov (~2.5 soat, fonda)
+- [ ] 1.6 Reliz v0.13.0 (10.5)
+- [ ] 1.7 10.4 = 1.0.0: README'da aniqlik natijalari va cheklovi (holatlar faqat mashhur odamlar),
+  CHANGELOG, reliz
+- [ ] 1.8 (siz) Oddiy odamlar holatlari, ularning roziligi bilan (`*.private.jsonl`) — 1.0.0 dan
+  keyin ham davom etadi; har yangi holat o'lchovga qo'shiladi
+
+### Bosqich 2 — Audit va xavfsizlik (8b.7–8b.10, R12) → 1.1.0
+- [ ] 2.1 (siz) 8b.10 qarori: umumiy jamoa ish joyi yoki har kim faqat o'zinikini ko'radi
+- [ ] 2.2 8b.8 Case'ga saqlashda manba vaqti yo'q natija: `saved_at`, chaqiruvchi dict'i o'zgarmaydi — S
+- [ ] 2.3 8b.9 Audit yozuvi fon vazifasida, eski yozuvlar soatiga bir marta tozalanadi — S
+- [ ] 2.4 8b.7 Sezgir o'qishlar auditi (shaxs kartasi, agent run, job — faqat birinchi o'qish) — S
+- [ ] 2.5 2.1 javobiga qarab: egalik (`owner` ustuni, filtrlar, testlar) yoki README'da aniq yozuv — S/M
+- [ ] 2.6 R12 Rasm hajmi stream paytida cheklanadi; watch signature 300 ta cheklovi — S
+- [ ] 2.7 Reviewer → reliz
+
+### Bosqich 3 — Bog'lash mustahkamligi → 1.2.0
+- [ ] 3.1 Jarayonlararo umumiy rate-limit (Redis orqali): dev.to, GitHub, Wikidata, Nominatim — M
+- [ ] 3.2 Klaster ichidagi bilvosita ziddiyat (A–B–C) vetosi — M; `eval_linkage.py` va Agent o'lchovi bilan
+- [ ] 3.3 2.7 Etalonga o'z scan'larimizdan real, qo'lda belgilangan holatlar — M
+- [ ] 3.4 Reviewer/QA → reliz
+
+### Bosqich 4 — Manbalar (test akkauntlar kerak)
+- [ ] 4.1 3.3 O'zbek saytlari ta'riflari — har biri mavjud username bilan jonli sinov
+- [ ] 4.2 (siz: test akkaunt) 4.5 Buzilgan Holehe modullari: Instagram, Google, GitHub, Discord
+- [ ] 4.3 4.6 Yangi modullar (OLX.uz, hh.uz, Uzum, Yandex, VK, Mail.ru) — Faza 4'dagi 4 bandli
+  xavfsizlik tekshiruvi bilan
+- [ ] 4.4 4.7 `HOLEHE_EXTENDED=1`
+- [ ] 4.5 (siz: test akkaunt) 4.3 Kanareyka: soxta salbiy natijani ushlash
+- [ ] 4.6 3b.5 egov reyestrlarini STIR bo'yicha birlashtirish — M/L
+
+### Bosqich 5 — Geolokatsiya va optimallashtirish
+- [ ] 5.1 G8 Mapillary/KartaView havolalari, quyosh/soya tahlili — M
+- [ ] 5.2 3.9 Social-Analyzer baholash (4.1 yetarli bo'lmasa; AGPL — alohida konteyner)
+- [ ] 5.3 "Optimallashtirish" bo'limi: Redis `appendonly`, memory/CPU limitlari, `investigate.py` va
+  `app.js`ni modullarga bo'lish, FastAPI `lifespan`
+
+**Sizdan kerak:** 8b.10 qarori (2.1), test akkauntlar (4.2, 4.5), rozilik bilan holatlar (1.8).
 
 ---
 
