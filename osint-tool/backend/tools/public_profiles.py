@@ -6,6 +6,7 @@ X, Facebook, Reddit, Wikimedia) are not fetched here: they are covered through
 search-engine indexes and manual-check links. Do not work around those blocks.
 """
 import asyncio
+import hashlib
 import html
 import os
 import re
@@ -13,6 +14,7 @@ from urllib.parse import quote, urlparse
 
 import httpx
 
+from cache import get_cached_json, set_cached_json
 from tools.base import ToolError
 from tools.domain_intel import DomainValidationError, normalize_domain
 from tools.hub_domains import is_hub_domain
@@ -72,7 +74,34 @@ def _github_headers() -> dict:
     return {"Authorization": f"Bearer {token}"} if token else {}
 
 
+# 10.2: without a token GitHub allows 60 calls an hour and one Agent run makes
+# ~10, so the 6th run in an hour lost the GitHub profile and its score dropped.
+# Answers are cached: profiles for a day, "no such user" for 6 hours.
+GITHUB_CACHE_TTL = 24 * 3600
+GITHUB_MISSING_TTL = 6 * 3600
+GITHUB_SEARCH_TTL = 3600
+_MISSING = {"__missing__": True}
+
+
+def _github_cache_key(url: str, params) -> str:
+    raw = url + "?" + "&".join(f"{k}={v}" for k, v in sorted((params or {}).items()))
+    return "osint:github:" + hashlib.sha256(raw.encode()).hexdigest()
+
+
 async def fetch_json(client: httpx.AsyncClient, url: str, missing=(404,), **kwargs):
+    if url.startswith(GITHUB_API):
+        key = _github_cache_key(url, kwargs.get("params"))
+        cached = await get_cached_json(key)
+        if cached is not None:
+            return None if cached == _MISSING else cached
+        data = await _fetch_json(client, url, missing, **kwargs)
+        ttl = GITHUB_SEARCH_TTL if "/search/" in url else GITHUB_CACHE_TTL
+        await set_cached_json(key, _MISSING if data is None else data, GITHUB_MISSING_TTL if data is None else ttl)
+        return data
+    return await _fetch_json(client, url, missing, **kwargs)
+
+
+async def _fetch_json(client: httpx.AsyncClient, url: str, missing=(404,), **kwargs):
     if url.startswith(GITHUB_API):
         kwargs["headers"] = {**kwargs.get("headers", {}), **_github_headers()}
     response = await client.get(url, **kwargs)

@@ -8,6 +8,14 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 (`vX.Y.Z`) va GitHub Release oladi.
 
 ## [Unreleased]
+Aniqlik (Faza 10.1–10.2).
+
+### Tuzatildi
+- **Bir xil username, boshqa odam (10.1)**: ismi, tug'ilgan yili yoki shahri tavsifga zid profil
+  nomzodga qo'shilmaydi, "boshqa odam bo'lishi mumkin" deb sababi bilan alohida ko'rsatiladi
+  (UI va PDF karta); tasdiqlanmagan profil bio'sidagi sayt avtomatik o'qilmaydi.
+- **Ball o'zgaruvchanligi (10.2)**: GitHub javoblari 24 soat keshlanadi (kalitsiz limit 60/soat
+  bir necha run'dan keyin tugardi); javob bermagan manbalar nomzodda "tekshirilmadi" deb yoziladi.
 
 ## [0.9.0] — 2026-11-21
 O'quv kursining yakuniy moduli (Faza 9). Reja yangilandi: Faza 8b (review tuzatishlari), Faza 10 (aniqlik va 1.0.0).

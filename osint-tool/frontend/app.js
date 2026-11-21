@@ -1513,6 +1513,31 @@ async function agentDecide(candidateId, decision, card) {
   card.querySelector(".badge[class*='decision-']").replaceWith(agentDecisionBadge(value));
 }
 
+// 10.1: same username on another site, but the profile describes someone else
+function buildAgentSetAside(items) {
+  const box = document.createElement("details");
+  box.className = "agent-set-aside";
+  const summary = document.createElement("summary");
+  summary.textContent = `Same username, probably another person (${items.length}) — not used`;
+  box.appendChild(summary);
+  const list = document.createElement("ul");
+  items.forEach((item) => {
+    const li = document.createElement("li");
+    const url = safeHttpUrl(item.url);
+    const name = document.createElement(url ? "a" : "span");
+    name.textContent = item.platform || "profile";
+    if (url) {
+      name.href = url;
+      name.target = "_blank";
+      name.rel = "noopener noreferrer";
+    }
+    li.append(name, ` — ${item.reason}`);
+    list.appendChild(li);
+  });
+  box.appendChild(list);
+  return box;
+}
+
 function buildAgentCandidate(c, decision) {
   const card = document.createElement("div");
   card.className = `card agent-card level-${c.level}` + (decision ? ` decided-${decision}` : "");
@@ -1553,8 +1578,17 @@ function buildAgentCandidate(c, decision) {
     card.appendChild(ai);
   }
 
+  // 10.2: a source that did not answer is "not checked", not "nothing there"
+  if ((c.unchecked || []).length) {
+    const note = document.createElement("div");
+    note.className = "agent-unchecked";
+    note.textContent = `Not checked this time: ${c.unchecked.join(", ")} — the score may be lower than it should be. Run again later.`;
+    card.appendChild(note);
+  }
+
   card.appendChild(buildAgentContacts(c.contacts || []));
   if ((c.chain || []).length) card.appendChild(buildAgentChain(c.chain));
+  if ((c.set_aside || []).length) card.appendChild(buildAgentSetAside(c.set_aside));
 
   const members = document.createElement("div");
   members.className = "card-meta";
