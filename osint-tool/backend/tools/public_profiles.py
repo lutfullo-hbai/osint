@@ -10,7 +10,8 @@ import hashlib
 import html
 import os
 import re
-from urllib.parse import quote, urlparse
+import time
+from urllib.parse import quote, urlencode, urlparse
 
 import httpx
 
@@ -78,27 +79,33 @@ def _github_headers() -> dict:
 # ~10, so the 6th run in an hour lost the GitHub profile and its score dropped.
 # Answers are cached: profiles for a day, "no such user" for 6 hours.
 GITHUB_CACHE_TTL = 24 * 3600
-GITHUB_MISSING_TTL = 6 * 3600
+GITHUB_MISSING_TTL = 3600          # a new account shows up within the hour
 GITHUB_SEARCH_TTL = 3600
 _MISSING = {"__missing__": True}
 
 
-def _github_cache_key(url: str, params) -> str:
-    raw = url + "?" + "&".join(f"{k}={v}" for k, v in sorted((params or {}).items()))
+def _github_cache_key(url: str, params, missing) -> str:
+    raw = url + "?" + urlencode(sorted((params or {}).items())) + "#" + ",".join(map(str, sorted(missing)))
     return "osint:github:" + hashlib.sha256(raw.encode()).hexdigest()
 
 
 async def fetch_json(client: httpx.AsyncClient, url: str, missing=(404,), **kwargs):
-    if url.startswith(GITHUB_API):
-        key = _github_cache_key(url, kwargs.get("params"))
-        cached = await get_cached_json(key)
-        if cached is not None:
-            return None if cached == _MISSING else cached
-        data = await _fetch_json(client, url, missing, **kwargs)
-        ttl = GITHUB_SEARCH_TTL if "/search/" in url else GITHUB_CACHE_TTL
-        await set_cached_json(key, _MISSING if data is None else data, GITHUB_MISSING_TTL if data is None else ttl)
-        return data
-    return await _fetch_json(client, url, missing, **kwargs)
+    if not url.startswith(GITHUB_API):
+        return await _fetch_json(client, url, missing, **kwargs)
+    key = _github_cache_key(url, kwargs.get("params"), missing)
+    cached = await get_cached_json(key)
+    if cached is not None:
+        return None if cached == _MISSING else cached
+    started = time.time()
+    data = await _fetch_json(client, url, missing, **kwargs)
+    if isinstance(data, dict) and data.get("incomplete_results"):
+        return data                    # a search that timed out on GitHub's side: not an answer to keep
+    from services.data_wipe import was_wiped_since   # late import: services import this module
+    if await was_wiped_since(started):
+        return data                    # everything was deleted while this ran (8b.6)
+    ttl = GITHUB_SEARCH_TTL if "/search/" in url else GITHUB_CACHE_TTL
+    await set_cached_json(key, _MISSING if data is None else data, GITHUB_MISSING_TTL if data is None else ttl)
+    return data
 
 
 async def _fetch_json(client: httpx.AsyncClient, url: str, missing=(404,), **kwargs):

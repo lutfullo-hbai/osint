@@ -293,13 +293,14 @@ Kurs (`evidence_log.py`, v0.9.0 ✅):
 - [x] 8b.15 `evidence_log.py` uchun avtomatik testlar
 
 ## Faza 10 — Aniqlik va 1.0.0
-- [x] 10.1 Boshqa odamning profili nomzodga noto'g'ri qo'shilishi — bog'lashdan oldin har bir username
-  natijasida ismi, tug'ilgan yili yoki shahri tavsifga (yoki ismi mos profilga) zid profil chetga olinadi
-  (`set_aside`, sababi bilan, UI va PDF'da); tasdiqlanmagan profil bio'sidagi sayt avtomatik o'qilmaydi.
-  Jonli: Docker Hub `torvalds` (Italiya) chetga olindi, "Italy" ziddiyati yo'qoldi
-- [x] 10.2 Ball o'zgaruvchanligi — sabab: GitHub API kalitsiz limiti (60/soat, bitta run ~10 so'rov),
-  GitHub profili tushib qolib ism/manzil bonuslari yo'qolardi (15.75 → 9.25). GitHub javoblari 24 soat
-  keshlanadi; javob bermagan manbalar nomzodda "tekshirilmadi" deb ko'rsatiladi (`unchecked`)
+- [x] 10.1 Boshqa odamning profili nomzodga noto'g'ri qo'shilishi — bitta username ostidagi aralash
+  profillardan boshqa odamniki chetga olinadi (`set_aside`, sababi bilan, UI va PDF'da), faqat
+  ishonchli belgilar bilan: ism aniq boshqa (imlo/translit/laqab bir xil hisoblanadi), tug'ilgan yil
+  zid, yoki shahar VA ish joyi birga zid (bittasi foydalanuvchi aytganiga). Tekshiruv har bir tugun
+  yaratilganda, pivotlar kuzatilishidan oldin; chetga olingan profil pivotlari tashlanadi.
+  QA review (2026-11-21) topgan 12 ta holat testlarda. Jonli: Docker Hub `torvalds` chetga olindi
+- [x] 10.2 Ball o'zgaruvchanligi — sabab: GitHub API kalitsiz limiti (60/soat, bitta run ~10 so'rov).
+  GitHub javoblari keshlanadi; javob bermagan manbalar nomzodda "tekshirilmadi" (`unchecked`)
 - [ ] 10.3 = 6.8 Belgilangan holatlar bilan baholash: 20–30 ta javobi ma'lum holat (o'zingiz va
   roziligi bor shaxslar), top-1/top-3 aniqlik, ball chegaralarini sozlash — M.
   Siz kerak: holatlar ro'yxati va to'g'ri javoblar
