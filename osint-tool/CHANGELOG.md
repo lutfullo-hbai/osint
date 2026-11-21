@@ -8,6 +8,8 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 (`vX.Y.Z`) va GitHub Release oladi.
 
 ## [Unreleased]
+
+## [0.9.0] — 2026-11-21
 O'quv kursining yakuniy moduli (Faza 9). Reja yangilandi: Faza 8b (review tuzatishlari), Faza 10 (aniqlik va 1.0.0).
 
 ### Qo'shildi
@@ -163,7 +165,8 @@ Birinchi to'liq to'plam.
 - Digital Footprint hisoboti, entity graph, PDF eksport.
 - Lokal Qwen (Ollama) orqali AI xulosa va rasm tahlili.
 
-[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/lutfullo-hbai/osint/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/lutfullo-hbai/osint/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/lutfullo-hbai/osint/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/lutfullo-hbai/osint/compare/v0.7.0...v0.7.1
