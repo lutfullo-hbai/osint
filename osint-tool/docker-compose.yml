@@ -150,6 +150,22 @@ services:
       - osint-net
     restart: unless-stopped
 
+  globe:
+    # gods-eye-view (MIT code; its data layers keep their own terms, see its
+    # DATA_SOURCES.md): a 3D globe of public feeds - flights, ships, satellites,
+    # fires, Sentinel-2 imagery, news. Opt-in:  docker compose --profile geo up -d globe
+    # Built from a pinned upstream commit (not a branch), so an upstream change
+    # cannot slip in unreviewed. Runs as its own non-root user, loopback only:
+    # it proxies any provider keys you paste into it, so never publish it wider.
+    # Keyless layers only by default; paid keys (Google Maps, OpenAI) are not needed.
+    profiles: ["geo"]
+    build:
+      context: https://github.com/bilawalsidhu/gods-eye-view.git#918435ddc7bd4529666ddafde65e68ad97fab4ce
+    container_name: osint-globe
+    ports:
+      - "127.0.0.1:4173:4173"
+    restart: unless-stopped
+
   tests:
     profiles: ["test"]
     build:

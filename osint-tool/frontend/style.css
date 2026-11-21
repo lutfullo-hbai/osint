@@ -196,6 +196,8 @@ body {
   cursor: pointer;
   transition: color 0.2s, background 0.2s, box-shadow 0.25s;
 }
+.tab-link { text-decoration: none; display: inline-flex; align-items: center; }
+.tab-link[hidden] { display: none; }
 .tab:hover {
   color: var(--text);
   background: rgba(255, 255, 255, 0.05);

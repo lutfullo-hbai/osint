@@ -9,6 +9,11 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 
 ## [Unreleased]
 
+### Qo'shildi
+- **Globe (ixtiyoriy)**: gods-eye-view — ochiq manbalar 3D globusi (samolyot, kema, sun'iy yo'ldosh,
+  yong'in, Sentinel-2) alohida servis sifatida: `docker compose --profile geo up -d globe`. Aniq upstream
+  commit'idan build, faqat `127.0.0.1:4173`. Servis ishlasa konsolda "Globe ↗" havolasi chiqadi.
+
 ## [0.10.0] — 2026-11-21
 Aniqlik (Faza 10.1–10.3, 10.5).
 
