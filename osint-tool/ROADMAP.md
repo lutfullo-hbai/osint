@@ -4,7 +4,7 @@ Holat va to'liq reja (2026-11-16). Manba: o'zimizning sinovlar, reviewer va rese
 Bajarilganlari `[x]`, qisman bajarilganlari `[~]` bilan belgilanadi. Hajm: S = kichik (≤ yarim kun),
 M = o'rta (1–2 kun), L = katta (3+ kun).
 
-Ish tartibi (2026-11-21 dan): **Faza 8b (v0.8.1 hotfix)** → v0.9.0 (Faza 9 + 8b-kurs) →
+Ish tartibi (2026-11-21 dan): Faza 8b (v0.8.1 ✅) → **v0.9.0 (Faza 9 + 8b-kurs)** →
 **Faza 10** (aniqlik: ma'lum xatolar + 6.8) → **1.0.0** → optimallashtirish.
 Har bir ish `feat/*` branch'da: testlar o'tadi → dev → stage → main (PR, CI, teg, release).
 
@@ -256,10 +256,10 @@ UI va sozlash:
 
 ---
 
-## Faza 8b — Uchinchi review tuzatishlari (2026-11-21, reviewer: `v0.7.1..dev`) — 8b.1–8b.6 ✅ (keyingi release'da)
+## Faza 8b — Uchinchi review tuzatishlari (2026-11-21, reviewer: `v0.7.1..dev`) — 8b.1–8b.6 ✅ v0.8.1
 Reviewer xulosasi: o'zgartirish kerak (3 ta jiddiy). Faza 9'da jiddiy muammo yo'q; XSS topilmadi.
 
-Jiddiy (v0.8.1, har biri test bilan):
+Jiddiy (v0.8.1 ✅, har biri test bilan):
 - [x] 8b.1 DNS rebinding: `Host` tekshiruvi yo'q — kalitsiz rejimda begona sayt `DELETE /api/data`
   yoki `GET /api/audit` chaqira oladi. `TrustedHostMiddleware` (localhost, 127.0.0.1 + env),
   kalitsiz rejimda o'chirish uchun `Origin` ham `ALLOWED_ORIGINS` bilan solishtiriladi — S
@@ -269,7 +269,7 @@ Jiddiy (v0.8.1, har biri test bilan):
   tekshirilmaydi, `VACUUM` xatosida Redis tozalanmaydi. Tartib: VACUUM → checkpoint, natija
   tekshiriladi, ogohlantirish qaytariladi, Redis baribir tozalanadi — S
 
-Kichikroq (v0.8.1 ga qo'shiladi):
+Kichikroq (v0.8.1 ✅):
 - [x] 8b.4 `OSINT_USERS`'da `admin`/`local`/`refused` nomlari rad etiladi (admin huquqini olib qo'yadi)
 - [x] 8b.5 Noto'g'ri `AUDIT_RETENTION_DAYS` backend'ni yiqitmaydi (standart qiymat + ogohlantirish)
 - [x] 8b.6 To'liq o'chirish to'liqroq: passiv DNS bazasidagi qidirilgan domenlar, `arq:in-progress`,

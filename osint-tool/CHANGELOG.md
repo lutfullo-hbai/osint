@@ -8,8 +8,17 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 (`vX.Y.Z`) va GitHub Release oladi.
 
 ## [Unreleased]
-Xavfsizlik tuzatishlari (uchinchi review, Faza 8b) va o'quv kursining yakuniy moduli (Faza 9).
-Reja yangilandi: Faza 8b (review tuzatishlari), Faza 10 (aniqlik va 1.0.0).
+O'quv kursining yakuniy moduli (Faza 9). Reja yangilandi: Faza 8b (review tuzatishlari), Faza 10 (aniqlik va 1.0.0).
+
+### Qo'shildi
+- **9-modul: yakuniy loyiha** (`09-yakuniy-loyiha/`): self-OSINT metodologiyasi, dalillarni
+  hujjatlashtirish, Admiralty bahosi, 8 bosqichli loyiha va baholash mezonlari,
+  hisobot va rozilik shablonlari.
+- `evidence_log.py`: dalil jurnali — URL, UTC vaqt, SHA-256, nusxa va `verify`, NEXUS JSON
+  eksportidan import (`retrieved_at` bilan), Markdown ilova.
+
+## [0.8.1] — 2026-11-21
+Xavfsizlik tuzatishlari (uchinchi review, Faza 8b).
 
 ### Xavfsizlik
 - **DNS rebinding**: kalitsiz rejimda API faqat `localhost`, `127.0.0.1`, `::1` nomlariga javob beradi
@@ -23,13 +32,6 @@ Reja yangilandi: Faza 8b (review tuzatishlari), Faza 10 (aniqlik va 1.0.0).
   qidirilgan domenlarning DNS tarixi va `arq:retry` ham o'chadi; o'chirish paytida tugagan
   qidiruv natijasi saqlanmaydi; xabarda kesh muddati to'g'rilandi (24 soat).
 - Noto'g'ri `AUDIT_RETENTION_DAYS` backend'ni to'xtatmaydi.
-
-### Qo'shildi
-- **9-modul: yakuniy loyiha** (`09-yakuniy-loyiha/`): self-OSINT metodologiyasi, dalillarni
-  hujjatlashtirish, Admiralty bahosi, 8 bosqichli loyiha va baholash mezonlari,
-  hisobot va rozilik shablonlari.
-- `evidence_log.py`: dalil jurnali — URL, UTC vaqt, SHA-256, nusxa va `verify`, NEXUS JSON
-  eksportidan import (`retrieved_at` bilan), Markdown ilova.
 
 ## [0.8.0] — 2026-11-19
 Qonuniy va operatsion talablar (Faza 8).
@@ -155,7 +157,8 @@ Birinchi to'liq to'plam.
 - Digital Footprint hisoboti, entity graph, PDF eksport.
 - Lokal Qwen (Ollama) orqali AI xulosa va rasm tahlili.
 
-[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/lutfullo-hbai/osint/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/lutfullo-hbai/osint/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/lutfullo-hbai/osint/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/lutfullo-hbai/osint/compare/v0.6.0...v0.7.0
