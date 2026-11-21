@@ -88,6 +88,13 @@ OSINT_API_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))") d
 ```
 
 Kalit kamida 16 belgi bo'lsin (qisqa bo'lsa ishga tushishda ogohlantirish chiqadi).
+`admin`, `local` va `refused` nomlari band: `OSINT_USERS`'da ular e'tiborga olinmaydi.
+
+**DNS rebinding himoyasi:** kalitsiz rejimda API faqat `localhost`, `127.0.0.1` va `::1`
+nomlari bilan kelgan so'rovlarga javob beradi; boshqa `Host` → 400. Shunday qilib siz
+ochgan begona sayt o'z domenini 127.0.0.1 ga yo'naltirib API'ni chaqira olmaydi.
+API'ni domen nomi bilan ishlatsangiz, `ALLOWED_HOSTS=osint.example.org` qo'ying.
+Kalitsiz rejimda "hammasini o'chirish" faqat konsol manzilidan (`ALLOWED_ORIGINS`) ishlaydi.
 Teskari proksi (nginx, Caddy) orqasida tarmoqqa ochsangiz, **albatta** kalit qo'ying:
 proksi orqali kelgan so'rov lokal ko'rinadi.
 
@@ -236,7 +243,8 @@ mavjud bo'lmasa, jarayon ichidagi xotira keshiga fallback qiladi.
 Har bir qidiruv, saqlash, o'chirish va yuklab olish (PDF, graf) lokal SQLite'ga
 yoziladi: **kim** (kalit nomi yoki `local`), **qachon** (UTC), **nima** (yo'l,
 kategoriya, qidirilgan matn), client IP va status. Rad etilgan so'rovlar ham
-(`refused`, 401/403) yoziladi. Ko'rish: **Data** tabi yoki `GET /api/audit` (admin).
+(`refused`, 401/403) yoziladi, lekin bitta IP'dan daqiqasiga 20 tagacha; qolgani bitta
+"yana N ta rad etildi" yozuviga yig'iladi. Mavjud bo'lmagan yo'llarga so'rovlar yozilmaydi. Ko'rish: **Data** tabi yoki `GET /api/audit` (admin).
 
 - `AUDIT_RETENTION_DAYS=90` — eski yozuvlar avtomatik o'chiriladi
 - `AUDIT_LOG_QUERIES=0` — qidirilgan matn o'rniga faqat uning SHA-256 hash'i saqlanadi
@@ -260,10 +268,13 @@ topilmalar ham shu vaqtni ko'rsatadi.
 - **Hammasi**: **Data** tabida "DELETE ALL" deb yozib, yoki
   `DELETE /api/data {"confirm": "DELETE ALL", "include_audit": false}` (admin).
   O'chiriladi: case'lar, topilmalar, watch'lar, Agent run'lar, Redis'dagi kesh va job
-  natijalari. `secure_delete` + `VACUUM` bilan diskda nusxa qolmaydi. Ochiq
-  ma'lumotlar to'plamlari (sanksiyalar, reyestrlar) shaxsiy ma'lumot emas va qoladi.
-  Audit log faqat `include_audit: true` bo'lsa o'chadi; o'chirish so'rovining o'zi
-  audit'ga yoziladi.
+  natijalari, qidirilgan domenlarning DNS tarixi. `secure_delete` + `VACUUM` bilan diskda
+  nusxa qolmaydi. Baza shu payt band bo'lsa (fonda qidiruv ishlayotgan bo'lsa), javobda
+  ogohlantirish chiqadi — keyinroq qayta bosing. O'chirish paytida tugagan qidiruv
+  natijasi keshga va job natijasiga yozilmaydi. Ochiq ma'lumotlar to'plamlari
+  (sanksiyalar, reyestrlar) shaxsiy ma'lumot emas va qoladi.
+  Audit log faqat `include_audit: true` bo'lsa o'chadi (unda qidirilgan matnlar bor,
+  agar `AUDIT_LOG_QUERIES=0` bo'lmasa); o'chirish so'rovining o'zi audit'ga yoziladi.
 
 ## Testlar
 

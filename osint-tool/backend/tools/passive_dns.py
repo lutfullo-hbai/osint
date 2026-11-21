@@ -83,6 +83,20 @@ def record_self(domain: str, records: list[tuple[str, list[str]]], path: str = D
     upsert(domain, rows, "self", path)
 
 
+def wipe(path: str | None = None) -> int:
+    """Full deletion (8b.6): every domain in this store was one somebody searched."""
+    path = path or DB_PATH
+    if not os.path.exists(path):
+        return 0
+    with _connect(path) as conn:
+        removed = conn.execute("DELETE FROM observation").rowcount
+        conn.execute("DELETE FROM fetched")
+    with _connect(path) as conn:
+        conn.execute("VACUUM")
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    return removed
+
+
 def _fresh(domain: str, source: str, path: str) -> bool:
     with _connect(path) as conn:
         row = conn.execute("SELECT at FROM fetched WHERE domain=? AND source=?", (domain, source)).fetchone()
