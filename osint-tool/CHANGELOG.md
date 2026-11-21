@@ -9,6 +9,9 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-11-21
+Ixtiyoriy Globe servisi (gods-eye-view).
+
 ### Qo'shildi
 - **Globe (ixtiyoriy)**: gods-eye-view — ochiq manbalar 3D globusi (samolyot, kema, sun'iy yo'ldosh,
   yong'in, Sentinel-2) alohida servis sifatida: `docker compose --profile geo up -d globe`. Aniq upstream
@@ -197,7 +200,8 @@ Birinchi to'liq to'plam.
 - Digital Footprint hisoboti, entity graph, PDF eksport.
 - Lokal Qwen (Ollama) orqali AI xulosa va rasm tahlili.
 
-[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/lutfullo-hbai/osint/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/lutfullo-hbai/osint/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/lutfullo-hbai/osint/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/lutfullo-hbai/osint/compare/v0.8.0...v0.8.1
