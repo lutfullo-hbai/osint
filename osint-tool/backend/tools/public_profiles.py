@@ -87,7 +87,38 @@ _MISSING = {"__missing__": True}
 GITLAB_API = "https://gitlab.com/api/"
 # 10.5: without a key GitLab's users endpoint answered "rate limit" in 24 of 30
 # evaluation runs; its answers are cached like GitHub's
-_CACHED_APIS = {GITHUB_API: "github", GITLAB_API: "gitlab"}
+DEVTO_API = "https://dev.to/api/"
+_CACHED_APIS = {GITHUB_API: "github", GITLAB_API: "gitlab", DEVTO_API: "devto"}
+
+# 10.5f: DEV Community answered "HTTP 429" in almost every evaluation run. Measured
+# 2026-11-21: parallel calls get 429 with "Retry-After: 1", and calling on while refused
+# keeps the refusal going; one call a second in sequence always passed. Calls to these
+# APIs are spaced out (per process), and one 429 with a short Retry-After is retried once.
+_PACED_APIS = {DEVTO_API: 1.0}     # seconds between calls
+PACE_MAX_WAIT = 30.0               # a longer queue fails fast instead of stalling a scan
+RETRY_AFTER_MAX = 5.0
+_next_slot: dict[str, float] = {}
+_sleep = asyncio.sleep             # tests replace it
+
+
+async def _pace(base: str, interval: float) -> None:
+    """Take the next free call slot for this API and wait for it. No lock is
+    needed: the slot is reserved before the first await."""
+    now = time.monotonic()
+    slot = max(now, _next_slot.get(base, 0.0))
+    if slot - now > PACE_MAX_WAIT:
+        raise ToolError("rate limit: too many queued requests, try again later.")
+    _next_slot[base] = slot + interval
+    if slot > now:
+        await _sleep(slot - now)
+
+
+def _retry_after(value) -> float | None:
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError):
+        return None                    # an HTTP date or garbage: do not guess
+    return seconds if 0 <= seconds <= RETRY_AFTER_MAX else None
 
 
 def _github_cache_key(url: str, params, missing, prefix: str = "github") -> str:
@@ -118,7 +149,18 @@ async def fetch_json(client: httpx.AsyncClient, url: str, missing=(404,), **kwar
 async def _fetch_json(client: httpx.AsyncClient, url: str, missing=(404,), **kwargs):
     if url.startswith(GITHUB_API):
         kwargs["headers"] = {**kwargs.get("headers", {}), **_github_headers()}
+    paced = next(((base, gap) for base, gap in _PACED_APIS.items() if url.startswith(base)), None)
+    if paced:
+        await _pace(*paced)
     response = await client.get(url, **kwargs)
+    if paced and response.status_code == 429:
+        delay = _retry_after(response.headers.get("retry-after"))
+        if delay is not None:
+            base, gap = paced
+            # everyone waits out the refusal, not only this call
+            _next_slot[base] = max(_next_slot.get(base, 0.0), time.monotonic() + delay)
+            await _pace(base, gap)
+            response = await client.get(url, **kwargs)
     if response.status_code in missing:
         return None
     if response.status_code == 429:
@@ -262,7 +304,7 @@ async def keybase_profile(client, username):
 
 async def devto_profile(client, username):
     data = await fetch_json(
-        client, f"https://dev.to/api/users/by_username?url={username}"
+        client, f"{DEVTO_API}users/by_username", params={"url": username}
     )
     if not data:
         return None
