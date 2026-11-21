@@ -139,16 +139,12 @@ async def test_deep_scan_follows_the_age_confirmed_account_as_knowledge_base(mon
 # ---------------- M1 (QA 10.5b): age confirmation is weaker than a unique-name KB hit ----------------
 
 def test_age_confirmed_pivot_is_weaker_than_a_curated_kb_hit():
-    from services.agent import POSSIBLE_LEAD, STRONG_LEAD
+    from services.agent import POSSIBLE_LEAD
     from services.correlate import B_AGE_CONFIRMED, B_KB
-    from services.names import name_bits
-    # a namesake picked only by the age the user gave is a lead to check, not "strong":
-    # on its own it lands in [possible, strong), and even WITH the unavoidable same-name
-    # bonus in rank() it must stay below strong (strong needs more, independent evidence).
-    max_name_bonus = name_bits(frozenset({"aaaa", "bbbb", "cccc"}))     # the 2.5 cap
-    assert B_AGE_CONFIRMED < B_KB
-    assert POSSIBLE_LEAD <= B_AGE_CONFIRMED < STRONG_LEAD
-    assert B_AGE_CONFIRMED + max_name_bonus < STRONG_LEAD
+    # age-confirmation ranks the person as well as a knowledge-base hit (so the right
+    # person ranks first); the "not strong without corroboration" guarantee is enforced
+    # by rank()'s level cap, tested in test_wrong_namesake_* and test_rank_caps_*.
+    assert POSSIBLE_LEAD <= B_AGE_CONFIRMED <= B_KB
 
 
 @pytest.mark.asyncio

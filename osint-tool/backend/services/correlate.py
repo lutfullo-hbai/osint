@@ -30,12 +30,13 @@ MIN_HANDLE_LEN = 4
 # (contradictions) argue against it.
 B_KB = 6.0             # a curated knowledge base (Wikidata) lists the account
 # 10.5b: a knowledge base lists several people with this name and we picked the
-# one whose birth year fits the age you gave. Weaker than a unique-name KB hit:
-# the age is often an estimate, so this alone is a lead ("possible"), not "strong".
-# Kept low enough that age-confirmation PLUS the (unavoidable) same-name bonus in
-# rank() — up to name_bits' 2.5 — still stays below STRONG_LEAD (6.0): a namesake
-# becomes "strong" only with further independent corroboration, never on age alone.
-B_AGE_CONFIRMED = 3.0
+# one whose birth year fits the age you gave. For RANKING this is as good as a
+# unique-name hit (it is our best guess at who they are), so the right person
+# ranks first. CONFIDENCE is handled separately: rank() caps an age-confirmed
+# candidate at "possible" unless independent evidence corroborates it, because
+# an age (often an estimate) is not proof. So the weight here is ranking power,
+# and never by itself produces a "strong" level.
+B_AGE_CONFIRMED = B_KB
 B_STATED_EMAIL = 6.0   # a profile itself publishes the email being investigated
 B_EMAIL = 5.0          # the same specific email address on two records
 B_ROLE_EMAIL = 1.0     # the same role address (info@, admin@): many people
