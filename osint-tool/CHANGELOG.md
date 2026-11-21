@@ -9,6 +9,11 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 
 ## [Unreleased]
 
+### Qo'shildi
+- **heretic (alohida vosita)**: `tools/heretic/run.sh` — modelni qayta o'qitmasdan o'zgartirish
+  (heretic 2.1.0, AGPL; o'z virtualenv'ida, NEXUS uni chaqirmaydi). Standart konfiguratsiya `nosyco`
+  (xushomad kamayadi); Ollama'ga qo'shish yo'riqnomasi `tools/heretic/README.md`'da.
+
 ## [0.11.0] — 2026-11-21
 Ixtiyoriy Globe servisi (gods-eye-view).
 
