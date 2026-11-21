@@ -11,11 +11,17 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 Aniqlik (Faza 10.1–10.2).
 
 ### Tuzatildi
-- **Bir xil username, boshqa odam (10.1)**: ismi, tug'ilgan yili yoki shahri tavsifga zid profil
-  nomzodga qo'shilmaydi, "boshqa odam bo'lishi mumkin" deb sababi bilan alohida ko'rsatiladi
-  (UI va PDF karta); tasdiqlanmagan profil bio'sidagi sayt avtomatik o'qilmaydi.
-- **Ball o'zgaruvchanligi (10.2)**: GitHub javoblari 24 soat keshlanadi (kalitsiz limit 60/soat
-  bir necha run'dan keyin tugardi); javob bermagan manbalar nomzodda "tekshirilmadi" deb yoziladi.
+- **Bir xil username, boshqa odam (10.1)**: bitta username ostida bir nechta odamning profillari
+  bo'lsa, boshqa odamniki chetga olinadi va sababi bilan alohida ko'rsatiladi (UI va PDF karta).
+  Faqat ishonchli belgilar bo'yicha: ism aniq boshqa (kirill/lotin imlosi va laqab bir xil ism
+  hisoblanadi), tug'ilgan yil siz aytgan yoshga mos emas, yoki shahar VA ish joyi birga farq qiladi
+  (kamida bittasi siz aytganiga zid). Ajratish profil tekshirilishi bilanoq, uning havolalari
+  kuzatilishidan oldin bajariladi; chetga olingan profilning havolalari kuzatilmaydi.
+  Tasdiqlanmagan profil bio'sidagi sayt avtomatik o'qilmaydi. Bio ichidagi "Company name:",
+  "Previous location:" endi ism yoki manzil deb o'qilmaydi.
+- **Ball o'zgaruvchanligi (10.2)**: GitHub javoblari keshlanadi (profil 24 soat, "yo'q" 1 soat;
+  qisman qidiruv natijasi va o'chirish paytida kelgan javob keshlanmaydi); javob bermagan
+  manbalar nomzodda "tekshirilmadi" deb yoziladi.
 
 ## [0.9.0] — 2026-11-21
 O'quv kursining yakuniy moduli (Faza 9). Reja yangilandi: Faza 8b (review tuzatishlari), Faza 10 (aniqlik va 1.0.0).

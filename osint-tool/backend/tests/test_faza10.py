@@ -47,14 +47,21 @@ def test_profile_of_another_person_is_set_aside():
     assert moved == 1
     assert [i["platform"] for i in node["results"]] == ["GitHub", "Bluesky", "Telegram"]
     assert node["set_aside"][0]["platform"] == "Docker Hub"
-    assert "Italy" in node["set_aside"][0]["reason"]
+    # two soft mismatches together (town AND workplace of the GitHub profile)
+    assert "Italy" in node["set_aside"][0]["reason"] and "DoLoop" in node["set_aside"][0]["reason"]
+    assert "info" not in node["set_aside"][0]                   # the stranger's bio is not kept
     assert node["anchored"] == ["https://github.com/torvalds"]
 
 
-def test_anchor_profile_gives_the_town_when_the_user_did_not():
+def test_anchor_values_alone_do_not_set_a_profile_aside():
+    # town and workplace differ only from the GitHub profile, not from anything the
+    # user said: maybe the same person before a move - kept (a score penalty only)
     nodes = _nodes(GITHUB, DOCKER)
     _target("linus torvalds").split_profiles(nodes)
-    assert [a["platform"] for a in nodes[1]["set_aside"]] == ["Docker Hub"]   # Italy vs Portland, OR
+    assert "set_aside" not in nodes[1]
+    nodes = _nodes(GITHUB, DOCKER)
+    _target("linus torvalds from Portland").split_profiles(nodes)   # the user's town + GitHub's workplace
+    assert [a["platform"] for a in nodes[1]["set_aside"]] == ["Docker Hub"]
 
 
 def test_other_name_or_birth_year_is_set_aside():
@@ -121,7 +128,7 @@ def test_unchecked_sources_are_read_from_warnings():
                            "45 site hit(s) ignored: those sites also report a random username",
                            "Hacker News: HTTP 400.", "GitLab: HTTP 503.", "Bluesky: ConnectError"],
               "failed_sources": ["Maigret"]}
-    assert unchecked_sources(result) == ["Bluesky", "GitHub", "GitLab", "Maigret"]
+    assert unchecked_sources(result) == ["Bluesky", "GitHub", "GitLab", "Hacker News", "Maigret"]
 
 
 def test_candidate_lists_sources_that_did_not_answer():
@@ -163,3 +170,157 @@ async def test_github_rate_limit_is_not_cached():
             with pytest.raises(Exception):
                 await public_profiles.fetch_json(client, "https://api.github.com/users/torvalds")
     assert len(calls) == 2                       # a failure is retried next time, not remembered
+
+
+# ---------------- QA regressions (10.1 / 10.2 review) ----------------
+
+def _one(info, target_text, platform="Mastodon"):
+    """Set-aside entries for the probed profile only (GitHub = Linus is there as context)."""
+    nodes = _nodes(GITHUB, {"platform": platform, "url": f"https://{platform.lower()}.example/torvalds",
+                            "status": "found", "info": info})
+    _target(target_text).split_profiles(nodes)
+    return [a for a in nodes[1].get("set_aside") or [] if a["platform"] == platform]
+
+
+@pytest.mark.parametrize("info,target_text", [
+    ("Location: USA", "linus torvalds 56 years old from Portland"),
+    ("Location: Oregon", "linus torvalds 56 years old from Portland"),
+    ("Location: remote", "linus torvalds 56 years old from Portland"),
+    ("Location: Helsinki", "linus torvalds 56 years old from Portland"),          # people move
+    ("Location: Uzbekistan", "Lutfullo Abdubaniyev 19 yosh Toshkentdan"),
+    ("Location: Moscow, Russia", "Lutfullo Abdubaniyev 19 yosh Namangandan"),
+    ("Company: Transmeta; Location: Santa Clara", "linus torvalds 56 years old"),  # alone: name decides
+])
+def test_one_soft_mismatch_never_sets_a_profile_aside(info, target_text):
+    assert _one(info, target_text) == []
+
+
+@pytest.mark.parametrize("name,target_text", [
+    ("Якубжон Юлдашев", "Yoqubjon Yo'ldoshev 30 yosh"),
+    ("Yakubjon Yuldashev", "Yoqubjon Yo'ldoshev 30 yosh"),
+    ("Лутфулло Абдубаниев", "Lutfullo Abdubaniyev 19 yosh"),
+    ("Sasha P.", "Aleksandr Petrov"),
+    ("Linus Benedict Torvalds", "linus torvalds"),
+])
+def test_spelling_variants_and_nicknames_are_the_same_person(name, target_text):
+    assert _one(f"Name: {name}", target_text) == []
+
+
+def test_bio_labels_are_not_read_as_fields():
+    assert _one("Bio: hacker; Company name: Linux Foundation; Previous location: Italy",
+                "linus torvalds 56 years old from Portland") == []
+    from services.correlate import _LOC_RE, _NAME_RE
+    assert _NAME_RE.findall("Bio: x; Company name: Linux Foundation") == []
+    assert _LOC_RE.findall("Previous location: Italy; Location: Portland") == ["Portland"]
+
+
+def test_a_namesake_with_the_same_name_is_not_trusted():
+    # same name, other age and town: not an anchor, and set aside by its birth year
+    namesake = {"platform": "Docker Hub", "url": "https://hub.docker.com/u/torvalds", "status": "found",
+                "info": "Name: Linus Torvalds; Location: Milan, Italy; Born: 1999"}
+    nodes = _nodes(GITHUB, namesake)
+    _target().split_profiles(nodes)
+    assert [a["platform"] for a in nodes[1]["set_aside"]] == ["Docker Hub"]
+    assert nodes[1]["anchored"] == ["https://github.com/torvalds"]
+
+
+def test_a_common_name_anchor_does_not_push_out_real_profiles():
+    github = {"platform": "GitHub", "url": "https://github.com/akarimov", "status": "found",
+              "info": "Name: Aziz Karimov; Location: Moscow"}
+    bluesky = {"platform": "Bluesky", "url": "https://bsky.app/profile/akarimov", "status": "found",
+               "info": "Location: Tashkent"}
+    nodes = _nodes(github, bluesky)
+    agent.Target(parse_request("Aziz Karimov", TODAY)).split_profiles(nodes)
+    assert "set_aside" not in nodes[1]
+
+
+def test_pivots_of_a_set_aside_profile_are_dropped():
+    docker = {**DOCKER, "info": "Company: DoLoop srls; Location: Italy; Website: doloop.it"}
+    nodes = _nodes(GITHUB, docker)
+    nodes[1]["pivots"] = [{"type": "domain", "value": "doloop.it", "via": "profile_link"},
+                          {"type": "username", "value": "torvalds", "via": "profile_link"}]
+    _target().split_profiles(nodes)
+    assert [p["value"] for p in nodes[1]["pivots"]] == ["torvalds"]     # also in the kept GitHub URL
+    assert nodes[1]["dropped_pivots"] == 1
+
+
+@pytest.mark.asyncio
+async def test_deep_scan_does_not_follow_a_set_aside_profile(monkeypatch):
+    from services import deep_scan
+
+    async def username(value):
+        return {"status": "success", "results": [dict(GITHUB),
+                                                 {**DOCKER, "info": DOCKER["info"] + "; Website: doloop.it"}],
+                "count": 2, "pivots": [{"type": "domain", "value": "doloop.it", "via": "profile_link"}]}
+
+    async def domain(value):
+        return {"status": "success", "results": [{"platform": "WHOIS", "info": "Email: info@doloop.it"}],
+                "count": 1, "pivots": []}
+
+    monkeypatch.setitem(deep_scan._HANDLERS, "username", username)
+    monkeypatch.setitem(deep_scan._HANDLERS, "domain", domain)
+    target = _target("linus torvalds 56 years old from Portland, works at Linux Foundation")
+    scan = await deep_scan.run_deep_scan("torvalds", "username", expand=target.expand,
+                                         prepare=target.split_profiles)
+    # the seed is via None (not "stated") here, so it is checked like a found handle
+    assert {n["key"] for n in scan["nodes"]} == {"username:torvalds"}
+    assert scan["nodes"][0]["set_aside"][0]["platform"] == "Docker Hub"
+
+
+def test_contacts_from_an_email_found_on_a_profile_are_not_confirmed():
+    email = {"key": "email:x@doloop.it", "type": "email", "query": "x@doloop.it", "via": "profile_link",
+             "results": [{"platform": "Gravatar", "url": "https://gravatar.com/x", "status": "found",
+                          "info": "Website: doloop.it"}]}
+    assert all(not c["confirmed"] for c in agent.profile_contacts([email]))
+    # a knowledge base names one account (GitHub), not every site with the handle
+    listed = {**_nodes(BLUESKY)[1], "via": "knowledge_base"}
+    assert all(not c["confirmed"] for c in agent.profile_contacts([listed]))
+
+
+def test_odd_values_do_not_break_the_check():
+    weird = {"platform": "X", "url": "https://x.example", "status": "found", "name": ["not", "text"],
+             "info": None}
+    nodes = _nodes(GITHUB, weird)
+    nodes[1]["results"].append("just a string")
+    _target().split_profiles(nodes)                                    # no exception
+
+
+@pytest.mark.asyncio
+async def test_github_cache_survives_neither_a_wipe_nor_an_incomplete_search(monkeypatch):
+    from cache import _memory
+    from services import data_wipe
+
+    def handler(request):
+        if "/search/" in request.url.path:
+            return httpx.Response(200, json={"total_count": 0, "incomplete_results": True, "items": []})
+        return httpx.Response(200, json={"login": "torvalds"})
+
+    real_fetch = public_profiles._fetch_json
+
+    async def fetch_then_wipe(*args, **kwargs):
+        data = await real_fetch(*args, **kwargs)
+        await data_wipe.wipe_everything()           # deletion lands while the request is in flight
+        return data
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        await public_profiles.fetch_json(client, "https://api.github.com/search/users", params={"q": "x"})
+        assert not any(k.startswith("osint:github:") for k in _memory)
+        monkeypatch.setattr(public_profiles, "_fetch_json", fetch_then_wipe)
+        await public_profiles.fetch_json(client, "https://api.github.com/users/torvalds")
+    assert not any(k.startswith("osint:github:") for k in _memory)
+
+
+def test_github_cache_key_depends_on_missing_codes_and_encodes_params():
+    k = public_profiles._github_cache_key
+    url = "https://api.github.com/search/users"
+    assert k(url, {"q": "a"}, (404,)) != k(url, {"q": "a"}, (404, 422))
+    assert k(url, {"q": "a&b=c"}, (404,)) != k(url, {"q": "a", "b": "c"}, (404,))
+
+
+def test_failure_labels_are_clean():
+    result = {"warnings": ["Web search failed unexpectedly: ReadTimeout",
+                           "Truecaller skipped: host unreachable",
+                           "GitHub: HTTP 403.", "Bluesky: RemoteProtocolError",
+                           "Keybase: malformed JSON.", "GitLab: HTTP 404.",
+                           "45 site hit(s) ignored: those sites also report a random username"]}
+    assert unchecked_sources(result) == ["Bluesky", "GitHub", "Keybase", "Truecaller", "Web search"]

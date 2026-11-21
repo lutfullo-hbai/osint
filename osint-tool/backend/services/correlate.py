@@ -75,8 +75,10 @@ STOPLIST_HANDLES = {
 GENERIC_PLATFORM_THRESHOLD = 18  # a handle seen on >= this many platforms is generic
 
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
-_LOC_RE = re.compile(r"Location:\s*([^;]+)", re.IGNORECASE)
-_NAME_RE = re.compile(r"Name:\s*([^;]+)", re.IGNORECASE)
+# only a field label at the start of an "a: b; c: d" part - not "Company name:"
+# or "Previous location:" inside a bio (QA 10.1)
+_LOC_RE = re.compile(r"(?:^|;)\s*Location:\s*([^;]+)", re.IGNORECASE)
+_NAME_RE = re.compile(r"(?:^|;)\s*Name:\s*([^;]+)", re.IGNORECASE)
 _LINKED_RE = re.compile(r"Linked:\s*([^;]+)", re.IGNORECASE)
 _BORN_RE = re.compile(r"\b(?:Born|Birth year|Year of birth):\s*(\d{4})", re.IGNORECASE)
 _DHASH_RE = re.compile(r"\bdhash[:=]?\s*([0-9a-f]{8,})", re.IGNORECASE)

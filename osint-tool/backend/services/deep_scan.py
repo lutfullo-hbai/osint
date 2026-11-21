@@ -146,18 +146,23 @@ async def _emit(progress: Callable[[dict], Any] | None, event: dict) -> None:
         pass
 
 
-# "GitHub: GitHub API rate limit reached." - a source that did not answer
-_FAILED_SOURCE_RE = re.compile(r"^([^:]{2,40}): .*(rate limit|HTTP 5\d\d|HTTP 429|unreachable|Timeout|"
-                               r"timed out|ConnectError|ReadError)", re.IGNORECASE)
+# "GitHub: GitHub API rate limit reached." - a source that did not answer.
+# Investigators report failures as "<Source>: <message>" or
+# "<Source> failed unexpectedly: <Error>"; "45 site hit(s) ignored: ..." is not one.
+_FAILED_SOURCE_RE = re.compile(
+    r"^(?P<label>[A-Za-z][\w .\-]{1,40}?)(?: failed unexpectedly| skipped)?: (?P<msg>.*)$")
+_FAILURE_WORDS = re.compile(
+    r"rate limit|HTTP (?!404)\d{3}|unreachable|time(?:d)? ?out|Timeout|Error\b|malformed|"
+    r"[A-Z][a-z]+Error|ConnectError|failed", re.IGNORECASE)
 
 
 def unchecked_sources(result: dict) -> list[str]:
     """Sources that failed for this record: missing results there mean nothing."""
-    names = set(result.get("failed_sources") or [])
+    names = {str(n) for n in result.get("failed_sources") or []}
     for warning in result.get("warnings") or []:
         match = _FAILED_SOURCE_RE.match(str(warning))
-        if match:
-            names.add(match.group(1).strip())
+        if match and _FAILURE_WORDS.search(match.group("msg")) and not any(ch.isdigit() for ch in match.group("label")):
+            names.add(match.group("label").strip())
     return sorted(names)
 
 
@@ -260,6 +265,18 @@ async def run_deep_scan(
             unchecked = unchecked_sources(result)
             if unchecked:
                 node["unchecked"] = unchecked              # 10.2: not "absent", just not asked
+            if result.get("username_ideas"):
+                node["username_ideas"] = list(result["username_ideas"])
+            if prepare is not None:
+                # Agent (10.1): set aside profiles that describe someone else NOW,
+                # before this record's pivots are judged and followed
+                try:
+                    prepare([node])
+                except Exception as exc:  # noqa: BLE001 - a filter bug must not stop the scan
+                    warnings.append(f"profile check skipped for {ptype} '{value}': {type(exc).__name__}")
+                for aside in node.get("set_aside") or []:
+                    await _emit(progress, {"kind": "set_aside", "type": ptype, "query": value,
+                                           "platform": aside.get("platform"), "reason": aside.get("reason")})
             nodes.append(node)
 
             if result.get("warnings"):
@@ -273,13 +290,13 @@ async def run_deep_scan(
 
             # enqueue children — unless the caller judges this node not worth it
             follow = True
-            if expand is not None and depth + 1 <= MAX_DEPTH and _node_pivots(result):
+            if expand is not None and depth + 1 <= MAX_DEPTH and _node_pivots(node):
                 follow, reason = expand(node)
                 if not follow:
                     node["not_followed"] = reason
                     await _emit(progress, {"kind": "skip", "type": ptype, "query": value, "reason": reason})
             if follow and depth + 1 <= MAX_DEPTH:
-                for pivot in _followable_pivots(_node_pivots(result)):
+                for pivot in _followable_pivots(_node_pivots(node)):
                     ctype = pivot.get("type")
                     cvalue = pivot.get("value")
                     if not ctype or not cvalue or ctype not in _HANDLERS:
@@ -312,8 +329,6 @@ async def run_deep_scan(
             edge_seen.add(ek)
             uniq_edges.append(e)
 
-    if prepare is not None:
-        prepare(nodes)          # Agent: set aside profiles that describe someone else (10.1)
     correlation = correlate(nodes)
     # a weak, cited second opinion on unmerged candidates (never merges)
     reviewed = 0
