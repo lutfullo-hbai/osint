@@ -16,6 +16,12 @@ O'quv kursining yakuniy moduli (Faza 9). Reja yangilandi: Faza 8b (review tuzati
   hisobot va rozilik shablonlari.
 - `evidence_log.py`: dalil jurnali — URL, UTC vaqt, SHA-256, nusxa va `verify`, NEXUS JSON
   eksportidan import (`retrieved_at` bilan), Markdown ilova.
+- `evidence_log.py` uchun 7 ta avtomatik test; CI ularni ham ishga tushiradi.
+
+### Tuzatildi (review 8b.11–8b.14)
+- `evidence_log.py`: nusxa yo'li jurnal papkasiga nisbiy (`verify` istalgan papkadan ishlaydi);
+  5 MB dan katta sahifa `truncated` deb belgilanadi; buzilgan qatorlar dasturni to'xtatmaydi;
+  hisobotda URL va nomlar escape qilinadi; HTTP ulanish yopiladi.
 
 ## [0.8.1] — 2026-11-21
 Xavfsizlik tuzatishlari (uchinchi review, Faza 8b).
