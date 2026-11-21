@@ -4,8 +4,9 @@ Holat va to'liq reja (2026-11-16). Manba: o'zimizning sinovlar, reviewer va rese
 Bajarilganlari `[x]`, qisman bajarilganlari `[~]` bilan belgilanadi. Hajm: S = kichik (≤ yarim kun),
 M = o'rta (1–2 kun), L = katta (3+ kun).
 
-Ish tartibi: Faza 1b → 2 → 3 → 4 → 5 → 6 → 7. Har bir faza alohida branch'da bajariladi:
-testlar o'tadi, keyin commit va main'ga merge.
+Ish tartibi (2026-11-21 dan): **Faza 8b (v0.8.1 hotfix)** → v0.9.0 (Faza 9 + 8b-kurs) →
+**Faza 10** (aniqlik: ma'lum xatolar + 6.8) → **1.0.0** → optimallashtirish.
+Har bir ish `feat/*` branch'da: testlar o'tadi → dev → stage → main (PR, CI, teg, release).
 
 ---
 
@@ -224,7 +225,7 @@ UI va sozlash:
 - [x] 6.6 "Confirm / Reject / Undo" — qaror insonda, SQLite'da saqlanadi
 - [x] 6.7 Soxta natija filtri: kunlik canary (tasodifiy username) — har qanday nomni "topadigan"
       42 Sherlock + 4 Maigret sayti e'tiborsiz; bitta ishda ko'p handle'ni "topgan" sayt ham chiqariladi
-- [ ] 6.8 Haqiqiy belgilangan holatlar bilan baholash (2.7 bilan birga)
+- [ ] 6.8 Haqiqiy belgilangan holatlar bilan baholash (2.7 bilan birga) → Faza 10.3
 
 ## Faza 7 — Shaxs kartasi va yangi manbalar ✅
 - [x] 7.1 Shaxs kartasi + PDF: profil maydonlari manbasi bilan, e'lon qilingan kontaktlar, dalillar zanjiri
@@ -254,6 +255,52 @@ UI va sozlash:
 - [x] 9-modul: yakuniy loyiha (self-OSINT, manbalarni hujjatlashtirish) — `09-yakuniy-loyiha/`: nazariya, 8 bosqichli loyiha va baholash mezonlari, hisobot va rozilik shablonlari, `evidence_log.py` (URL, UTC vaqt, SHA-256, Admiralty bahosi, NEXUS JSON importi)
 
 ---
+
+## Faza 8b — Uchinchi review tuzatishlari (2026-11-21, reviewer: `v0.7.1..dev`) — v0.8.1 hotfix
+Reviewer xulosasi: o'zgartirish kerak (3 ta jiddiy). Faza 9'da jiddiy muammo yo'q; XSS topilmadi.
+
+Jiddiy (v0.8.1, har biri test bilan):
+- [ ] 8b.1 DNS rebinding: `Host` tekshiruvi yo'q — kalitsiz rejimda begona sayt `DELETE /api/data`
+  yoki `GET /api/audit` chaqira oladi. `TrustedHostMiddleware` (localhost, 127.0.0.1 + env),
+  kalitsiz rejimda o'chirish uchun `Origin` ham `ALLOWED_ORIGINS` bilan solishtiriladi — S
+- [ ] 8b.2 Audit'ni cheksiz to'ldirish: rad etilgan (401/403) va mavjud bo'lmagan yo'llar ham
+  limitsiz yoziladi. Faqat mavjud route'lar; `refused` yozuvlari IP bo'yicha cheklanadi — S
+- [ ] 8b.3 "Hammasini o'chirish" xato holatida yarim ishlaydi: `wal_checkpoint` natijasi
+  tekshirilmaydi, `VACUUM` xatosida Redis tozalanmaydi. Tartib: VACUUM → checkpoint, natija
+  tekshiriladi, ogohlantirish qaytariladi, Redis baribir tozalanadi — S
+
+Kichikroq (v0.8.1 ga qo'shiladi):
+- [ ] 8b.4 `OSINT_USERS`'da `admin`/`local`/`refused` nomlari rad etiladi (admin huquqini olib qo'yadi)
+- [ ] 8b.5 Noto'g'ri `AUDIT_RETENTION_DAYS` backend'ni yiqitmaydi (standart qiymat + ogohlantirish)
+- [ ] 8b.6 To'liq o'chirish to'liqroq: passiv DNS bazasidagi qidirilgan domenlar, `arq:in-progress`,
+  `arq:retry`, navbat; ishlayotgan job keyin keshni qayta to'ldirmasligi; "bir soatda eskiradi"
+  xabari to'g'rilanadi (qidiruv keshi 24 soat); Data tabida audit'da qidiruv matni qolishi aytiladi
+
+Keyinroq (S, Faza 10 bilan):
+- [ ] 8b.7 Audit'ga sezgir o'qishlar: shaxs kartasi JSON, `GET /api/agent/{id}` va
+  `GET /api/jobs/{id}` (faqat birinchi o'qish, polling emas)
+- [ ] 8b.8 Case'ga saqlashda manbadan vaqt kelmagan natija: `retrieved_at` emas, `saved_at`;
+  chaqiruvchi dict'i o'zgartirilmaydi
+- [ ] 8b.9 Audit yozuvi javobni kutdirmaydi (fon vazifasi); eski yozuvlarni tozalash soatiga bir marta
+- [ ] 8b.10 Savol (siz hal qilasiz): oddiy foydalanuvchi boshqalarning case/run'larini ko'rishi va
+  o'chirishi — umumiy jamoa ish joyimi yoki har kim faqat o'zinikini? Javobga qarab README yoki egalik
+
+Kurs (`evidence_log.py`, v0.9.0 bilan):
+- [ ] 8b.11 Nusxa yo'li jurnal papkasiga nisbiy (boshqa papkadan `verify` ishlasin)
+- [ ] 8b.12 5 MB dan katta sahifa: `truncated: true` belgisi (hash qisman kontentdan)
+- [ ] 8b.13 Buzilgan yoki `id`/`url`siz qator dasturni to'xtatmaydi
+- [ ] 8b.14 Hisobot jadvalida URL escape qilinadi; HTTP ulanish yopiladi
+- [ ] 8b.15 `evidence_log.py` uchun avtomatik testlar
+
+## Faza 10 — Aniqlik va 1.0.0
+- [ ] 10.1 Boshqa odamning profili nomzodga noto'g'ri qo'shilishi (misol: `torvalds.bsky.social`
+  Linus Torvalds klasteriga tushgan) — korrelyatsiya qoidasini tuzatish, test bilan — S/M
+- [ ] 10.2 Bir xil qidiruvda ball o'zgaruvchanligi (9.25 va 15.75): sababini aniqlash
+  (GitHub so'rov cheklovi?), manba ishlamasa ball "noma'lum" deb belgilanadi — S/M
+- [ ] 10.3 = 6.8 Belgilangan holatlar bilan baholash: 20–30 ta javobi ma'lum holat (o'zingiz va
+  roziligi bor shaxslar), top-1/top-3 aniqlik, ball chegaralarini sozlash — M.
+  Siz kerak: holatlar ro'yxati va to'g'ri javoblar
+- [ ] 10.4 1.0.0 release: CHANGELOG, README'da aniqlik natijalari
 
 ## Tashqi OSINT loyihalari tahlili (2026-11-16, GitHub ma'lumotlari bo'yicha)
 
