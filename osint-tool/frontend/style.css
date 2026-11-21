@@ -196,6 +196,8 @@ body {
   cursor: pointer;
   transition: color 0.2s, background 0.2s, box-shadow 0.25s;
 }
+.tablist { display: contents; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .tab-link { text-decoration: none; display: inline-flex; align-items: center; }
 .tab-link[hidden] { display: none; }
 .tab:hover {
