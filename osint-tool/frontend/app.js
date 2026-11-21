@@ -220,7 +220,7 @@ function escapeHtml(value) {
 }
 
 function activateTab(name) {
-  document.querySelectorAll(".tab").forEach((btn) => {
+  document.querySelectorAll(".tab[data-tab]").forEach((btn) => {
     const active = btn.dataset.tab === name;
     btn.classList.toggle("active", active);
     btn.setAttribute("aria-selected", active ? "true" : "false");
@@ -1920,7 +1920,7 @@ async function checkSources() {
   }
 }
 
-document.querySelectorAll(".tab").forEach((btn) => {
+document.querySelectorAll(".tab[data-tab]").forEach((btn) => {
   btn.addEventListener("click", () => activateTab(btn.dataset.tab));
 });
 
@@ -2637,3 +2637,14 @@ dataEls.wipeBtn.addEventListener("click", async () => {
     dataEls.wipeBtn.disabled = false;
   }
 });
+
+// Globe (gods-eye-view, optional "geo" compose profile): show the link only
+// when that service answers on this host. no-cors: we only learn "reachable".
+(function globeLink() {
+  const link = document.getElementById("globe-link");
+  if (!link) return;
+  const url = `${location.protocol}//${location.hostname}:4173/`;
+  fetch(url, { mode: "no-cors", cache: "no-store" })
+    .then(() => { link.href = url; link.hidden = false; })
+    .catch(() => {});
+})();
