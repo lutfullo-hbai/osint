@@ -8,7 +8,21 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 (`vX.Y.Z`) va GitHub Release oladi.
 
 ## [Unreleased]
-O'quv kursining yakuniy moduli (Faza 9). Reja yangilandi: Faza 8b (review tuzatishlari), Faza 10 (aniqlik va 1.0.0).
+Xavfsizlik tuzatishlari (uchinchi review, Faza 8b) va o'quv kursining yakuniy moduli (Faza 9).
+Reja yangilandi: Faza 8b (review tuzatishlari), Faza 10 (aniqlik va 1.0.0).
+
+### Xavfsizlik
+- **DNS rebinding**: kalitsiz rejimda API faqat `localhost`, `127.0.0.1`, `::1` nomlariga javob beradi
+  (`ALLOWED_HOSTS` bilan kengaytiriladi); "hammasini o'chirish" faqat konsol `Origin`'idan.
+- **Audit log'ni to'ldirish**: mavjud bo'lmagan yo'llar yozilmaydi; rad etilgan so'rovlar bitta IP'dan
+  daqiqasiga 20 tagacha, qolgani bitta yig'ma yozuvga.
+- `OSINT_USERS`'da `admin`, `local`, `refused` nomlari band (admin huquqini olib qo'ymasin).
+
+### Tuzatildi
+- "Hammasini o'chirish": baza band bo'lsa ogohlantiradi; xato bo'lsa ham Redis tozalanadi;
+  qidirilgan domenlarning DNS tarixi va `arq:retry` ham o'chadi; o'chirish paytida tugagan
+  qidiruv natijasi saqlanmaydi; xabarda kesh muddati to'g'rilandi (24 soat).
+- Noto'g'ri `AUDIT_RETENTION_DAYS` backend'ni to'xtatmaydi.
 
 ### Qo'shildi
 - **9-modul: yakuniy loyiha** (`09-yakuniy-loyiha/`): self-OSINT metodologiyasi, dalillarni

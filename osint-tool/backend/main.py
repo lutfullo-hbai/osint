@@ -40,7 +40,7 @@ from routers import (
     username,
 )
 import store
-from security import limiter, user_for, weak_key_warnings
+from security import REFUSED, host_allowed, limiter, user_for, weak_key_warnings
 
 
 def _read_version() -> str:
@@ -133,6 +133,29 @@ def _store_queries() -> bool:
     return os.environ.get("AUDIT_LOG_QUERIES", "1").strip().lower() not in ("0", "false", "no")
 
 
+# 8b.2: rejected requests are recorded, but at most this many per client IP
+# per minute; the rest are counted and written as one summary entry
+REFUSED_PER_MINUTE = 20
+_refused: dict[str, list] = {}           # ip -> [window start, recorded, suppressed]
+
+
+def _refused_gate(client: str | None, now: float) -> tuple[bool, int]:
+    """(record this one?, suppressed count from the window that just ended)."""
+    key = client or "?"
+    if len(_refused) > 10_000:
+        _refused.clear()
+    window = _refused.get(key)
+    if window is None or now - window[0] >= 60:
+        ended = window[2] if window else 0
+        _refused[key] = [now, 1, 0]
+        return True, ended
+    if window[1] < REFUSED_PER_MINUTE:
+        window[1] += 1
+        return True, 0
+    window[2] += 1
+    return False, 0
+
+
 async def _persist_audit(entry: dict) -> None:
     try:
         await asyncio.to_thread(store.add_audit, entry)
@@ -186,28 +209,52 @@ async def audit_and_request_id(request: Request, call_next):
             "query_hash": query_hash,
         }
         audit_logger.info(json.dumps(entry, ensure_ascii=False))
-        if _audited(request.method, request.url.path):
+        # 8b.2: only requests that reached a real endpoint; probes of made-up
+        # paths would otherwise fill the table
+        if _audited(request.method, request.url.path) and request.scope.get("route") is not None:
             # 8.3: who, when, what - kept locally in the cases database
             searched = _searched(payload)
             if searched and not _store_queries():
                 searched = "sha256:" + hashlib.sha256(searched.lower().encode()).hexdigest()
             category = payload.get("category") if isinstance(payload.get("category"), str) else None
-            await _persist_audit({
-                "at": entry["ts"][:19] + "+00:00",
-                "user": user_for(request.headers.get("X-API-Key"), client) or "refused",
-                "client": client,
-                "method": request.method,
-                "path": request.url.path,
-                "status": status,
-                "action": category,
-                "query": searched,
-                "request_id": request_id,
-            })
+            user = user_for(request.headers.get("X-API-Key"), client) or REFUSED
+            record, suppressed = (True, 0)
+            if user == REFUSED:
+                record, suppressed = _refused_gate(client, time.monotonic())
+            if suppressed:
+                await _persist_audit({
+                    "user": REFUSED, "client": client, "method": "-", "path": "(rate-limited)",
+                    "status": 401, "action": f"{suppressed} more rejected requests in one minute"})
+            if record:
+                await _persist_audit({
+                    "at": entry["ts"][:19] + "+00:00",
+                    "user": user,
+                    "client": client,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status": status,
+                    "action": category,
+                    "query": searched,
+                    "request_id": request_id,
+                })
 
     if response is None:
         return response
     response.headers["X-Request-ID"] = request_id
     return response
+
+
+@app.middleware("http")
+async def trusted_host(request: Request, call_next):
+    """8b.1: refuse requests addressed to another host name (DNS rebinding:
+    a web page re-points its own domain at 127.0.0.1 and calls this API)."""
+    if not host_allowed(request.headers.get("host")):
+        audit_logger.warning(json.dumps({"event": "host_rejected", "host": (request.headers.get("host") or "")[:100],
+                                         "path": request.url.path}))
+        return JSONResponse(status_code=400, content={
+            "status": "error",
+            "message": "Unknown host name. Use http://localhost:8000, or list the name in ALLOWED_HOSTS."})
+    return await call_next(request)
 
 
 app.include_router(username.router)

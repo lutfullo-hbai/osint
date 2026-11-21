@@ -43,8 +43,12 @@ limiter = Limiter(key_func=get_remote_address, headers_enabled=True)
 
 ADMIN = "admin"
 LOCAL = "local"                      # no keys configured, request from this machine / LAN
+REFUSED = "refused"                  # how the audit log names a rejected request
+# names with a meaning of their own: "admin" in OSINT_USERS would grant admin rights
+RESERVED_NAMES = {ADMIN, LOCAL, REFUSED}
 MIN_KEY_LENGTH = 16
 _USER_RE = re.compile(r"^[A-Za-z0-9._-]{1,40}$")
+DEFAULT_LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")
 
 
 def api_key_expected() -> str:
@@ -56,8 +60,9 @@ def configured_users() -> dict[str, str]:
     users: dict[str, str] = {}
     for entry in os.environ.get("OSINT_USERS", "").split(","):
         name, sep, key = entry.strip().partition(":")
-        if sep and _USER_RE.match(name.strip()) and key.strip():
-            users[key.strip()] = name.strip()
+        name = name.strip()
+        if sep and _USER_RE.match(name) and name.lower() not in RESERVED_NAMES and key.strip():
+            users[key.strip()] = name
     single = api_key_expected()
     if single:
         users.setdefault(single, ADMIN)
@@ -65,9 +70,43 @@ def configured_users() -> dict[str, str]:
 
 
 def weak_key_warnings() -> list[str]:
-    """Shown at startup: keys too short to resist guessing over the network."""
-    return [f"API key of '{name}' is shorter than {MIN_KEY_LENGTH} characters"
-            for key, name in configured_users().items() if len(key) < MIN_KEY_LENGTH]
+    """Shown at startup: short keys and OSINT_USERS entries that were ignored."""
+    warnings = [f"API key of '{name}' is shorter than {MIN_KEY_LENGTH} characters"
+                for key, name in configured_users().items() if len(key) < MIN_KEY_LENGTH]
+    for entry in os.environ.get("OSINT_USERS", "").split(","):
+        name = entry.strip().partition(":")[0].strip()
+        if name.lower() in RESERVED_NAMES:
+            warnings.append(f"OSINT_USERS entry '{name}' ignored: the name is reserved "
+                            "(the admin key is OSINT_API_KEY)")
+    return warnings
+
+
+def allowed_hosts() -> tuple[str, ...] | None:
+    """Host names the API answers to (DNS-rebinding guard, ROADMAP 8b.1).
+
+    ALLOWED_HOSTS set: always enforced ("*" turns the check off).
+    Not set: enforced only without keys, the mode a rebinding page could
+    abuse, with localhost names; with keys an attacker page has no key.
+    """
+    raw = os.environ.get("ALLOWED_HOSTS", "").strip()
+    if raw:
+        hosts = tuple(h.strip().lower() for h in raw.split(",") if h.strip())
+        return None if "*" in hosts else hosts
+    if configured_users():
+        return None
+    return DEFAULT_LOCAL_HOSTS
+
+
+def host_allowed(host_header: str | None) -> bool:
+    hosts = allowed_hosts()
+    if hosts is None:
+        return True
+    host = (host_header or "").strip().lower()
+    if host.startswith("["):                      # [::1]:8000
+        host = host[1:].split("]")[0]
+    elif host.count(":") == 1:
+        host = host.split(":")[0]
+    return host in hosts
 
 
 def _is_private_client(host: str | None) -> bool:
