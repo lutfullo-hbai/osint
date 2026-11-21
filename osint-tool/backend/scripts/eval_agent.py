@@ -9,6 +9,11 @@ CASES.jsonl, one case per line:
      "source": "https://www.wikidata.org/wiki/Q34253",          # where the answer comes from
      "kind": "public"}                                          # public | consented
 
+Negative cases ("kind": "negative") describe someone who is NOT the known
+person: a well-known name with another age. "expect" is empty and "not" holds
+the known person's profiles; that profile must not come out as a strong lead.
+Other strong leads are listed for a manual look (a real namesake may exist).
+
 The answer must come from an open source (a knowledge base, the person's own
 site) or from the person themselves. Cases about private people are run only
 with their consent and are kept out of git (*.private.jsonl is ignored).
@@ -77,7 +82,25 @@ def is_match(candidate: dict, expected: set[str], handles: set[str]) -> bool:
                for m in candidate.get("members") or [])
 
 
+def score_negative(case: dict, result: dict) -> dict:
+    avoid = {norm_url(u) for u in case.get("not") or []} - {""}
+    handles = expected_handles(case.get("not") or [])
+    candidates = result.get("candidates") or []
+    famous = next(((i, c) for i, c in enumerate(candidates, 1) if is_match(c, avoid, handles)), None)
+    nodes = (result.get("scan") or {}).get("nodes") or []
+    row = {"id": case.get("id"), "kind": "negative", "candidates": len(candidates),
+           "famous_rank": famous[0] if famous else None, "famous_level": famous[1].get("level") if famous else None,
+           "strong_leads": [c.get("label") for c in candidates if c.get("level") == "strong"],
+           "false_strong": [famous[1].get("label")] if famous and famous[1].get("level") == "strong" else [],
+           "wrongly_set_aside": [], "unchecked": sorted({s for n in nodes for s in n.get("unchecked") or []})}
+    if famous:
+        row["detail"] = {"famous": explain(famous[1])}
+    return row
+
+
 def score_case(case: dict, result: dict) -> dict:
+    if case.get("kind") == "negative":
+        return score_negative(case, result)
     expected = {norm_url(u) for u in case.get("expect") or []} - {""}
     handles = expected_handles(case.get("expect") or [])
     candidates = result.get("candidates") or []
@@ -114,9 +137,15 @@ def explain(candidate: dict) -> dict:
 
 
 def summarize(rows: list[dict]) -> dict:
+    negatives = [r for r in rows if r.get("kind") == "negative"]
+    rows = [r for r in rows if r.get("kind") != "negative"]
     n = len(rows) or 1
     ranked = [r["rank"] for r in rows if r.get("rank")]
     return {
+        "negative_cases": len(negatives),
+        "negative_famous_strong": sum(1 for r in negatives if r.get("famous_level") == "strong"),
+        "negative_strong_leads": sum(len(r.get("strong_leads") or []) for r in negatives),
+        "negative_errors": sum(1 for r in negatives if r.get("error")),
         "cases": len(rows),
         "hit@1": round(sum(1 for r in ranked if r == 1) / n, 3),
         "hit@3": round(sum(1 for r in ranked if r <= 3) / n, 3),
@@ -138,12 +167,23 @@ def markdown(rows: list[dict], totals: dict) -> str:
              f"cases with unanswered sources {totals['unchecked_cases']}", "",
              "| Case | Rank | Level | Candidates | False strong | Set aside wrongly | Not checked | Seconds |",
              "|---|---|---|---|---|---|---|---|"]
+    negatives = [r for r in rows if r.get("kind") == "negative"]
+    rows = [r for r in rows if r.get("kind") != "negative"]
     for r in rows:
         lines.append(f"| {r['id']} | {r.get('rank') or '—'} | {r.get('level') or '—'} | {r.get('candidates', 0)} | "
                      f"{', '.join(map(str, r.get('false_strong') or [])) or '—'} | "
                      f"{', '.join(r.get('wrongly_set_aside') or []) or '—'} | "
                      f"{', '.join(r.get('unchecked') or []) or '—'} | {r.get('seconds', '')}"
                      + (f" (error: {r['error']})" if r.get("error") else "") + " |")
+    if negatives:
+        lines += ["", f"## Negative cases (someone else with a known name): {totals['negative_cases']} · "
+                      f"known person still a strong lead {totals['negative_famous_strong']} · "
+                      f"strong leads to check by hand {totals['negative_strong_leads']}", "",
+                  "| Case | Known person: rank | Level | Strong leads | Seconds |", "|---|---|---|---|---|"]
+        for r in negatives:
+            lines.append(f"| {r['id']} | {r.get('famous_rank') or '—'} | {r.get('famous_level') or '—'} | "
+                         f"{', '.join(map(str, r.get('strong_leads') or [])) or '—'} | {r.get('seconds', '')}"
+                         + (f" (error: {r['error']})" if r.get("error") else "") + " |")
     return "\n".join(lines) + "\n"
 
 
@@ -154,8 +194,9 @@ def load_cases(path: str) -> list[dict]:
             if not line.strip() or line.lstrip().startswith("#"):
                 continue
             case = json.loads(line)
-            if not case.get("id") or not case.get("text") or not case.get("expect"):
-                raise SystemExit(f"{path}:{n}: a case needs id, text and expect")
+            answer = case.get("not") if case.get("kind") == "negative" else case.get("expect")
+            if not case.get("id") or not case.get("text") or not answer:
+                raise SystemExit(f"{path}:{n}: a case needs id, text and expect (a negative case: not)")
             cases.append(case)
     return cases
 
@@ -176,10 +217,17 @@ async def run(cases: list[dict], pause: float) -> list[dict]:
         except Exception as exc:  # noqa: BLE001 - one failing case must not stop the evaluation
             row = {"id": case["id"], "rank": None, "level": None, "candidates": 0, "false_strong": [],
                    "wrongly_set_aside": [], "unchecked": [], "error": f"{type(exc).__name__}: {exc}"[:200]}
+            if case.get("kind") == "negative":
+                row.update(kind="negative", famous_rank=None, famous_level=None, strong_leads=[])
         row["seconds"] = round(time.monotonic() - started, 1)
         rows.append(row)
-        print(f"[{i + 1}/{len(cases)}] {row['id']}: rank {row.get('rank') or '—'}, level {row.get('level') or '—'}",
-              file=sys.stderr)
+        if row.get("kind") == "negative":
+            print(f"[{i + 1}/{len(cases)}] {row['id']} (negative): known person "
+                  f"{row.get('famous_level') or 'absent'}, strong leads {len(row.get('strong_leads') or [])}",
+                  file=sys.stderr)
+        else:
+            print(f"[{i + 1}/{len(cases)}] {row['id']}: rank {row.get('rank') or '—'}, level {row.get('level') or '—'}",
+                  file=sys.stderr)
     return rows
 
 
