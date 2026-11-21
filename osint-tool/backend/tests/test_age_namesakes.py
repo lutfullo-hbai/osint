@@ -81,7 +81,7 @@ VIROLOGY = {"type": "username", "value": "ian_virology", "via": "name_match", "b
 def test_the_age_picks_the_one_namesake_it_fits():
     node = name_node(GOODFELI, VIROLOGY)
     assert target("Ian Goodfellow, 39 years old, from San Francisco").confirm_by_age([node]) == 1
-    assert node["pivots"][0]["via"] == "knowledge_base" and node["pivots"][0]["age_confirmed"] == 1987
+    assert node["pivots"][0]["via"] == "age_confirmed" and node["pivots"][0]["age_confirmed"] == 1987
     assert node["pivots"][1]["via"] == "name_match"            # no birth year: stays a namesake
 
 
@@ -114,7 +114,7 @@ def test_cached_pivots_are_not_edited():
     node = name_node()
     node["pivots"] = cached["pivots"]                                 # deep_scan shares the list
     target("Ian Goodfellow, 39 years old").confirm_by_age([node])
-    assert cached == before and node["pivots"][0]["via"] == "knowledge_base"
+    assert cached == before and node["pivots"][0]["via"] == "age_confirmed"
 
 
 @pytest.mark.asyncio
@@ -132,5 +132,51 @@ async def test_deep_scan_follows_the_age_confirmed_account_as_knowledge_base(mon
     t = target("Ian Goodfellow, 39 years old")
     scan = await deep_scan.run_deep_scan("Ian Goodfellow", "name", expand=t.expand, prepare=t.prepare)
     via = {n["query"]: n.get("via") for n in scan["nodes"] if n["type"] == "username"}
-    assert via.get("goodfeli") == "knowledge_base"
+    assert via.get("goodfeli") == "age_confirmed"
     assert via.get("ian_virology", "name_match") == "name_match"
+
+
+# ---------------- M1 (QA 10.5b): age confirmation is weaker than a unique-name KB hit ----------------
+
+def test_age_confirmed_pivot_is_weaker_than_a_curated_kb_hit():
+    from services.agent import POSSIBLE_LEAD, STRONG_LEAD
+    from services.correlate import B_AGE_CONFIRMED, B_KB
+    from services.names import name_bits
+    # a namesake picked only by the age the user gave is a lead to check, not "strong":
+    # on its own it lands in [possible, strong), and even WITH the unavoidable same-name
+    # bonus in rank() it must stay below strong (strong needs more, independent evidence).
+    max_name_bonus = name_bits(frozenset({"aaaa", "bbbb", "cccc"}))     # the 2.5 cap
+    assert B_AGE_CONFIRMED < B_KB
+    assert POSSIBLE_LEAD <= B_AGE_CONFIRMED < STRONG_LEAD
+    assert B_AGE_CONFIRMED + max_name_bonus < STRONG_LEAD
+
+
+@pytest.mark.asyncio
+async def test_wrong_namesake_with_unrecorded_target_is_not_strong(monkeypatch):
+    """The real target has no birth year on Wikidata; an unrelated same-name person
+    does, and it matches the age. That person is surfaced (age_confirmed) but must
+    NOT be a strong lead on the age alone — only a lead to check by hand."""
+    from services import deep_scan
+    from services.correlate import correlate
+    # the real target's birth year is unrecorded ([None]); the unrelated namesake's fits
+    wrong = {"type": "username", "value": "other_person", "via": "name_match",
+             "born": 1987, "namesake_births": [None]}
+
+    async def name(value):
+        return {"status": "success", "results": [], "count": 0, "pivots": [dict(wrong)]}
+
+    async def username(value):
+        res = [{"platform": "GitHub", "url": f"https://github.com/{value}", "status": "found",
+                "info": "Name: Jane Common"}]
+        return {"status": "success", "results": res, "count": 1, "pivots": []}
+
+    monkeypatch.setitem(deep_scan._HANDLERS, "name", name)
+    monkeypatch.setitem(deep_scan._HANDLERS, "username", username)
+    t = target("Jane Common, 39 years old")
+    scan = await deep_scan.run_deep_scan("Jane Common", "name", expand=t.expand, prepare=t.prepare)
+    via = {n["query"]: n.get("via") for n in scan["nodes"] if n["type"] == "username"}
+    assert via.get("other_person") == "age_confirmed"       # surfaced as a lead
+    scan["clusters"] = correlate(scan["nodes"])["clusters"]
+    cands, _ = agent.rank(scan, t, set())
+    picked = next((c for c in cands if any(m["query"] == "other_person" for m in c["members"])), None)
+    assert picked is not None and picked["level"] != "strong"   # a lead, not a confident identification

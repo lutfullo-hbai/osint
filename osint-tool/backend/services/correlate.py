@@ -29,6 +29,13 @@ MIN_HANDLE_LEN = 4
 # people (Fellegi-Sunter). Positive bits support a link, negative bits
 # (contradictions) argue against it.
 B_KB = 6.0             # a curated knowledge base (Wikidata) lists the account
+# 10.5b: a knowledge base lists several people with this name and we picked the
+# one whose birth year fits the age you gave. Weaker than a unique-name KB hit:
+# the age is often an estimate, so this alone is a lead ("possible"), not "strong".
+# Kept low enough that age-confirmation PLUS the (unavoidable) same-name bonus in
+# rank() — up to name_bits' 2.5 — still stays below STRONG_LEAD (6.0): a namesake
+# becomes "strong" only with further independent corroboration, never on age alone.
+B_AGE_CONFIRMED = 3.0
 B_STATED_EMAIL = 6.0   # a profile itself publishes the email being investigated
 B_EMAIL = 5.0          # the same specific email address on two records
 B_ROLE_EMAIL = 1.0     # the same role address (info@, admin@): many people
@@ -435,6 +442,9 @@ def correlate(nodes: list[dict]) -> dict:
 
             if via == "knowledge_base":
                 evidence.append(("kb", B_KB, f"listed on a knowledge base: @{refs[child][1]}"))
+            elif via == "age_confirmed":
+                evidence.append(("kb", B_AGE_CONFIRMED,
+                                 f"knowledge base: this name at the age you gave -> @{refs[child][1]}"))
             elif via == "profile_link":
                 evidence.append(("linked", B_LINKED, f"profile links to {refs[child][1]}"))
             else:

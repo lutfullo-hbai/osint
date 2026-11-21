@@ -107,6 +107,7 @@ NOTICE = (
 
 _VIA_LABEL = {
     "knowledge_base": "listed on a knowledge base",
+    "age_confirmed": "this name at the age you gave",
     "profile_link": "linked from a profile",
     "name_match": "same display name",
     "name_variant": "username guessed from the name",
@@ -165,8 +166,10 @@ class Target:
         matching = sorted(loc for loc in locations if any(place_relation(loc, p) == "agree" for p in self.places))
         if matching:
             return B_PLACE_AGREE, f"location '{matching[0]}' matches {', '.join(self.places)}"
-        # 10.5b: only places that clearly differ count against; a town vs a country is unknown
-        if all(places_conflict(loc, p) for loc in locations for p in self.places):
+        # 10.5b: no location agrees (we returned above if one did). A clear
+        # conflict counts against even if another location is unplaceable; a town
+        # vs a country we cannot place is unknown, not a conflict.
+        if any(places_conflict(loc, p) for loc in locations for p in self.places):
             return B_PLACE_CONFLICT, (f"stated location '{'; '.join(sorted(locations))}', not "
                                       f"{', '.join(self.places)}")
         return None
@@ -270,7 +273,7 @@ class Target:
             for pivot in node["pivots"]:
                 if (pivot.get("via") == "name_match" and fits(pivot.get("born"))
                         and not any(fits(b) for b in pivot.get("namesake_births") or [])):
-                    pivot = {**pivot, "via": "knowledge_base", "age_confirmed": pivot["born"]}
+                    pivot = {**pivot, "via": "age_confirmed", "age_confirmed": pivot["born"]}
                     confirmed += 1
                 pivots.append(pivot)
             node["pivots"] = pivots
@@ -633,6 +636,16 @@ def rank(scan: dict, target: Target, stated_keys: set[str]) -> tuple[list[dict],
         vias = {m.get("via") for m in members}
         if not stated and vias <= {"name_match", "name_variant", None} and len(members) == 1:
             why.append("found only through the name — may be a namesake")
+        # 10.5b (QA M1): a namesake picked out by the age you gave is a lead, never a
+        # confident identification on its own. "Strong" needs evidence independent of
+        # the name+age — a stated identifier, a knowledge-base entry, or one profile
+        # linking to another. Without that, cap an age-confirmed candidate at "possible".
+        level = _level(score, conflicts)
+        corroborated = bool(stated) or any(m.get("via") in ("knowledge_base", "profile_link")
+                                           for m in members)
+        if level == "strong" and "age_confirmed" in vias and not corroborated:
+            level = "possible"
+            why.append("confirmed only by the name and the age you gave — a lead, not an identification")
         missing = [f for f in FIELDS if not fields[f]]
         set_aside = [a for m in members for a in m.get("set_aside") or []][:MAX_SET_ASIDE]
         # only sources that look for this person's accounts; a domain record's
@@ -646,7 +659,7 @@ def rank(scan: dict, target: Target, stated_keys: set[str]) -> tuple[list[dict],
             "id": _candidate_id([m["key"] for m in members]),
             "label": label,
             "score": round(score, 2),
-            "level": _level(score, conflicts),
+            "level": level,
             "fields": fields,
             "missing": missing,
             "why": list(dict.fromkeys(why)),
