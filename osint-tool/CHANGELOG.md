@@ -9,6 +9,33 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-11-21
+Aniqlik (Faza 10.1–10.3, 10.5).
+
+### Qo'shildi
+- **Aniqlikni o'lchash (10.3)**: `scripts/eval_agent.py` — javobi ma'lum holatlarda hit@1/3, MRR,
+  noto'g'ri "kuchli" nomzodlar, xato chetga olingan profillar; `scripts/eval_cases_wikidata.py` —
+  30 ta ochiq holat (Wikidata). Birinchi o'lchov: hit@1 87%, hit@3 93%, xato chetga olingan 0.
+  Shaxsiy holatlar (`*.private.jsonl`) git'ga ham, Docker image'ga ham tushmaydi.
+
+### Tuzatildi
+- **Bir xil username, boshqa odam (10.1)**: bitta username ostida bir nechta odamning profillari
+  bo'lsa, boshqa odamniki chetga olinadi va sababi bilan alohida ko'rsatiladi (UI va PDF karta).
+  Faqat ishonchli belgilar bo'yicha: ism aniq boshqa (kirill/lotin imlosi va laqab bir xil ism
+  hisoblanadi), tug'ilgan yil siz aytgan yoshga mos emas, yoki shahar VA ish joyi birga farq qiladi
+  (kamida bittasi siz aytganiga zid). Ajratish profil tekshirilishi bilanoq, uning havolalari
+  kuzatilishidan oldin bajariladi; chetga olingan profilning havolalari kuzatilmaydi.
+  Tasdiqlanmagan profil bio'sidagi sayt avtomatik o'qilmaydi. Bio ichidagi "Company name:",
+  "Previous location:" endi ism yoki manzil deb o'qilmaydi.
+- **Ko'p so'zli joy nomlari (10.5)**: "from United States", "from San Francisco" endi ismga qo'shilib
+  ketmaydi (birinchi o'lchovda Terence Tao va Ian Goodfellow shu sababli topilmagan edi).
+- **"Tekshirilmadi" shovqini (10.5)**: GitLab javoblari keshlanadi (kalitsiz limit 30 holatdan 24 tasida
+  tugagan); Hacker News'ga u qabul qilmaydigan username yuborilmaydi; nomzodning ro'yxatiga faqat
+  profil qidiradigan manbalar kiradi (domen tekshiruvlari emas).
+- **Ball o'zgaruvchanligi (10.2)**: GitHub javoblari keshlanadi (profil 24 soat, "yo'q" 1 soat;
+  qisman qidiruv natijasi va o'chirish paytida kelgan javob keshlanmaydi); javob bermagan
+  manbalar nomzodda "tekshirilmadi" deb yoziladi.
+
 ## [0.9.0] — 2026-11-21
 O'quv kursining yakuniy moduli (Faza 9). Reja yangilandi: Faza 8b (review tuzatishlari), Faza 10 (aniqlik va 1.0.0).
 
@@ -165,7 +192,8 @@ Birinchi to'liq to'plam.
 - Digital Footprint hisoboti, entity graph, PDF eksport.
 - Lokal Qwen (Ollama) orqali AI xulosa va rasm tahlili.
 
-[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/lutfullo-hbai/osint/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/lutfullo-hbai/osint/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/lutfullo-hbai/osint/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/lutfullo-hbai/osint/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/lutfullo-hbai/osint/compare/v0.7.1...v0.8.0
