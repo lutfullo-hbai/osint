@@ -29,6 +29,7 @@ MALTEGO_TYPES = {
 
 _VIA_LABEL = {
     "knowledge_base": "listed on a knowledge base",
+    "age_confirmed": "this name at the age you gave",
     "profile_link": "linked from a profile",
     "name_match": "same display name",
     "name_variant": "username guessed from the name",

@@ -32,6 +32,17 @@ def test_rank_level_false_strong_and_wrong_set_aside():
     assert row["false_strong"] == ["Namesake"]
     assert row["wrongly_set_aside"] == ["github.com/torvalds"]
     assert row["unchecked"] == ["GitHub"]
+    assert row["detail"]["match"]["label"] == "Linus" and row["detail"]["top"]["label"] == "Namesake"
+
+
+def test_detail_explains_the_level():
+    case = {"id": "t", "expect": ["https://github.com/torvalds"]}
+    linus = cand("Linus", "weak", ["https://github.com/torvalds"])
+    linus.update(score=2.5, why=["same name"], contradictions=["age differs"], missing=["work"])
+    row = ev.score_case(case, {"candidates": [linus]})
+    assert row["detail"] == {"match": {"label": "Linus", "score": 2.5, "level": "weak", "why": ["same name"],
+                                       "contradictions": ["age differs"], "missing": ["work"]}}
+    assert "detail" not in ev.score_case(case, {"candidates": []})
 
 
 def test_summary():
@@ -86,3 +97,68 @@ def test_a_candidate_built_on_the_handle_counts_when_github_did_not_answer():
     row = ev.score_case(case, {"candidates": [other, built_on_handle]})
     assert row["rank"] == 2 and row["false_strong"] == ["@linus.t"]
     assert ev.expected_handles(["https://github.com/a/b", "https://example.com/x"]) == set()
+
+
+# ---------------- negative cases (plan 1.3) ----------------
+
+NEG = {"id": "not-torvalds", "text": "Linus Torvalds, 26 years old", "expect": [], "kind": "negative",
+       "not": ["https://github.com/torvalds"]}
+
+
+def test_negative_case_flags_the_known_person_as_a_strong_lead():
+    result = {"candidates": [cand("Linus", "strong", ["https://github.com/torvalds"]),
+                             cand("Other Linus", "strong", ["https://x.com/linus26"]),
+                             cand("Weak one", "weak", ["https://vk.com/l"])]}
+    row = ev.score_case(NEG, result)
+    assert row["kind"] == "negative" and row["famous_rank"] == 1 and row["famous_level"] == "strong"
+    assert row["false_strong"] == ["Linus"]                       # the known person is surely wrong here
+    assert row["strong_leads"] == ["Linus", "Other Linus"]        # the rest: for a manual look
+    assert row["detail"]["famous"]["label"] == "Linus"
+
+
+def test_negative_case_passes_when_the_known_person_is_not_strong():
+    row = ev.score_case(NEG, {"candidates": [cand("Linus", "weak", ["https://github.com/torvalds"])]})
+    assert row["famous_level"] == "weak" and row["false_strong"] == []
+    row = ev.score_case(NEG, {"candidates": []})
+    assert row["famous_rank"] is None and "detail" not in row
+
+
+def test_negatives_do_not_count_in_hit_rates():
+    rows = [{"id": "a", "rank": 1, "level": "strong", "false_strong": [], "wrongly_set_aside": [], "unchecked": []},
+            {"id": "not-a", "kind": "negative", "famous_rank": 1, "famous_level": "strong", "strong_leads": ["a", "b"],
+             "false_strong": ["a"], "wrongly_set_aside": [], "unchecked": []},
+            {"id": "not-b", "kind": "negative", "famous_rank": None, "famous_level": None, "strong_leads": [],
+             "false_strong": [], "wrongly_set_aside": [], "unchecked": [], "error": "boom"}]
+    totals = ev.summarize(rows)
+    assert totals["cases"] == 1 and totals["hit@1"] == 1.0 and totals["false_strong_per_case"] == 0.0
+    assert totals["negative_cases"] == 2 and totals["negative_famous_strong"] == 1
+    assert totals["negative_strong_leads"] == 2 and totals["negative_errors"] == 1
+    report = ev.markdown(rows, totals)
+    assert "## Negative cases" in report and "known person still a strong lead 1" in report
+
+
+def test_negative_case_file_rules(tmp_path):
+    bad = tmp_path / "n.jsonl"
+    bad.write_text('{"id": "x", "text": "Ali, 30 years old", "expect": [], "kind": "negative"}\n', encoding="utf-8")
+    with pytest.raises(SystemExit):
+        ev.load_cases(str(bad))                                   # a negative case needs "not"
+
+
+def test_negative_cases_are_built_from_the_public_ones():
+    from scripts.eval_cases_wikidata import negatives
+    out = negatives([{"id": "ken", "text": "Ken Thompson, 83 years old", "expect": ["https://github.com/ken"],
+                      "source": "s", "kind": "public"},
+                     {"id": "goodfeli", "text": "Ian Goodfellow, 39 years old, from San Francisco",
+                      "expect": ["https://github.com/goodfeli"], "source": "s", "kind": "public"}])
+    assert [c["text"] for c in out] == ["Ken Thompson, 53 years old", "Ian Goodfellow, 69 years old"]
+    assert out[0]["not"] == ["https://github.com/ken"] and out[0]["expect"] == [] and out[0]["kind"] == "negative"
+
+
+def test_negative_case_file_is_well_formed():
+    import os
+    path = os.path.join(os.path.dirname(CASES), "agent_cases.negative.jsonl")
+    cases = ev.load_cases(path)
+    public = {c["id"]: c for c in ev.load_cases(CASES)}
+    assert len(cases) == len(public)
+    for case in cases:
+        assert case["kind"] == "negative" and case["not"] == public[case["id"].removeprefix("not-")]["expect"]

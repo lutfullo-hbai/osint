@@ -72,6 +72,16 @@ def _claim_ids(claims: dict, prop: str) -> list[str]:
     return ids
 
 
+def _birth_year(claims: dict) -> int | None:
+    """Year of birth from a P569 claim ("+1987-00-00T00:00:00Z" -> 1987)."""
+    value = _claim_value(claims, BIRTH_PROPERTY)
+    match = re.match(r"\+?(\d{4})-", str(value.get("time", ""))) if isinstance(value, dict) else None
+    return int(match.group(1)) if match else None
+
+
+_BORN_RE = re.compile(r"\bBorn: (\d{4})\b")
+
+
 def _format_wikidata_time(value) -> str:
     if not isinstance(value, dict):
         return ""
@@ -184,7 +194,7 @@ async def _entity_detail(client, qid: str, label: str, description: str) -> tupl
 
 
 def _grade_pivots(name: str, details: list[tuple[dict, list[dict], bool]],
-                  other_matching_humans: int = 0) -> list[dict]:
+                  other_matching_humans: int = 0, other_births: tuple = ()) -> list[dict]:
     """Decide how strongly each entity's accounts identify the searched person.
 
     A Wikidata search returns every item that shares the name. Only a human
@@ -193,6 +203,11 @@ def _grade_pivots(name: str, details: list[tuple[dict, list[dict], bool]],
     share the name (Michael Jordan the player and the professor) nobody knows
     which one is meant, so every account is a namesake candidate. Non-human
     items (a film, a band) contribute nothing.
+
+    10.5b: a namesake candidate of an exactly matching human carries that
+    human's birth year ("born") and the birth years of the other humans with
+    this name ("namesake_births", None = not recorded), so a caller that knows
+    the person's age can tell them apart (agent.Target.confirm_by_age).
     """
     wanted = _norm_label(name)
     matching = [
@@ -200,33 +215,47 @@ def _grade_pivots(name: str, details: list[tuple[dict, list[dict], bool]],
     ]
     # a namesake further down the search (not fetched in full) also counts
     unique = matching[0] if len(matching) == 1 and other_matching_humans == 0 else None
+    def born(detail) -> int | None:
+        match = _BORN_RE.search(str(detail[0].get("info") or ""))
+        return int(match.group(1)) if match else None
+
     graded = []
     for detail in details:
         entry, pivots, is_human = detail
         if not is_human:
             continue
-        via = "knowledge_base" if detail is unique else "name_match"
-        graded.extend({**p, "via": via} for p in pivots)
+        if detail is unique:
+            graded.extend({**p, "via": "knowledge_base"} for p in pivots)
+            continue
+        extra = {}
+        if any(d is detail for d in matching):
+            others = [born(d) for d in matching if d is not detail] + list(other_births)
+            # namesakes further down the search whose birth year was not read are unknown
+            others += [None] * max(0, other_matching_humans - len(other_births))
+            extra = {"born": born(detail), "namesake_births": others}
+        graded.extend({**p, "via": "name_match", **extra} for p in pivots)
     return graded
 
 
-async def _matching_humans(client, name: str, qids: list[str]) -> int:
-    """How many of these items are humans labelled exactly like the query."""
+async def _matching_humans(client, name: str, qids: list[str]) -> list[int | None]:
+    """Birth years (None = not recorded) of the items that are humans labelled
+    exactly like the query: one entry per such human."""
     if not qids:
-        return 0
+        return []
     try:
         data = await _get_json(client, "https://www.wikidata.org/w/api.php", params={
             "action": "wbgetentities", "ids": "|".join(qids), "props": "labels|claims",
             "languages": "en", "format": "json"})
     except ToolError:
-        return 1      # unknown: be conservative, do not call anyone "unique"
+        return [None]  # unknown: be conservative, do not call anyone "unique"
     wanted = _norm_label(name)
-    count = 0
+    births = []
     for entity in (data.get("entities") or {}).values():
         label = ((entity.get("labels") or {}).get("en") or {}).get("value", "")
-        if HUMAN_QID in _claim_ids(entity.get("claims") or {}, INSTANCE_OF_PROPERTY) and _norm_label(label) == wanted:
-            count += 1
-    return count
+        claims = entity.get("claims") or {}
+        if HUMAN_QID in _claim_ids(claims, INSTANCE_OF_PROPERTY) and _norm_label(label) == wanted:
+            births.append(_birth_year(claims))
+    return births
 
 
 async def run_person_entity(name: str) -> dict:
@@ -250,7 +279,7 @@ async def run_person_entity(name: str) -> dict:
         if not found:
             return {"results": [], "pivots": []}
         candidates = found[:MAX_CANDIDATES]
-        others = await _matching_humans(client, name, [c["id"] for c in found[MAX_CANDIDATES:]])
+        other_births = await _matching_humans(client, name, [c["id"] for c in found[MAX_CANDIDATES:]])
 
         detail_tasks = [
             _entity_detail(
@@ -272,7 +301,7 @@ async def run_person_entity(name: str) -> dict:
     *detail_outcomes, summary_outcome = outcomes
     details = [o for o in detail_outcomes if isinstance(o, tuple)]
     results.extend(entry for entry, _p, _h in details)
-    pivots = _grade_pivots(name, details, others)
+    pivots = _grade_pivots(name, details, len(other_births), tuple(other_births))
     if isinstance(summary_outcome, dict):
         results.insert(0, summary_outcome)
 

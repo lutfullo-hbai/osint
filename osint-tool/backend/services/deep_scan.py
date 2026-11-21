@@ -47,6 +47,7 @@ MAX_NAME_VARIANT_PIVOTS = 2
 # followed automatically (they are still shown and clickable in the UI).
 _VIA_PRIORITY = {
     "knowledge_base": 0,
+    "age_confirmed": 0,     # 10.5b: namesake picked out by the age you gave (weaker than KB, see correlate)
     "profile_link": 1,
     None: 2,
     "email_localpart": 3,

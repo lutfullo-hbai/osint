@@ -10,6 +10,17 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 ## [Unreleased]
 
 ### Tuzatildi
+- **To'g'ri topilgan, lekin "zaif" nomzodlar (10.5b)**: mashhur ismdoshlar aniqlik pasaytirardi.
+  (A) Wikidata bir nechta bir ismli odamni qaytarsa, siz aytgan yoshga (±1) aynan bittasi mos kelsa,
+  uning akkauntlari endi bilim bazasidan tasdiqlangan deb olinadi. (B) joy solishtiruvi aniqlashtirildi:
+  shahar va davlat "mos / zid / noma'lum" bo'ladi (mas. "Los Angeles" va "United States" endi zid emas),
+  "United Kingdom" va "United States" bir xil hisoblanmaydi; boshqa shahar (odamlar ko'chadi) ballni
+  kamaytiradi, lekin o'zi nomzodni "zaif" qilmaydi — tug'ilgan yil yoki ism farqi qiladi.
+  Jonli o'lchov (7 holat): barchasi 1-o'rin, "kuchli", 0 xato kuchli nomzod.
+- **Baholashda salbiy holatlar (reja 1.3)**: mashhur ism + boshqa yosh ("Ken Thompson, 30 years old")
+  — o'sha mashhur odamning profili "kuchli" chiqmasligini tekshiradi (`*.negative.jsonl`).
+
+### Tuzatildi
 - **DEV Community javob bermasdi (10.5f)**: u bir vaqtda kelgan so'rovlarni rad etardi (HTTP 429).
   Endi so'rovlar orasida 1 soniya pauza, qisqa rad etishdan keyin bitta qayta urinish, javoblar keshlanadi.
   Uch holatli qayta o'lchovda "tekshirilmadi" ro'yxatidan butunlay chiqdi.

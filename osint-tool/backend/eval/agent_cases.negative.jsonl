@@ -1,0 +1,30 @@
+{"id": "not-acton", "text": "Brian Acton, 24 years old", "expect": [], "not": ["https://github.com/acton"], "source": "https://www.wikidata.org/wiki/Q15778935", "kind": "negative"}
+{"id": "not-ahejlsberg", "text": "Anders Hejlsberg, 36 years old", "expect": [], "not": ["https://github.com/ahejlsberg"], "source": "https://www.wikidata.org/wiki/Q316544", "kind": "negative"}
+{"id": "not-bjarnestroustrup", "text": "Bjarne Stroustrup, 46 years old", "expect": [], "not": ["https://github.com/BjarneStroustrup"], "source": "https://www.wikidata.org/wiki/Q92620", "kind": "negative"}
+{"id": "not-brendaneich", "text": "Brendan Eich, 35 years old", "expect": [], "not": ["https://github.com/BrendanEich"], "source": "https://www.wikidata.org/wiki/Q92648", "kind": "negative"}
+{"id": "not-dhh", "text": "David Heinemeier Hansson, 77 years old", "expect": [], "not": ["https://github.com/dhh"], "source": "https://www.wikidata.org/wiki/Q719413", "kind": "negative"}
+{"id": "not-douglascrockford", "text": "Douglas Crockford, 41 years old", "expect": [], "not": ["https://github.com/douglascrockford"], "source": "https://www.wikidata.org/wiki/Q3037998", "kind": "negative"}
+{"id": "not-egamma", "text": "Erich Gamma, 35 years old", "expect": [], "not": ["https://github.com/egamma"], "source": "https://www.wikidata.org/wiki/Q92838", "kind": "negative"}
+{"id": "not-gdb", "text": "Greg Brockman, 69 years old", "expect": [], "not": ["https://github.com/gdb"], "source": "https://www.wikidata.org/wiki/Q100604534", "kind": "negative"}
+{"id": "not-geohot", "text": "George Hotz, 67 years old", "expect": [], "not": ["https://github.com/geohot"], "source": "https://www.wikidata.org/wiki/Q370733", "kind": "negative"}
+{"id": "not-goodfeli", "text": "Ian Goodfellow, 69 years old", "expect": [], "not": ["https://github.com/goodfeli"], "source": "https://www.wikidata.org/wiki/Q26703063", "kind": "negative"}
+{"id": "not-gvanrossum", "text": "Guido van Rossum, 40 years old", "expect": [], "not": ["https://github.com/gvanrossum"], "source": "https://www.wikidata.org/wiki/Q30942", "kind": "negative"}
+{"id": "not-jmechner", "text": "Jordan Mechner, 32 years old", "expect": [], "not": ["https://github.com/jmechner"], "source": "https://www.wikidata.org/wiki/Q263175", "kind": "negative"}
+{"id": "not-jspolsky", "text": "Joel Spolsky, 31 years old", "expect": [], "not": ["https://github.com/jspolsky"], "source": "https://www.wikidata.org/wiki/Q2387083", "kind": "negative"}
+{"id": "not-karpathy", "text": "Andrej Karpathy, 70 years old", "expect": [], "not": ["https://github.com/karpathy"], "source": "https://www.wikidata.org/wiki/Q56037405", "kind": "negative"}
+{"id": "not-ken", "text": "Ken Thompson, 53 years old", "expect": [], "not": ["https://github.com/ken"], "source": "https://www.wikidata.org/wiki/Q1107006", "kind": "negative"}
+{"id": "not-lexfridman", "text": "Lex Fridman, 73 years old", "expect": [], "not": ["https://github.com/lexfridman"], "source": "https://www.wikidata.org/wiki/Q76448707", "kind": "negative"}
+{"id": "not-matz", "text": "Yukihiro Matsumoto, 31 years old", "expect": [], "not": ["https://github.com/matz"], "source": "https://www.wikidata.org/wiki/Q92748", "kind": "negative"}
+{"id": "not-migueldeicaza", "text": "Miguel de Icaza, 24 years old", "expect": [], "not": ["https://github.com/migueldeicaza"], "source": "https://www.wikidata.org/wiki/Q62849", "kind": "negative"}
+{"id": "not-montywi", "text": "Michael Widenius, 34 years old", "expect": [], "not": ["https://github.com/montywi"], "source": "https://www.wikidata.org/wiki/Q1362152", "kind": "negative"}
+{"id": "not-nat", "text": "Nat Friedman, 79 years old", "expect": [], "not": ["https://github.com/nat"], "source": "https://www.wikidata.org/wiki/Q92955", "kind": "negative"}
+{"id": "not-paulbuchheit", "text": "Paul Buchheit, 79 years old", "expect": [], "not": ["https://github.com/paulbuchheit"], "source": "https://www.wikidata.org/wiki/Q3299582", "kind": "negative"}
+{"id": "not-robpike", "text": "Rob Pike, 40 years old", "expect": [], "not": ["https://github.com/robpike"], "source": "https://www.wikidata.org/wiki/Q517764", "kind": "negative"}
+{"id": "not-stevec", "text": "Steve Coast, 76 years old", "expect": [], "not": ["https://github.com/SteveC"], "source": "https://www.wikidata.org/wiki/Q56200", "kind": "negative"}
+{"id": "not-teorth", "text": "Terence Tao, 21 years old", "expect": [], "not": ["https://github.com/teorth"], "source": "https://www.wikidata.org/wiki/Q295981", "kind": "negative"}
+{"id": "not-timbl", "text": "Tim Berners-Lee, 41 years old", "expect": [], "not": ["https://github.com/timbl"], "source": "https://www.wikidata.org/wiki/Q80", "kind": "negative"}
+{"id": "not-torvalds", "text": "Linus Torvalds, 27 years old", "expect": [], "not": ["https://github.com/torvalds"], "source": "https://www.wikidata.org/wiki/Q34253", "kind": "negative"}
+{"id": "not-unclebob", "text": "Robert Cecil Martin, 44 years old", "expect": [], "not": ["https://github.com/unclebob"], "source": "https://www.wikidata.org/wiki/Q93010", "kind": "negative"}
+{"id": "not-vbuterin", "text": "Vitalik Buterin, 62 years old", "expect": [], "not": ["https://github.com/vbuterin"], "source": "https://www.wikidata.org/wiki/Q16197959", "kind": "negative"}
+{"id": "not-vrandezo", "text": "Denny Vrandečić, 78 years old", "expect": [], "not": ["https://github.com/vrandezo"], "source": "https://www.wikidata.org/wiki/Q18618629", "kind": "negative"}
+{"id": "not-yesthatjwz", "text": "Jamie Zawinski, 28 years old", "expect": [], "not": ["https://github.com/yesthatjwz"], "source": "https://www.wikidata.org/wiki/Q92958", "kind": "negative"}

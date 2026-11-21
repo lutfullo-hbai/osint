@@ -32,7 +32,8 @@ from services.correlate import (
 )
 from services.deep_scan import _node_key, run_deep_scan
 from services.investigate import InvestigationValidationError
-from services.names import fold, name_bits, name_tokens, names_match, places_conflict, username_variants
+from services.names import (fold, name_bits, name_tokens, names_match, place_relation, places_conflict,
+                            username_variants)
 from tools.contact_extract import contacts_from_text, extract_contacts
 
 AGENT_MAX_NODES = 20
@@ -106,6 +107,7 @@ NOTICE = (
 
 _VIA_LABEL = {
     "knowledge_base": "listed on a knowledge base",
+    "age_confirmed": "this name at the age you gave",
     "profile_link": "linked from a profile",
     "name_match": "same display name",
     "name_variant": "username guessed from the name",
@@ -161,11 +163,16 @@ class Target:
     def place_check(self, locations: set[str]) -> tuple[float, str] | None:
         if not locations or not self.places:
             return None
-        matching = sorted(loc for loc in locations if any(not places_conflict(loc, p) for p in self.places))
+        matching = sorted(loc for loc in locations if any(place_relation(loc, p) == "agree" for p in self.places))
         if matching:
             return B_PLACE_AGREE, f"location '{matching[0]}' matches {', '.join(self.places)}"
-        return B_PLACE_CONFLICT, (f"stated location '{'; '.join(sorted(locations))}', not "
-                                  f"{', '.join(self.places)}")
+        # 10.5b: no location agrees (we returned above if one did). A clear
+        # conflict counts against even if another location is unplaceable; a town
+        # vs a country we cannot place is unknown, not a conflict.
+        if any(places_conflict(loc, p) for loc in locations for p in self.places):
+            return B_PLACE_CONFLICT, (f"stated location '{'; '.join(sorted(locations))}', not "
+                                      f"{', '.join(self.places)}")
+        return None
 
     def name_check(self, names: set[str]) -> tuple[float, str] | None:
         if not names or not self.name:
@@ -243,6 +250,39 @@ class Target:
                 places_conflict(loc, p) for loc in ids["locations"] for p in self.places):
             return False                                 # a namesake in another town
         return True
+
+    def confirm_by_age(self, nodes: list[dict]) -> int:
+        """10.5b: a knowledge base lists several people with this name; if exactly
+        one of them was born when the person you describe was (+-1 year) and no
+        namesake with a recorded birth year fits too, that person's accounts are
+        knowledge-base evidence, like those of a name nobody else has. A namesake
+        whose birth year is not recorded does not block this (the same trade-off
+        as the "only one person with this name" rule). The pivots are replaced,
+        not edited: the name lookup's cached result is shared by other runs."""
+        if not self.years:
+            return 0
+
+        def fits(year) -> bool:
+            return isinstance(year, int) and any(abs(year - y) <= 1 for y in self.years)
+
+        confirmed = 0
+        for node in nodes:
+            if node.get("type") != "name" or not node.get("pivots"):
+                continue
+            pivots = []
+            for pivot in node["pivots"]:
+                if (pivot.get("via") == "name_match" and fits(pivot.get("born"))
+                        and not any(fits(b) for b in pivot.get("namesake_births") or [])):
+                    pivot = {**pivot, "via": "age_confirmed", "age_confirmed": pivot["born"]}
+                    confirmed += 1
+                pivots.append(pivot)
+            node["pivots"] = pivots
+        return confirmed
+
+    def prepare(self, nodes: list[dict]) -> int:
+        """Called by the deep scan for each record before its pivots are followed."""
+        self.confirm_by_age(nodes)
+        return self.split_profiles(nodes)
 
     def split_profiles(self, nodes: list[dict]) -> int:
         """Set aside (node["set_aside"], with the reason) the profiles of a
@@ -531,8 +571,20 @@ def _candidate_id(member_keys: list[str]) -> str:
     return hashlib.sha256("|".join(sorted(member_keys)).encode()).hexdigest()[:12]
 
 
+# 10.5b: a different town is soft (people move, profiles go stale): it lowers the
+# score but does not by itself make a lead weak. A different birth year or name does.
+_SOFT_CONFLICT_PREFIXES = ("different stated locations", "stated location ")
+# conflicts with what the USER stated (not within-cluster data noise): age_check and
+# name_check messages. A candidate carrying one is never a strong lead (10.5b).
+_TARGET_CONFLICT_PREFIXES = ("born ", "different name:")
+
+
+def _hard(conflicts: list[str]) -> list[str]:
+    return [c for c in conflicts if not c.startswith(_SOFT_CONFLICT_PREFIXES)]
+
+
 def _level(score: float, conflicts: list[str]) -> str:
-    if conflicts and score < STRONG_LEAD:
+    if _hard(conflicts) and score < STRONG_LEAD:
         return "weak"
     if score >= STRONG_LEAD:
         return "strong"
@@ -587,6 +639,23 @@ def rank(scan: dict, target: Target, stated_keys: set[str]) -> tuple[list[dict],
         vias = {m.get("via") for m in members}
         if not stated and vias <= {"name_match", "name_variant", None} and len(members) == 1:
             why.append("found only through the name — may be a namesake")
+        # 10.5b (QA M1): a namesake picked out by the age you gave is a lead, never a
+        # confident identification on its own. "Strong" needs evidence independent of
+        # the name+age — a stated identifier, a knowledge-base entry, or one profile
+        # linking to another. Without that, cap an age-confirmed candidate at "possible".
+        level = _level(score, conflicts)
+        corroborated = bool(stated) or any(m.get("via") in ("knowledge_base", "profile_link")
+                                           for m in members)
+        if level == "strong" and "age_confirmed" in vias and not corroborated:
+            level = "possible"
+            why.append("confirmed only by the name and the age you gave — a lead, not an identification")
+        # 10.5b (QA, negative cases): a candidate that clearly conflicts with the age or
+        # name YOU gave is not "the person you are looking for", however real the account
+        # is. Even a knowledge-base identity (e.g. the famous person at a different age) is
+        # capped at "possible" so the mismatch is not hidden behind a high score.
+        if level == "strong" and any(c.startswith(_TARGET_CONFLICT_PREFIXES) for c in conflicts):
+            level = "possible"
+            why.append("conflicts with the age or name you gave — check before trusting")
         missing = [f for f in FIELDS if not fields[f]]
         set_aside = [a for m in members for a in m.get("set_aside") or []][:MAX_SET_ASIDE]
         # only sources that look for this person's accounts; a domain record's
@@ -600,7 +669,7 @@ def rank(scan: dict, target: Target, stated_keys: set[str]) -> tuple[list[dict],
             "id": _candidate_id([m["key"] for m in members]),
             "label": label,
             "score": round(score, 2),
-            "level": _level(score, conflicts),
+            "level": level,
             "fields": fields,
             "missing": missing,
             "why": list(dict.fromkeys(why)),
@@ -658,7 +727,7 @@ async def run_agent(text: str, step: Step | None = None) -> dict:
 
     scan = await run_deep_scan(primary["value"], primary["type"], extra_seeds=extras,
                                progress=on_progress, expand=target.expand, max_nodes=AGENT_MAX_NODES,
-                               prepare=target.split_profiles)
+                               prepare=target.prepare)
     unchecked = sorted({s for n in scan["nodes"] if n.get("type") in PROFILE_TYPES for s in n.get("unchecked") or []})
     if unchecked:
         await say("skip", "Not checked this time: " + ", ".join(unchecked[:5])

@@ -29,6 +29,14 @@ MIN_HANDLE_LEN = 4
 # people (Fellegi-Sunter). Positive bits support a link, negative bits
 # (contradictions) argue against it.
 B_KB = 6.0             # a curated knowledge base (Wikidata) lists the account
+# 10.5b: a knowledge base lists several people with this name and we picked the
+# one whose birth year fits the age you gave. For RANKING this is as good as a
+# unique-name hit (it is our best guess at who they are), so the right person
+# ranks first. CONFIDENCE is handled separately: rank() caps an age-confirmed
+# candidate at "possible" unless independent evidence corroborates it, because
+# an age (often an estimate) is not proof. So the weight here is ranking power,
+# and never by itself produces a "strong" level.
+B_AGE_CONFIRMED = B_KB
 B_STATED_EMAIL = 6.0   # a profile itself publishes the email being investigated
 B_EMAIL = 5.0          # the same specific email address on two records
 B_ROLE_EMAIL = 1.0     # the same role address (info@, admin@): many people
@@ -435,6 +443,9 @@ def correlate(nodes: list[dict]) -> dict:
 
             if via == "knowledge_base":
                 evidence.append(("kb", B_KB, f"listed on a knowledge base: @{refs[child][1]}"))
+            elif via == "age_confirmed":
+                evidence.append(("kb", B_AGE_CONFIRMED,
+                                 f"knowledge base: this name at the age you gave -> @{refs[child][1]}"))
             elif via == "profile_link":
                 evidence.append(("linked", B_LINKED, f"profile links to {refs[child][1]}"))
             else:

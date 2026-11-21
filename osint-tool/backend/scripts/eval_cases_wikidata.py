@@ -1,6 +1,7 @@
 """Build public evaluation cases from Wikidata (ROADMAP 10.3).
 
     python scripts/eval_cases_wikidata.py > eval/agent_cases.public.jsonl
+    python scripts/eval_cases_wikidata.py --negatives eval/agent_cases.public.jsonl > eval/agent_cases.negative.jsonl
 
 Only well-known technologists who present their work publicly are listed
 (QIDS below, chosen by hand): no politicians, no people known for a criminal
@@ -17,6 +18,7 @@ from the people themselves, with consent: put them in a *.private.jsonl file
 from __future__ import annotations
 
 import json
+import re
 import sys
 from datetime import date
 
@@ -68,7 +70,31 @@ def build(rows: list[dict], today: date) -> list[dict]:
     return sorted(cases, key=lambda c: c["id"])
 
 
+NEGATIVE_SHIFT = 30           # years: far beyond the +-1 a birth year is allowed to differ
+
+
+def negatives(cases: list[dict]) -> list[dict]:
+    """10.5b / plan 1.3: the same known names with an age 30 years off and no
+    town: someone else. The known person's profile must not be a strong lead."""
+    out = []
+    for case in cases:
+        match = re.match(r"(.+?), (\d+) years old", case["text"])
+        if not match:
+            continue
+        name, age = match.group(1), int(match.group(2))
+        other = age - NEGATIVE_SHIFT if age - NEGATIVE_SHIFT >= 20 else age + NEGATIVE_SHIFT
+        out.append({"id": f"not-{case['id']}", "text": f"{name}, {other} years old", "expect": [],
+                    "not": case["expect"], "source": case["source"], "kind": "negative"})
+    return out
+
+
 def main() -> None:
+    if sys.argv[1:2] == ["--negatives"]:
+        with open(sys.argv[2], encoding="utf-8") as fh:
+            cases = [json.loads(line) for line in fh if line.strip()]
+        for case in negatives(cases):
+            sys.stdout.write(json.dumps(case, ensure_ascii=False) + "\n")
+        return
     query = QUERY % " ".join(f"wd:{q}" for q in QIDS)
     response = httpx.get(ENDPOINT, params={"query": query}, timeout=60,
                          headers={"Accept": "application/sparql-results+json", "User-Agent": USER_AGENT})
