@@ -150,20 +150,23 @@ Odam qidirmaydi va NEXUS backend'iga ulanmaydi: alohida servis.
 
     docker compose --profile geo up -d --build globe      # http://localhost:4173
 
-- Servis ishlayotgan bo'lsa, konsolda **Globe ↗** havolasi chiqadi (aks holda yashirin).
+- Servis ishlayotgan bo'lsa, konsolda **Globe ↗** havolasi chiqadi (servis keyin yoqilsa — konsol
+  sahifasini yangilang).
 - Upstream'ning aniq commit'idan build qilinadi; yangilash — `docker-compose.yml`'dagi
-  commit'ni ko'rib chiqib almashtirish.
+  commit'ni (va uning Dockerfile'ini) ko'rib chiqib almashtirish.
 - Faqat `127.0.0.1`'da ochiladi: unga kiritilgan provayder kalitlarini u o'zi orqali uzatadi,
   shuning uchun portni tarmoqqa ochmang.
-- Kalitsiz qatlamlar yetarli. Pulli kalitlar (Google Maps, OpenAI) kerak emas.
+- Kalitsiz qatlamlar yetarli. Pulli kalitlar (Google Maps, OpenAI) kerak emas. Globe sozlamalariga
+  kiritilgan bepul kalitlar faqat konteyner ichida saqlanadi: qayta ishga tushirishda qoladi, lekin
+  qayta build qilinganda (`up --build`, commit yangilanganda) yo'qoladi — qayta kiriting.
 - Har bir qatlam ma'lumotining o'z shartlari bor (ba'zilari faqat notijorat, masalan
-  OpenSky): upstream `DATA_SOURCES.md`. Ochiq kamera qatlamlari (CCTV, ALPR) bilan
-  ishlaganda maxfiylikni hurmat qiling.
+  OpenSky): upstream `DATA_SOURCES.md`. Ochiq kamera qatlamlari (CCTV, ALPR) NEXUS ishida
+  kerak bo'lmasa o'chiq qolsin; ishlatsangiz maxfiylikni hurmat qiling.
 - Ko'rilgan hududlar tashqi provayderlarga (OSM, OpenSky va boshqalar) ma'lum bo'ladi.
 
 ### Lokal AI (server tomonda)
 Modelni o'zgartirish (xushomadni kamaytirish, qisqa javob) uchun alohida vosita:
-`tools/heretic/` (NEXUS'ga ulanmagan, GPU kerak).
+`tools/heretic/` (NEXUS'ga ulanmagan, GPU kerak; ulashdan oldin rad etish testi majburiy).
 Ollama kompyuterda faqat `127.0.0.1`da tinglaydi; `ollama-proxy` konteyneri (socat,
 host tarmog'ida) uni faqat compose tarmog'i shlyuziga (`172.20.0.1:11435`) uzatadi —
 Ollama LAN'ga ochilmaydi, tizim sozlamasi o'zgarmaydi. AI: Deep Scan nomzodlariga

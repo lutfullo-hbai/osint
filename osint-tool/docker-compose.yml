@@ -158,6 +158,11 @@ services:
     # cannot slip in unreviewed. Runs as its own non-root user, loopback only:
     # it proxies any provider keys you paste into it, so never publish it wider.
     # Keyless layers only by default; paid keys (Google Maps, OpenAI) are not needed.
+    # Keys pasted into its Provider Settings live only inside this container
+    # (/app/.env): kept across restarts, lost on rebuild/recreate - paste again.
+    # Upstream bind-mounts its checkout for that; we do not mount host paths.
+    # Its Dockerfile's "# syntax=docker/dockerfile:1" frontend tag is the one
+    # unpinned link; review it with the commit when updating.
     profiles: ["geo"]
     build:
       context: https://github.com/bilawalsidhu/gods-eye-view.git#918435ddc7bd4529666ddafde65e68ad97fab4ce

@@ -11,8 +11,14 @@ Ish tartibi: `feat/xxx → dev → stage → main`. Har bir `main` chiqarilishi 
 
 ### Qo'shildi
 - **heretic (alohida vosita)**: `tools/heretic/run.sh` — modelni qayta o'qitmasdan o'zgartirish
-  (heretic 2.1.0, AGPL; o'z virtualenv'ida, NEXUS uni chaqirmaydi). Standart konfiguratsiya `nosyco`
-  (xushomad kamayadi); Ollama'ga qo'shish yo'riqnomasi `tools/heretic/README.md`'da.
+  (heretic 2.1.0, AGPL; o'z virtualenv'ida, NEXUS uni chaqirmaydi). Faqat `nosyco` (xushomad kamayadi),
+  `noslop`, `terse`; rad etishni olib tashlash ataylab qo'shilmagan. Paketlar hash bilan qotirilgan,
+  konfiguratsiya aniq commit'dan olinib sha256 bilan tekshiriladi. `check_refusals.py` — o'zgartirilgan
+  modelni NEXUS'ga ulashdan oldin rad etish testi.
+
+### Tuzatildi
+- **Globe**: konsoldagi havola ARIA tab ro'yxatidan chiqarildi (ekran o'qiydigan dasturlar uchun);
+  README'da Globe'ga kiritilgan kalitlar konteyner qayta build qilinganda yo'qolishi yozildi.
 
 ## [0.11.0] — 2026-11-21
 Ixtiyoriy Globe servisi (gods-eye-view).
