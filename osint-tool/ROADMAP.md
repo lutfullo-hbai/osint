@@ -378,7 +378,13 @@ Kurs (`evidence_log.py`, v0.9.0 ✅):
     (e) nomzodning "tekshirilmadi" ro'yxati faqat profil manbalaridan
   - Qayta o'lchov (7 holat, 2026-11-21): goodfeli —→1, teorth —→2, ken 2→1, paulbuchheit 3,
     matz 1 (mumkin), timbl/torvalds 1 (kuchli); hit@3 7/7, noto'g'ri kuchli 0, xato chetga olingan 0
-  - [ ] (b) To'g'ri topilgan, lekin "zaif" (goodfeli, ken, teorth, paulbuchheit): ball qoidalari
+  - [~] (b) To'g'ri topilgan, lekin "zaif" (goodfeli, ken, teorth, paulbuchheit) — ikki sabab:
+    (A) Wikidata'da shu ism bilan bir nechta odam bo'lsa, akkauntlari "faqat ism" (name_match) qolardi;
+    endi aytilgan yoshga aynan bittasi mos kelsa, u knowledge_base bo'ladi. (B) joy solishtiruvi: shahar
+    va davlat endi mos/zid/noma'lum (teorth "Los Angeles" vs "United States" endi zid emas); joy farqi
+    (odamlar ko'chadi) ballni kamaytiradi, lekin o'zi nomzodni "zaif" qilmaydi.
+    A jonli o'lchov (7 holat): goodfeli/ken/teorth/paulbuchheit "zaif"→"kuchli", matz "mumkin"→"kuchli",
+    timbl/torvalds "kuchli" (buzilmadi); hammasi 1-o'rin, 0 xato kuchli
   - [x] (f) DEV Community deyarli har holatda javob bermasdi — sabab: parallel so'rovlarga 429
     (`Retry-After: 1`). So'rovlar 1 soniya oraliq bilan, qisqa 429 bir marta qayta urinadi, javoblar
     keshlanadi. Qayta o'lchov (ken, matz, paulbuchheit): "tekshirilmadi" 3/3 → 0/3
