@@ -180,3 +180,43 @@ async def test_wrong_namesake_with_unrecorded_target_is_not_strong(monkeypatch):
     cands, _ = agent.rank(scan, t, set())
     picked = next((c for c in cands if any(m["query"] == "other_person" for m in c["members"])), None)
     assert picked is not None and picked["level"] != "strong"   # a lead, not a confident identification
+
+
+# ---------------- M1 negative (QA): clash with the user's age/name is never "strong" ----------------
+
+def test_knowledge_base_identity_at_a_conflicting_age_is_not_strong():
+    """The famous person really is found (unique-name KB, high score), but the user gave
+    an age 30 years off. The account is real, yet it is not 'the person you are looking
+    for': cap at possible with the conflict shown (negative-case goal)."""
+    # the cap keys on the user-facing age/name conflict messages, not on within-cluster noise
+    assert any("born 1955, but the person you describe".startswith(p) for p in agent._TARGET_CONFLICT_PREFIXES)
+    assert any("different name: Ann".startswith(p) for p in agent._TARGET_CONFLICT_PREFIXES)
+    assert not any("different stated locations: X".startswith(p) for p in agent._TARGET_CONFLICT_PREFIXES)
+
+
+@pytest.mark.asyncio
+async def test_rank_caps_a_conflicting_kb_identity_at_possible(monkeypatch):
+    from services import deep_scan
+    from services.correlate import correlate
+
+    async def name(value):
+        # a knowledge-base hit whose profile shows a birth year that conflicts with the age
+        return {"status": "success",
+                "results": [{"platform": "Wikidata", "url": "https://www.wikidata.org/wiki/Q80",
+                             "status": "found", "info": "Name: Tim Person; Born: 1955"}],
+                "count": 1, "pivots": [{"type": "username", "value": "timperson", "via": "knowledge_base"}]}
+
+    async def username(value):
+        return {"status": "success",
+                "results": [{"platform": "GitHub", "url": f"https://github.com/{value}", "status": "found",
+                             "info": "Name: Tim Person; Born: 1955"}],
+                "count": 1, "pivots": []}
+
+    monkeypatch.setitem(deep_scan._HANDLERS, "name", name)
+    monkeypatch.setitem(deep_scan._HANDLERS, "username", username)
+    t = target("Tim Person, 25 years old")           # ~2001, conflicts with 1955
+    scan = await deep_scan.run_deep_scan("Tim Person", "name", expand=t.expand, prepare=t.prepare)
+    scan["clusters"] = correlate(scan["nodes"])["clusters"]
+    cands, _ = agent.rank(scan, t, set())
+    assert cands and cands[0]["level"] != "strong"   # real identity, wrong age -> not strong
+    assert any("born" in c.lower() for c in cands[0]["contradictions"])

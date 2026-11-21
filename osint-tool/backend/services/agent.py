@@ -574,6 +574,9 @@ def _candidate_id(member_keys: list[str]) -> str:
 # 10.5b: a different town is soft (people move, profiles go stale): it lowers the
 # score but does not by itself make a lead weak. A different birth year or name does.
 _SOFT_CONFLICT_PREFIXES = ("different stated locations", "stated location ")
+# conflicts with what the USER stated (not within-cluster data noise): age_check and
+# name_check messages. A candidate carrying one is never a strong lead (10.5b).
+_TARGET_CONFLICT_PREFIXES = ("born ", "different name:")
 
 
 def _hard(conflicts: list[str]) -> list[str]:
@@ -646,6 +649,13 @@ def rank(scan: dict, target: Target, stated_keys: set[str]) -> tuple[list[dict],
         if level == "strong" and "age_confirmed" in vias and not corroborated:
             level = "possible"
             why.append("confirmed only by the name and the age you gave — a lead, not an identification")
+        # 10.5b (QA, negative cases): a candidate that clearly conflicts with the age or
+        # name YOU gave is not "the person you are looking for", however real the account
+        # is. Even a knowledge-base identity (e.g. the famous person at a different age) is
+        # capped at "possible" so the mismatch is not hidden behind a high score.
+        if level == "strong" and any(c.startswith(_TARGET_CONFLICT_PREFIXES) for c in conflicts):
+            level = "possible"
+            why.append("conflicts with the age or name you gave — check before trusting")
         missing = [f for f in FIELDS if not fields[f]]
         set_aside = [a for m in members for a in m.get("set_aside") or []][:MAX_SET_ASIDE]
         # only sources that look for this person's accounts; a domain record's
