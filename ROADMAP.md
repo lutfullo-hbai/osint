@@ -66,6 +66,8 @@ Manba: P3.
   LLM kalitini o'quvchi beradi (ixtiyoriy)
 - [ ] M4.2 Faqat lab nishoniga qarata ishlash namunasi + cheklov hujjati
 - [ ] M4.3 Reviewer: izolyatsiya, litsenziya, LLM kalit brokerligi → **Reliz pentest-lab v0.2**
+- [ ] M4.4 (ixtiyoriy, keyinroq) Ikkinchi AI dvigatel **PentAGI** (`vxcontrol/pentagi`, MIT) — Strix
+  bilan yonma-yon, solishtirish uchun; faqat lab nishonlariga. Tafsilot: pentest P6
 
 ### M5 — Pentest qo'llanma (kurs to'liq)
 Manba: P4.
